@@ -22,10 +22,9 @@ return new class extends Migration
             $table->unsignedBigInteger('lifetime_wood')->default(0);
             $table->unsignedBigInteger('lifetime_stone')->default(0);
             $table->unsignedBigInteger('lifetime_food')->default(0);
+            $table->unsignedInteger('manual_collects')->default(0);
             $table->timestamp('last_produced_at')->nullable();
             $table->timestamp('last_collected_at')->nullable();
-            $table->unsignedInteger('manual_collects_today')->default(0);
-            $table->date('manual_collects_reset_date')->nullable();
             $table->timestamps();
 
             $table->unique('user_id');

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('building_type_id')->constrained()->cascadeOnDelete();
-            $table->unsignedInteger('level')->default(1);
+            $table->unsignedInteger('level')->default(0);
             $table->timestamp('built_at')->nullable();
             $table->timestamps();
 

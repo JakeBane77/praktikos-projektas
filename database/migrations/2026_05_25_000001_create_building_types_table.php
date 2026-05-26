@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug')->unique();
             $table->string('produces_resource')->nullable();
-            $table->unsignedInteger('base_production_per_minute')->default(0);
+            $table->unsignedInteger('base_production_per_hour')->default(0);
             $table->decimal('production_multiplier', 8, 2)->nullable();
             $table->string('effect_type')->nullable();
             $table->json('effects')->nullable();
