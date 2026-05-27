@@ -69,7 +69,9 @@ class DashboardController extends Controller
                 'production' => $this->buildingProductionLabel($building),
                 'upgradeCost' => $this->upgradeCostLabel($building),
                 'isRoad' => $this->isRoad($building),
-                'canUpgrade' => $this->canAfford($resources, $this->upgradeCostsFor($building)),
+                'isMaxLevel' => $this->isMaxLevel($building),
+                'canUpgrade' => ! $this->isMaxLevel($building)
+                    && $this->canAfford($resources, $this->upgradeCostsFor($building)),
             ])->values(),
         ]);
     }
@@ -407,6 +409,12 @@ class DashboardController extends Controller
         }
 
         return 'Level '.$building->level;
+    }
+
+    private function isMaxLevel(UserBuilding $building): bool
+    {
+        return $building->buildingType->max_level !== null
+            && $building->level >= $building->buildingType->max_level;
     }
 
     /**

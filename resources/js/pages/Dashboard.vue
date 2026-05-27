@@ -82,7 +82,6 @@ const lifetimeResourceCards = computed(() => [
     })),
 ]);
 
-const totalResources = computed(() => getTotalResources(props.resources));
 const lifetimeTotalResources = computed(() =>
     getTotalResources(props.lifetimeResources),
 );
@@ -239,8 +238,8 @@ function upgradeBuilding(building: Building) {
                             <p
                                 class="mt-1 text-xs text-[#7a705d] dark:text-[#aaa18f]"
                             >
-                                Resources earned from daily collects and
-                                passive production.
+                                Resources earned from daily collects and passive
+                                production.
                             </p>
                         </div>
                         <p
@@ -416,7 +415,9 @@ function upgradeBuilding(building: Building) {
 
                             <div class="flex flex-col gap-2 sm:items-end">
                                 <label
-                                    v-if="building.isRoad"
+                                    v-if="
+                                        building.isRoad && !building.isMaxLevel
+                                    "
                                     class="flex items-center gap-2 text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
                                 >
                                     km
@@ -432,7 +433,14 @@ function upgradeBuilding(building: Building) {
                                     />
                                 </label>
 
+                                <div
+                                    v-if="building.isMaxLevel"
+                                    class="inline-flex items-center justify-center rounded-md border border-[#cfc1a8] bg-[#e9e1d3] px-4 py-2.5 text-sm font-semibold text-[#4e432f] dark:border-[#4a4438] dark:bg-[#24281d] dark:text-[#d8ccb8]"
+                                >
+                                    Max level
+                                </div>
                                 <button
+                                    v-else
                                     type="button"
                                     class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
                                     :disabled="
@@ -458,8 +466,13 @@ function upgradeBuilding(building: Building) {
                         <p
                             class="mt-3 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
                         >
-                            {{ building.isRoad ? 'Next km cost' : 'Cost' }}:
-                            {{ building.upgradeCost }}
+                            <template v-if="building.isMaxLevel">
+                                No further upgrades available.
+                            </template>
+                            <template v-else>
+                                {{ building.isRoad ? 'Next km cost' : 'Cost' }}:
+                                {{ building.upgradeCost }}
+                            </template>
                         </p>
                     </article>
                 </div>

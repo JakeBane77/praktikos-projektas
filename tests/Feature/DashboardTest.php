@@ -330,6 +330,46 @@ test('users cannot upgrade without enough resources', function () {
     ]);
 });
 
+test('max level buildings are shown as maxed and cannot be upgraded', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $mine = BuildingType::create([
+        'name' => 'Mine',
+        'slug' => 'mine',
+        'produces_resource' => 'gold',
+        'base_production_per_hour' => 5,
+        'production_multiplier' => 1,
+        'base_costs' => ['wood' => 100],
+        'max_level' => 3,
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $mine->id,
+        'level' => 3,
+        'built_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 500,
+        'stone' => 0,
+        'food' => 0,
+        'last_produced_at' => now(),
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('buildings.0.levelLabel', 'Level 3')
+            ->where('buildings.0.isMaxLevel', true)
+            ->where('buildings.0.canUpgrade', false)
+        );
+});
+
 test('users can build multiple kilometers of road at once', function () {
     $user = User::factory()->create();
     $this->actingAs($user);

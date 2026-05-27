@@ -13,6 +13,7 @@ export type Building = {
     production: string;
     upgradeCost: string;
     isRoad: boolean;
+    isMaxLevel: boolean;
     canUpgrade: boolean;
 };
 
