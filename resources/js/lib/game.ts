@@ -46,6 +46,10 @@ export type AchievementUnlock = {
 };
 
 export type DashboardGameData = {
+    serverTime: {
+        iso: string;
+        timezone: string;
+    };
     resources: Resources;
     lifetimeResources: Resources;
     resourceRates: ResourceRates;

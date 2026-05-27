@@ -43,8 +43,13 @@ class DashboardController extends Controller
 
         $productionRates = $this->productionRatesFor($buildings, $productionBonuses);
         $roadLength = $this->roadLengthFor($buildings);
+        $serverTime = now();
 
         return Inertia::render('Dashboard', [
+            'serverTime' => [
+                'iso' => $serverTime->toIso8601String(),
+                'timezone' => $serverTime->timezoneName,
+            ],
             'resources' => [
                 'gold' => $resources->gold,
                 'wood' => $resources->wood,

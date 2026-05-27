@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowUp,
@@ -11,7 +11,6 @@ import {
     Mountain,
     PackagePlus,
     RotateCcw,
-    Route,
     TreePine,
     Trophy,
     Wheat,
@@ -49,6 +48,7 @@ const roadBuildAmounts = ref<Record<number, number>>({});
 const hideCompletedAchievements = ref(true);
 const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
 const activeAchievementUnlockIndex = ref(0);
+const serverTimeMilliseconds = ref(Date.now());
 const buildings = computed<Building[]>(() => props.buildings);
 const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
@@ -147,6 +147,43 @@ const collectButtonLabel = computed(() => {
 
     return props.canCollect ? 'Collect' : 'Collected today';
 });
+const serverDateTimeLabel = computed(() =>
+    formatServerDateTime(serverTimeMilliseconds.value),
+);
+const serverTimezoneLabel = computed(() =>
+    props.serverTime.timezone.replaceAll('_', ' '),
+);
+
+let serverTimeBaseMilliseconds = Date.now();
+let serverTimeClientStartedAt = Date.now();
+let serverTimeInterval: number | undefined;
+
+function syncServerTime() {
+    const parsedServerTime = Date.parse(props.serverTime.iso);
+
+    serverTimeBaseMilliseconds = Number.isNaN(parsedServerTime)
+        ? Date.now()
+        : parsedServerTime;
+    serverTimeClientStartedAt = Date.now();
+    serverTimeMilliseconds.value = serverTimeBaseMilliseconds;
+}
+
+function formatServerDateTime(milliseconds: number): string {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: props.serverTime.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).formatToParts(new Date(milliseconds));
+    const partValue = (type: string) =>
+        parts.find((part) => part.type === type)?.value ?? '00';
+
+    return `${partValue('year')}-${partValue('month')}-${partValue('day')} ${partValue('hour')}:${partValue('minute')}:${partValue('second')}`;
+}
 
 watch(
     () => props.achievementUnlocks,
@@ -164,10 +201,26 @@ watch(
     { immediate: true },
 );
 
+watch(() => props.serverTime.iso, syncServerTime, { immediate: true });
+
 watch(currentAchievementUnlock, (achievementUnlock) => {
     if (achievementUnlock) {
         isBuildingsOpen.value = false;
         isPrestigeConfirmOpen.value = false;
+    }
+});
+
+onMounted(() => {
+    serverTimeInterval = window.setInterval(() => {
+        serverTimeMilliseconds.value =
+            serverTimeBaseMilliseconds +
+            (Date.now() - serverTimeClientStartedAt);
+    }, 1000);
+});
+
+onBeforeUnmount(() => {
+    if (serverTimeInterval !== undefined) {
+        window.clearInterval(serverTimeInterval);
     }
 });
 
@@ -322,24 +375,40 @@ function upgradeBuilding(building: Building) {
                     </p>
                 </div>
 
-                <div class="flex flex-wrap gap-3">
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="collectDisabled"
-                        @click="collectResources"
-                    >
-                        <PackagePlus class="h-4 w-4" />
-                        {{ collectButtonLabel }}
-                    </button>
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
-                        @click="openBuildings"
-                    >
-                        <Building2 class="h-4 w-4" />
-                        Buildings
-                    </button>
+                <div class="flex flex-col gap-3 sm:items-end">
+                    <div class="text-left sm:text-right">
+                        <p
+                            class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Server time
+                        </p>
+                        <p class="mt-1 text-sm font-semibold">
+                            {{ serverDateTimeLabel }}
+                        </p>
+                        <p class="text-xs text-[#7a705d] dark:text-[#aaa18f]">
+                            {{ serverTimezoneLabel }}
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3 sm:justify-end">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="collectDisabled"
+                            @click="collectResources"
+                        >
+                            <PackagePlus class="h-4 w-4" />
+                            {{ collectButtonLabel }}
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                            @click="openBuildings"
+                        >
+                            <Building2 class="h-4 w-4" />
+                            Buildings
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -370,116 +439,6 @@ function upgradeBuilding(building: Building) {
                         {{ resource.rate }}
                     </p>
                 </article>
-            </section>
-
-            <section class="grid gap-4 lg:grid-cols-[1fr_0.75fr]">
-                <div
-                    class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
-                >
-                    <div
-                        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                        <div>
-                            <h2 class="text-lg font-semibold">
-                                Lifetime collected
-                            </h2>
-                            <p
-                                class="text-sm text-[#696250] dark:text-[#b6ae9d]"
-                            >
-                                Last collected: {{ props.lastCollectedAt }}
-                            </p>
-                            <p
-                                class="mt-1 text-xs text-[#7a705d] dark:text-[#aaa18f]"
-                            >
-                                Resources earned from daily collects and passive
-                                production.
-                            </p>
-                        </div>
-                        <p
-                            class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                        >
-                            {{ lifetimeTotalResources.toLocaleString() }}
-                            lifetime resources
-                        </p>
-                    </div>
-
-                    <div class="mt-5 grid gap-3 sm:grid-cols-2">
-                        <div
-                            v-for="resource in lifetimeResourceCards"
-                            :key="resource.key"
-                            class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                        >
-                            <div
-                                class="flex items-center justify-between gap-4"
-                            >
-                                <div class="flex items-center gap-3">
-                                    <component
-                                        :is="resource.icon"
-                                        class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
-                                    />
-                                    <p class="font-semibold">
-                                        {{ resource.label }}
-                                    </p>
-                                </div>
-                                <p
-                                    class="text-right text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                                >
-                                    {{ resource.amount.toLocaleString() }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
-                >
-                    <div class="flex items-center gap-3">
-                        <div class="rounded-md bg-[#243627] p-2 text-white">
-                            <Route class="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h2 class="text-lg font-semibold">Road network</h2>
-                            <p
-                                class="text-sm text-[#696250] dark:text-[#b6ae9d]"
-                            >
-                                Settlement reach
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="mt-5 grid gap-3">
-                        <div
-                            class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                        >
-                            <div
-                                class="flex items-center justify-between gap-4"
-                            >
-                                <p
-                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                                >
-                                    Road length
-                                </p>
-                                <Route
-                                    class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
-                                />
-                            </div>
-                            <p class="mt-3 text-3xl font-bold">
-                                {{ props.roadStats.length.toLocaleString() }}
-                                km
-                            </p>
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
-                        @click="openBuildings"
-                    >
-                        <Route class="h-4 w-4" />
-                        Build roads
-                    </button>
-                </div>
             </section>
 
             <section
@@ -601,6 +560,66 @@ function upgradeBuilding(building: Building) {
                             </template>
                         </p>
                     </article>
+                </div>
+            </section>
+
+            <section>
+                <div
+                    class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+                >
+                    <div
+                        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <div>
+                            <h2 class="text-lg font-semibold">
+                                Lifetime collected
+                            </h2>
+                            <p
+                                class="text-sm text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Last collected: {{ props.lastCollectedAt }}
+                            </p>
+                            <p
+                                class="mt-1 text-xs text-[#7a705d] dark:text-[#aaa18f]"
+                            >
+                                Resources earned from daily collects and passive
+                                production.
+                            </p>
+                        </div>
+                        <p
+                            class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            {{ lifetimeTotalResources.toLocaleString() }}
+                            lifetime resources
+                        </p>
+                    </div>
+
+                    <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                        <div
+                            v-for="resource in lifetimeResourceCards"
+                            :key="resource.key"
+                            class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                        >
+                            <div
+                                class="flex items-center justify-between gap-4"
+                            >
+                                <div class="flex items-center gap-3">
+                                    <component
+                                        :is="resource.icon"
+                                        class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
+                                    />
+                                    <p class="font-semibold">
+                                        {{ resource.label }}
+                                    </p>
+                                </div>
+                                <p
+                                    class="text-right text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                                >
+                                    {{ resource.amount.toLocaleString() }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
