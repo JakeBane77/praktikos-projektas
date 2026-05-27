@@ -14,13 +14,18 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { dashboard, immersive } from '@/routes';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Game',
-        href: dashboard(), 
+        title: 'Dashboard mode',
+        href: dashboard(),
+        icon: LayoutGrid,
+    },
+    {
+        title: 'Immersive mode',
+        href: immersive(),
         icon: Joystick,
     },
 ];

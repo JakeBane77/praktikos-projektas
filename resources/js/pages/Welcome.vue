@@ -25,7 +25,7 @@ import { dashboard, login, register } from '@/routes';
                     :href="dashboard()"
                     class="rounded-md bg-[#243627] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1a291d]"
                 >
-                    Dashboard
+                    Dashboard mode
                 </Link>
 
                 <template v-else>
@@ -91,7 +91,7 @@ import { dashboard, login, register } from '@/routes';
                     :href="dashboard()"
                     class="mt-8 inline-flex rounded-md bg-[#243627] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
                 >
-                    Continue to dashboard
+                    Continue to Dashboard mode
                 </Link>
             </div>
 

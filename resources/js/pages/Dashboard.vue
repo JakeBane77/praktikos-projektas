@@ -30,7 +30,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Game',
+                title: 'Dashboard mode',
                 href: dashboard(),
             },
         ],
@@ -347,7 +347,7 @@ function upgradeBuilding(building: Building) {
 </script>
 
 <template>
-    <Head title="Dashboard" />
+    <Head title="Dashboard mode" />
 
     <div
         class="min-h-full bg-[#f6f3ec] text-[#1f241c] dark:bg-[#12140f] dark:text-[#f3efe4]"

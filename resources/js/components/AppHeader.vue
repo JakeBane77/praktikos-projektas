@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-vue-next';
+import {
+    BookOpen,
+    Folder,
+    Joystick,
+    LayoutGrid,
+    Menu,
+    Search,
+} from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
@@ -35,7 +42,7 @@ import UserMenuContent from '@/components/UserMenuContent.vue';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
-import { dashboard } from '@/routes';
+import { dashboard, immersive } from '@/routes';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
@@ -55,9 +62,14 @@ const activeItemStyles =
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Dashboard mode',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Immersive mode',
+        href: immersive(),
+        icon: Joystick,
     },
 ];
 
