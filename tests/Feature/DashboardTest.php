@@ -67,22 +67,22 @@ test('daily collect adds base rewards and six hours of building production', fun
     $this->assertDatabaseHas('user_resources', [
         'user_id' => $user->id,
         'gold' => 12,
-        'wood' => 16,
+        'wood' => 36,
         'stone' => 0,
-        'food' => 10,
+        'food' => 20,
         'lifetime_gold' => 12,
-        'lifetime_wood' => 16,
+        'lifetime_wood' => 36,
         'lifetime_stone' => 0,
-        'lifetime_food' => 10,
+        'lifetime_food' => 20,
         'manual_collects' => 1,
     ]);
 
     $this->assertDatabaseHas('resource_collections', [
         'user_id' => $user->id,
         'gold' => 12,
-        'wood' => 16,
+        'wood' => 36,
         'stone' => 0,
-        'food' => 10,
+        'food' => 20,
         'source' => 'manual',
     ]);
 });
@@ -116,8 +116,8 @@ test('daily collect can only be used once per day', function () {
 
     $resources = UserResource::where('user_id', $user->id)->firstOrFail();
 
-    expect($resources->wood)->toBe(10)
-        ->and($resources->food)->toBe(16)
+    expect($resources->wood)->toBe(30)
+        ->and($resources->food)->toBe(26)
         ->and($resources->manual_collects)->toBe(1);
 
     expect(ResourceCollection::where('user_id', $user->id)->count())->toBe(1);
@@ -188,9 +188,9 @@ test('level zero buildings do not produce resources', function () {
     $this->assertDatabaseHas('user_resources', [
         'user_id' => $user->id,
         'gold' => 0,
-        'wood' => 10,
+        'wood' => 30,
         'stone' => 0,
-        'food' => 10,
+        'food' => 20,
     ]);
 });
 

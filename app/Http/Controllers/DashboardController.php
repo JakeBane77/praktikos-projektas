@@ -24,9 +24,9 @@ class DashboardController extends Controller
 
     private const DAILY_BASE_REWARDS = [
         'gold' => 0,
-        'wood' => 10,
+        'wood' => 30,
         'stone' => 0,
-        'food' => 10,
+        'food' => 20,
     ];
 
     private const DAILY_PRODUCTION_HOURS = 6;
