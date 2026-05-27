@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowUp,
@@ -51,6 +51,9 @@ const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
 const currentAchievementUnlock = computed(
     () => achievementUnlockQueue.value[activeAchievementUnlockIndex.value],
+);
+const isPageOverlayOpen = computed(
+    () => Boolean(currentAchievementUnlock.value) || isBuildingsOpen.value,
 );
 const achievementUnlockCount = computed(
     () => achievementUnlockQueue.value.length,
@@ -149,6 +152,53 @@ watch(
     },
     { immediate: true },
 );
+
+watch(currentAchievementUnlock, (achievementUnlock) => {
+    if (achievementUnlock) {
+        isBuildingsOpen.value = false;
+    }
+});
+
+let lockedScrollY = 0;
+let isScrollLocked = false;
+
+function lockPageScroll() {
+    if (isScrollLocked || typeof window === 'undefined') {
+        return;
+    }
+
+    lockedScrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${lockedScrollY}px`;
+    document.body.style.width = '100%';
+    isScrollLocked = true;
+}
+
+function unlockPageScroll() {
+    if (!isScrollLocked || typeof window === 'undefined') {
+        return;
+    }
+
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, lockedScrollY);
+    isScrollLocked = false;
+}
+
+watch(isPageOverlayOpen, (isOpen) => {
+    if (isOpen) {
+        lockPageScroll();
+
+        return;
+    }
+
+    unlockPageScroll();
+});
+
+onBeforeUnmount(() => {
+    unlockPageScroll();
+});
 
 function collectResources() {
     router.post(
@@ -618,10 +668,10 @@ function upgradeBuilding(building: Building) {
     <Teleport to="body">
         <div
             v-if="currentAchievementUnlock"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+            class="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
         >
             <section
-                class="w-full max-w-md rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <div class="flex items-start gap-4">
                     <div class="rounded-md bg-[#243627] p-3 text-white">
@@ -685,11 +735,11 @@ function upgradeBuilding(building: Building) {
     <Teleport to="body">
         <div
             v-if="isBuildingsOpen"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6"
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overscroll-contain bg-black/45 px-4 py-6"
             @click.self="isBuildingsOpen = false"
         >
             <section
-                class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-3xl overflow-y-auto rounded-lg bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <header class="flex items-start justify-between gap-4">
                     <div>
