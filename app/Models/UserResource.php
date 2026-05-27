@@ -18,6 +18,7 @@ class UserResource extends Model
         'lifetime_stone',
         'lifetime_food',
         'manual_collects',
+        'prestiges',
         'last_produced_at',
         'last_collected_at',
     ];

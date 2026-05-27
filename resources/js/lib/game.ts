@@ -53,7 +53,12 @@ export type DashboardGameData = {
     canCollect: boolean;
     roadStats: {
         length: number;
-        rank: number | null;
+    };
+    prestigeStats: {
+        count: number;
+        rank: number;
+        canPrestige: boolean;
+        requirement: number;
     };
     achievementBonuses: AchievementBonus[];
     achievementUnlocks: AchievementUnlock[];

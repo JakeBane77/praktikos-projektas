@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowUp,
@@ -10,6 +10,7 @@ import {
     Lock,
     Mountain,
     PackagePlus,
+    RotateCcw,
     Route,
     TreePine,
     Trophy,
@@ -41,6 +42,8 @@ const props = defineProps<DashboardGameData>();
 
 const isBuildingsOpen = ref(false);
 const isCollecting = ref(false);
+const isPrestiging = ref(false);
+const isPrestigeConfirmOpen = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const hideCompletedAchievements = ref(true);
@@ -51,9 +54,6 @@ const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
 const currentAchievementUnlock = computed(
     () => achievementUnlockQueue.value[activeAchievementUnlockIndex.value],
-);
-const isPageOverlayOpen = computed(
-    () => Boolean(currentAchievementUnlock.value) || isBuildingsOpen.value,
 );
 const achievementUnlockCount = computed(
     () => achievementUnlockQueue.value.length,
@@ -125,8 +125,19 @@ const lifetimeResourceCards = computed(() => [
 const lifetimeTotalResources = computed(() =>
     getTotalResources(props.lifetimeResources),
 );
-const roadRankLabel = computed(() =>
-    props.roadStats.rank === null ? 'Unranked' : `#${props.roadStats.rank}`,
+const prestigeRankLabel = computed(
+    () => `#${props.prestigeStats.rank.toLocaleString()}`,
+);
+const prestigeRequirementLabel = computed(() =>
+    props.prestigeStats.requirement.toLocaleString(),
+);
+const prestigeProgressPercent = computed(() =>
+    Math.min(
+        100,
+        Math.floor(
+            (props.roadStats.length / props.prestigeStats.requirement) * 100,
+        ),
+    ),
 );
 const collectDisabled = computed(() => isCollecting.value || !props.canCollect);
 const collectButtonLabel = computed(() => {
@@ -156,48 +167,8 @@ watch(
 watch(currentAchievementUnlock, (achievementUnlock) => {
     if (achievementUnlock) {
         isBuildingsOpen.value = false;
+        isPrestigeConfirmOpen.value = false;
     }
-});
-
-let lockedScrollY = 0;
-let isScrollLocked = false;
-
-function lockPageScroll() {
-    if (isScrollLocked || typeof window === 'undefined') {
-        return;
-    }
-
-    lockedScrollY = window.scrollY;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${lockedScrollY}px`;
-    document.body.style.width = '100%';
-    isScrollLocked = true;
-}
-
-function unlockPageScroll() {
-    if (!isScrollLocked || typeof window === 'undefined') {
-        return;
-    }
-
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.width = '';
-    window.scrollTo(0, lockedScrollY);
-    isScrollLocked = false;
-}
-
-watch(isPageOverlayOpen, (isOpen) => {
-    if (isOpen) {
-        lockPageScroll();
-
-        return;
-    }
-
-    unlockPageScroll();
-});
-
-onBeforeUnmount(() => {
-    unlockPageScroll();
 });
 
 function collectResources() {
@@ -241,6 +212,52 @@ function advanceAchievementUnlockPopup() {
         },
         {
             preserveScroll: true,
+        },
+    );
+}
+
+function openBuildings() {
+    isBuildingsOpen.value = true;
+}
+
+function closeBuildings() {
+    isBuildingsOpen.value = false;
+}
+
+function openPrestigeConfirm() {
+    isPrestigeConfirmOpen.value = true;
+}
+
+function closePrestigeConfirm() {
+    isPrestigeConfirmOpen.value = false;
+}
+
+function prestige() {
+    if (!props.prestigeStats.canPrestige) {
+        return;
+    }
+
+    openPrestigeConfirm();
+}
+
+function confirmPrestige() {
+    if (!props.prestigeStats.canPrestige) {
+        return;
+    }
+
+    closePrestigeConfirm();
+
+    router.post(
+        '/dashboard/prestige',
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isPrestiging.value = true;
+            },
+            onFinish: () => {
+                isPrestiging.value = false;
+            },
         },
     );
 }
@@ -318,7 +335,7 @@ function upgradeBuilding(building: Building) {
                     <button
                         type="button"
                         class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
-                        @click="isBuildingsOpen = true"
+                        @click="openBuildings"
                     >
                         <Building2 class="h-4 w-4" />
                         Buildings
@@ -426,12 +443,12 @@ function upgradeBuilding(building: Building) {
                             <p
                                 class="text-sm text-[#696250] dark:text-[#b6ae9d]"
                             >
-                                Longest road leaderboard
+                                Settlement reach
                             </p>
                         </div>
                     </div>
 
-                    <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <div class="mt-5 grid gap-3">
                         <div
                             class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
                         >
@@ -452,36 +469,250 @@ function upgradeBuilding(building: Building) {
                                 km
                             </p>
                         </div>
+                    </div>
 
-                        <div
-                            class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    <button
+                        type="button"
+                        class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
+                        @click="openBuildings"
+                    >
+                        <Route class="h-4 w-4" />
+                        Build roads
+                    </button>
+                </div>
+            </section>
+
+            <section
+                v-if="isBuildingsOpen"
+                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
                         >
-                            <div
-                                class="flex items-center justify-between gap-4"
-                            >
+                            Buildings
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">
+                            Manage structures
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close buildings"
+                        @click="closeBuildings"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div class="mt-5 grid gap-3">
+                    <article
+                        v-for="building in buildings"
+                        :key="building.name"
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <div
+                            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-semibold">
+                                        {{ building.name }}
+                                    </h3>
+                                    <span
+                                        class="rounded-sm bg-[#e9e1d3] px-2 py-1 text-xs font-semibold text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]"
+                                    >
+                                        {{ building.levelLabel }}
+                                    </span>
+                                </div>
                                 <p
-                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
                                 >
-                                    Your spot
+                                    {{ building.description }}
                                 </p>
-                                <Trophy
-                                    class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
-                                />
+                                <p
+                                    class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                                >
+                                    {{ building.production }}
+                                </p>
                             </div>
-                            <p class="mt-3 text-3xl font-bold">
-                                {{ roadRankLabel }}
+
+                            <div class="flex flex-col gap-2 sm:items-end">
+                                <label
+                                    v-if="
+                                        building.isRoad && !building.isMaxLevel
+                                    "
+                                    class="flex items-center gap-2 text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    km
+                                    <input
+                                        v-model.number="
+                                            roadBuildAmounts[building.id]
+                                        "
+                                        type="number"
+                                        min="1"
+                                        :max="MAX_ROAD_BUILD_AMOUNT"
+                                        class="h-10 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4]"
+                                        placeholder="1"
+                                    />
+                                </label>
+
+                                <div
+                                    v-if="building.isMaxLevel"
+                                    class="inline-flex items-center justify-center rounded-md border border-[#cfc1a8] bg-[#e9e1d3] px-4 py-2.5 text-sm font-semibold text-[#4e432f] dark:border-[#4a4438] dark:bg-[#24281d] dark:text-[#d8ccb8]"
+                                >
+                                    Max level
+                                </div>
+                                <button
+                                    v-else
+                                    type="button"
+                                    class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                                    :disabled="
+                                        !building.canUpgrade ||
+                                        upgradingBuildingId === building.id
+                                    "
+                                    @click="upgradeBuilding(building)"
+                                >
+                                    <ArrowUp class="h-4 w-4" />
+                                    {{
+                                        upgradingBuildingId === building.id
+                                            ? 'Building...'
+                                            : building.isRoad
+                                              ? 'Build road'
+                                              : building.level === 0
+                                                ? 'Build'
+                                                : 'Upgrade'
+                                    }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <p
+                            class="mt-3 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
+                        >
+                            <template v-if="building.isMaxLevel">
+                                No further upgrades available.
+                            </template>
+                            <template v-else>
+                                {{ building.isRoad ? 'Next km cost' : 'Cost' }}:
+                                {{ building.upgradeCost }}
+                            </template>
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <section
+                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+            >
+                <div
+                    class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
+                >
+                    <div class="flex items-start gap-3">
+                        <div class="rounded-md bg-[#5c3b25] p-2 text-white">
+                            <RotateCcw class="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold">Prestige</h2>
+                            <p
+                                class="text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Reset your active settlement after connecting
+                                the planet, while keeping achievements and
+                                lifetime records.
                             </p>
                         </div>
                     </div>
 
                     <button
                         type="button"
-                        class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
-                        @click="isBuildingsOpen = true"
+                        class="inline-flex items-center justify-center gap-2 rounded-md bg-[#5c3b25] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#472d1c] disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="
+                            !props.prestigeStats.canPrestige || isPrestiging
+                        "
+                        @click="prestige"
                     >
-                        <Route class="h-4 w-4" />
-                        Build roads
+                        <RotateCcw class="h-4 w-4" />
+                        {{ isPrestiging ? 'Prestiging...' : 'Prestige' }}
                     </button>
+                </div>
+
+                <div class="mt-5 grid gap-3 md:grid-cols-4">
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Prestiges
+                        </p>
+                        <p class="mt-3 text-3xl font-bold">
+                            {{ props.prestigeStats.count.toLocaleString() }}
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <div class="flex items-center justify-between gap-4">
+                            <p
+                                class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Prestige rank
+                            </p>
+                            <Trophy
+                                class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
+                            />
+                        </div>
+                        <p class="mt-3 text-3xl font-bold">
+                            {{ prestigeRankLabel }}
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Current roads
+                        </p>
+                        <p class="mt-3 text-3xl font-bold">
+                            {{ props.roadStats.length.toLocaleString() }} km
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Required roads
+                        </p>
+                        <p class="mt-3 text-3xl font-bold">
+                            {{ prestigeRequirementLabel }} km
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <div
+                        class="flex items-center justify-between gap-4 text-xs font-semibold text-[#7a705d] dark:text-[#aaa18f]"
+                    >
+                        <span>Prestige progress</span>
+                        <span>{{ prestigeProgressPercent }}%</span>
+                    </div>
+                    <div
+                        class="mt-2 h-2 overflow-hidden rounded-full bg-[#e9e1d3] dark:bg-[#24281d]"
+                    >
+                        <div
+                            class="h-full rounded-full bg-[#5c3b25] dark:bg-[#caa66c]"
+                            :style="{ width: `${prestigeProgressPercent}%` }"
+                        />
+                    </div>
                 </div>
             </section>
 
@@ -667,6 +898,116 @@ function upgradeBuilding(building: Building) {
 
     <Teleport to="body">
         <div
+            v-if="isPrestigeConfirmOpen"
+            class="fixed inset-0 z-[55] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
+            @click.self="closePrestigeConfirm"
+        >
+            <section
+                class="max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-4">
+                        <div class="rounded-md bg-[#5c3b25] p-3 text-white">
+                            <RotateCcw class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Prestige
+                            </p>
+                            <h2 class="mt-1 text-2xl font-bold">
+                                Begin a new settlement
+                            </h2>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close prestige confirmation"
+                        @click="closePrestigeConfirm"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <p
+                    class="mt-5 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
+                >
+                    Your current resources, buildings, and roads will reset to
+                    zero. Your unlocked achievements, achievement bonuses,
+                    lifetime resources, and prestige count stay.
+                </p>
+
+                <div
+                    class="mt-5 grid gap-3 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                >
+                    <div class="flex items-center justify-between gap-4">
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Required road length
+                        </p>
+                        <p class="text-sm font-bold">
+                            {{ prestigeRequirementLabel }} km
+                        </p>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Current road length
+                        </p>
+                        <p
+                            class="text-sm font-bold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            {{ props.roadStats.length.toLocaleString() }} km
+                        </p>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Prestiges after reset
+                        </p>
+                        <p
+                            class="text-sm font-bold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            {{
+                                (props.prestigeStats.count + 1).toLocaleString()
+                            }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 flex flex-col-reverse gap-3 border-t border-[#e4dac7] pt-4 sm:flex-row sm:justify-end dark:border-[#35332c]"
+                >
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                        @click="closePrestigeConfirm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-md bg-[#5c3b25] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#472d1c] disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="isPrestiging"
+                        @click="confirmPrestige"
+                    >
+                        <RotateCcw class="h-4 w-4" />
+                        {{
+                            isPrestiging ? 'Prestiging...' : 'Confirm prestige'
+                        }}
+                    </button>
+                </div>
+            </section>
+        </div>
+    </Teleport>
+
+    <Teleport to="body">
+        <div
             v-if="currentAchievementUnlock"
             class="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
         >
@@ -727,135 +1068,6 @@ function upgradeBuilding(building: Building) {
                     >
                         {{ achievementUnlockButtonLabel }}
                     </button>
-                </div>
-            </section>
-        </div>
-    </Teleport>
-
-    <Teleport to="body">
-        <div
-            v-if="isBuildingsOpen"
-            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overscroll-contain bg-black/45 px-4 py-6"
-            @click.self="isBuildingsOpen = false"
-        >
-            <section
-                class="max-h-[calc(100vh-3rem)] w-full max-w-3xl overflow-y-auto rounded-lg bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:bg-[#1a1d15] dark:text-[#f3efe4]"
-            >
-                <header class="flex items-start justify-between gap-4">
-                    <div>
-                        <p
-                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                        >
-                            Buildings
-                        </p>
-                        <h2 class="mt-1 text-2xl font-bold">
-                            Manage structures
-                        </h2>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close buildings"
-                        @click="isBuildingsOpen = false"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div class="mt-5 grid gap-3">
-                    <article
-                        v-for="building in buildings"
-                        :key="building.name"
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <div
-                            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <h3 class="font-semibold">
-                                        {{ building.name }}
-                                    </h3>
-                                    <span
-                                        class="rounded-sm bg-[#e9e1d3] px-2 py-1 text-xs font-semibold text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]"
-                                    >
-                                        {{ building.levelLabel }}
-                                    </span>
-                                </div>
-                                <p
-                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
-                                >
-                                    {{ building.description }}
-                                </p>
-                                <p
-                                    class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                                >
-                                    {{ building.production }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col gap-2 sm:items-end">
-                                <label
-                                    v-if="
-                                        building.isRoad && !building.isMaxLevel
-                                    "
-                                    class="flex items-center gap-2 text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
-                                >
-                                    km
-                                    <input
-                                        v-model.number="
-                                            roadBuildAmounts[building.id]
-                                        "
-                                        type="number"
-                                        min="1"
-                                        :max="MAX_ROAD_BUILD_AMOUNT"
-                                        class="h-10 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4]"
-                                        placeholder="1"
-                                    />
-                                </label>
-
-                                <div
-                                    v-if="building.isMaxLevel"
-                                    class="inline-flex items-center justify-center rounded-md border border-[#cfc1a8] bg-[#e9e1d3] px-4 py-2.5 text-sm font-semibold text-[#4e432f] dark:border-[#4a4438] dark:bg-[#24281d] dark:text-[#d8ccb8]"
-                                >
-                                    Max level
-                                </div>
-                                <button
-                                    v-else
-                                    type="button"
-                                    class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                                    :disabled="
-                                        !building.canUpgrade ||
-                                        upgradingBuildingId === building.id
-                                    "
-                                    @click="upgradeBuilding(building)"
-                                >
-                                    <ArrowUp class="h-4 w-4" />
-                                    {{
-                                        upgradingBuildingId === building.id
-                                            ? 'Building...'
-                                            : building.isRoad
-                                              ? 'Build road'
-                                              : building.level === 0
-                                                ? 'Build'
-                                                : 'Upgrade'
-                                    }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <p
-                            class="mt-3 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
-                        >
-                            <template v-if="building.isMaxLevel">
-                                No further upgrades available.
-                            </template>
-                            <template v-else>
-                                {{ building.isRoad ? 'Next km cost' : 'Cost' }}:
-                                {{ building.upgradeCost }}
-                            </template>
-                        </p>
-                    </article>
                 </div>
             </section>
         </div>

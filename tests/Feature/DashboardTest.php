@@ -123,6 +123,46 @@ test('daily collect can only be used once per day', function () {
     expect(ResourceCollection::where('user_id', $user->id)->count())->toBe(1);
 });
 
+test('daily collect gives one hundred of each resource after first prestige', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'prestiges' => 1,
+        'last_produced_at' => now(),
+    ]);
+
+    $this->post(route('dashboard.collect'))
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'gold' => 100,
+        'wood' => 100,
+        'stone' => 100,
+        'food' => 100,
+        'lifetime_gold' => 100,
+        'lifetime_wood' => 100,
+        'lifetime_stone' => 100,
+        'lifetime_food' => 100,
+        'manual_collects' => 1,
+    ]);
+
+    $this->assertDatabaseHas('resource_collections', [
+        'user_id' => $user->id,
+        'gold' => 100,
+        'wood' => 100,
+        'stone' => 100,
+        'food' => 100,
+        'source' => 'manual',
+    ]);
+});
+
 test('level zero buildings do not produce resources', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -719,6 +759,15 @@ test('roads are displayed as kilometers instead of production per hour', functio
         'level' => 6,
         'built_at' => now(),
     ]);
+    UserResource::create([
+        'user_id' => $leader->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'prestiges' => 2,
+        'last_produced_at' => now(),
+    ]);
 
     $tiedUser = User::factory()->create();
     UserBuilding::create([
@@ -726,6 +775,15 @@ test('roads are displayed as kilometers instead of production per hour', functio
         'building_type_id' => $road->id,
         'level' => 4,
         'built_at' => now(),
+    ]);
+    UserResource::create([
+        'user_id' => $tiedUser->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'prestiges' => 0,
+        'last_produced_at' => now(),
     ]);
 
     UserResource::create([
@@ -745,6 +803,149 @@ test('roads are displayed as kilometers instead of production per hour', functio
             ->where('buildings.0.production', '4 km built')
             ->where('buildings.0.isRoad', true)
             ->where('roadStats.length', 4)
-            ->where('roadStats.rank', 2)
+            ->where('prestigeStats.count', 0)
+            ->where('prestigeStats.rank', 2)
+            ->where('prestigeStats.canPrestige', false)
+            ->where('prestigeStats.requirement', 60_000_000)
         );
+});
+
+test('users can prestige after building sixty million kilometers of road', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $road = BuildingType::create([
+        'name' => 'Road',
+        'slug' => 'road',
+        'produces_resource' => null,
+        'base_production_per_hour' => 0,
+        'production_multiplier' => null,
+        'effect_type' => 'road_length',
+        'base_costs' => ['wood' => 10],
+    ]);
+
+    $roadBuilding = UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $road->id,
+        'level' => 60_000_000,
+        'built_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 100,
+        'wood' => 200,
+        'stone' => 300,
+        'food' => 400,
+        'lifetime_gold' => 100,
+        'manual_collects' => 7,
+        'last_produced_at' => now(),
+        'last_collected_at' => now(),
+    ]);
+
+    $keptAchievement = Achievement::create([
+        'name' => 'Road Master',
+        'slug' => 'road-master',
+        'description' => 'A previous unlock.',
+        'type' => 'road_length',
+        'target_value' => 100,
+        'production_bonus_percent' => 5,
+    ]);
+
+    $prestigeAchievement = Achievement::create([
+        'name' => '1 Prestige',
+        'slug' => 'prestiges-1',
+        'description' => 'Prestige once.',
+        'type' => 'prestiges',
+        'target_value' => 1,
+        'production_bonus_percent' => 5,
+    ]);
+
+    UserAchievement::create([
+        'user_id' => $user->id,
+        'achievement_id' => $keptAchievement->id,
+        'progress' => 100,
+        'unlocked_at' => now(),
+        'notification_seen_at' => now(),
+    ]);
+
+    $this->post(route('dashboard.prestige'))
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'lifetime_gold' => 100,
+        'manual_collects' => 7,
+        'prestiges' => 1,
+        'last_collected_at' => null,
+    ]);
+
+    $this->assertDatabaseHas('user_buildings', [
+        'id' => $roadBuilding->id,
+        'level' => 0,
+        'built_at' => null,
+    ]);
+
+    $this->assertDatabaseHas('user_achievements', [
+        'user_id' => $user->id,
+        'achievement_id' => $keptAchievement->id,
+    ]);
+
+    $this->assertDatabaseHas('user_achievements', [
+        'user_id' => $user->id,
+        'achievement_id' => $prestigeAchievement->id,
+        'progress' => 1,
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('achievements.1.rewardLabel', '+5% all buildings base production, daily collect base becomes 100 of each resource')
+        );
+});
+
+test('users cannot prestige before reaching sixty million kilometers of road', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $road = BuildingType::create([
+        'name' => 'Road',
+        'slug' => 'road',
+        'produces_resource' => null,
+        'base_production_per_hour' => 0,
+        'production_multiplier' => null,
+        'effect_type' => 'road_length',
+        'base_costs' => ['wood' => 10],
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $road->id,
+        'level' => 59_999_999,
+        'built_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 100,
+        'wood' => 100,
+        'stone' => 100,
+        'food' => 100,
+        'last_produced_at' => now(),
+    ]);
+
+    $this->post(route('dashboard.prestige'))
+        ->assertRedirect(route('dashboard'))
+        ->assertSessionHasErrors('prestige');
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'gold' => 100,
+        'prestiges' => 0,
+    ]);
 });

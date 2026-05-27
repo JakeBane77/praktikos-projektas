@@ -8,6 +8,7 @@ Route::inertia('/', 'Welcome')->name('home');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('dashboard/collect', [DashboardController::class, 'collect'])->name('dashboard.collect');
+    Route::post('dashboard/prestige', [DashboardController::class, 'prestige'])->name('dashboard.prestige');
     Route::post('dashboard/buildings/{building}/upgrade', [DashboardController::class, 'upgrade'])->name('dashboard.buildings.upgrade');
     Route::post('dashboard/achievements/unlocks/seen', [DashboardController::class, 'markAchievementUnlocksSeen'])
         ->name('dashboard.achievements.unlocks.seen');

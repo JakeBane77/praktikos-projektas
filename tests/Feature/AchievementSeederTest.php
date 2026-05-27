@@ -13,7 +13,7 @@ test('achievement seeder creates milestone achievements with default production 
         AchievementSeeder::class,
     ]);
 
-    expect(DB::table('achievements')->count())->toBe(42);
+    expect(DB::table('achievements')->count())->toBe(46);
 
     $this->assertDatabaseHas('achievements', [
         'slug' => 'gold-1000',
@@ -43,6 +43,21 @@ test('achievement seeder creates milestone achievements with default production 
         'slug' => 'manual-collects-1000',
         'type' => 'manual_collects',
         'target_value' => 1_000,
+        'production_bonus_percent' => 5,
+    ]);
+
+    $this->assertDatabaseHas('achievements', [
+        'slug' => 'prestiges-1',
+        'type' => 'prestiges',
+        'target_value' => 1,
+        'description' => 'Prestige 1 time and begin again with your achievements intact. Daily collect now gives 100 of each resource.',
+        'production_bonus_percent' => 5,
+    ]);
+
+    $this->assertDatabaseHas('achievements', [
+        'slug' => 'prestiges-100',
+        'type' => 'prestiges',
+        'target_value' => 100,
         'production_bonus_percent' => 5,
     ]);
 });

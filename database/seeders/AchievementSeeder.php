@@ -29,6 +29,7 @@ class AchievementSeeder extends Seeder
             ...$this->buildingLevelAchievements($now, $buildingTypes),
             ...$this->roadAchievements($now),
             ...$this->manualCollectAchievements($now),
+            ...$this->prestigeAchievements($now),
         ];
 
         DB::table('achievements')->upsert(
@@ -159,6 +160,26 @@ class AchievementSeeder extends Seeder
                 now: $now,
             ),
         ];
+    }
+
+    private function prestigeAchievements(mixed $now): array
+    {
+        $rows = [];
+
+        foreach ([1, 5, 10, 100] as $target) {
+            $rows[] = $this->achievementRow(
+                name: number_format($target).' Prestige'.($target === 1 ? '' : 's'),
+                slug: 'prestiges-'.$target,
+                description: $target === 1
+                    ? 'Prestige 1 time and begin again with your achievements intact. Daily collect now gives 100 of each resource.'
+                    : 'Prestige '.number_format($target).' times and begin again with your achievements intact.',
+                type: 'prestiges',
+                targetValue: $target,
+                now: $now,
+            );
+        }
+
+        return $rows;
     }
 
     private function achievementRow(

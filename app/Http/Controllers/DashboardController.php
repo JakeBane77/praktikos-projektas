@@ -20,6 +20,8 @@ class DashboardController extends Controller
 {
     private const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
 
+    private const PRESTIGE_ROAD_REQUIREMENT = 60_000_000;
+
     private const DAILY_BASE_REWARDS = [
         'gold' => 0,
         'wood' => 10,
@@ -65,7 +67,12 @@ class DashboardController extends Controller
             'canCollect' => $this->canCollect($resources),
             'roadStats' => [
                 'length' => $roadLength,
-                'rank' => $this->roadLeaderboardRankFor($roadLength),
+            ],
+            'prestigeStats' => [
+                'count' => (int) $resources->prestiges,
+                'rank' => $this->prestigeLeaderboardRankFor((int) $resources->prestiges),
+                'canPrestige' => $roadLength >= self::PRESTIGE_ROAD_REQUIREMENT,
+                'requirement' => self::PRESTIGE_ROAD_REQUIREMENT,
             ],
             'achievementBonuses' => $this->achievementBonusCardsFor($productionBonuses),
             'achievementUnlocks' => $this->achievementUnlockCardsFor($achievements),
@@ -102,7 +109,7 @@ class DashboardController extends Controller
                 ]);
         }
 
-        $collectAmounts = $this->collectAmountsFor($buildings, $productionBonuses);
+        $collectAmounts = $this->collectAmountsFor($resources, $buildings, $productionBonuses);
 
         $resources->gold += $collectAmounts['gold'];
         $resources->wood += $collectAmounts['wood'];
@@ -184,6 +191,44 @@ class DashboardController extends Controller
         return redirect()->route('dashboard');
     }
 
+    public function prestige(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $resources = $this->resourcesFor($user);
+        $buildings = $this->buildingsFor($user);
+        $this->applyPassiveProduction($resources, $buildings, $this->productionBonusesFor($user));
+
+        if ($this->roadLengthFor($buildings) < self::PRESTIGE_ROAD_REQUIREMENT) {
+            return redirect()
+                ->route('dashboard')
+                ->withErrors([
+                    'prestige' => 'You need 60,000,000 km of roads before you can prestige.',
+                ]);
+        }
+
+        DB::transaction(function () use ($resources, $user): void {
+            $resources->gold = 0;
+            $resources->wood = 0;
+            $resources->stone = 0;
+            $resources->food = 0;
+            $resources->prestiges += 1;
+            $resources->last_produced_at = now();
+            $resources->last_collected_at = null;
+            $resources->save();
+
+            UserBuilding::query()
+                ->where('user_id', $user->id)
+                ->update([
+                    'level' => 0,
+                    'built_at' => null,
+                ]);
+        });
+
+        $this->syncAchievementsFor($user, $resources->fresh(), $this->buildingsFor($user));
+
+        return redirect()->route('dashboard');
+    }
+
     public function markAchievementUnlocksSeen(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -212,6 +257,7 @@ class DashboardController extends Controller
                 'wood' => 0,
                 'stone' => 0,
                 'food' => 0,
+                'prestiges' => 0,
                 'last_produced_at' => now(),
             ],
         );
@@ -293,24 +339,11 @@ class DashboardController extends Controller
         return 0;
     }
 
-    private function roadLeaderboardRankFor(int $roadLength): ?int
+    private function prestigeLeaderboardRankFor(int $prestiges): int
     {
-        $roadTypeIds = BuildingType::query()
-            ->where('slug', 'road')
-            ->orWhere('name', 'Road')
-            ->orWhere('effect_type', 'road_length')
-            ->orWhere('produces_resource', 'roadLength')
-            ->pluck('id');
-
-        if ($roadTypeIds->isEmpty()) {
-            return null;
-        }
-
-        return UserBuilding::query()
-            ->whereIn('building_type_id', $roadTypeIds)
-            ->where('level', '>', $roadLength)
-            ->distinct()
-            ->count('user_id') + 1;
+        return UserResource::query()
+            ->where('prestiges', '>', $prestiges)
+            ->count() + 1;
     }
 
     /**
@@ -399,6 +432,7 @@ class DashboardController extends Controller
             'resource', 'resource_lifetime' => $this->resourceProgressFor($resources, $achievement->resource_type, true),
             'resource_current' => $this->resourceProgressFor($resources, $achievement->resource_type, false),
             'manual_collects' => $resources->manual_collects,
+            'prestiges' => $resources->prestiges,
             'building_level' => $this->buildingLevelProgressFor($achievement, $buildings),
             'building_levels', 'total_building_levels', 'buildings_built' => $buildings->sum('level'),
             'road_length' => $this->roadLengthFor($buildings),
@@ -491,8 +525,13 @@ class DashboardController extends Controller
         }
 
         $target = $achievement->bonusBuildingType?->name ?? 'all buildings';
+        $rewardLabel = '+'.$bonusPercent.'% '.$target.' base production';
 
-        return '+'.$bonusPercent.'% '.$target.' base production';
+        if ($achievement->slug === 'prestiges-1') {
+            return $rewardLabel.', daily collect base becomes 100 of each resource';
+        }
+
+        return $rewardLabel;
     }
 
     /**
@@ -537,19 +576,36 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param  iterable<UserBuilding>  $buildings
      * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      * @return array{gold: int, wood: int, stone: int, food: int}
      */
-    private function collectAmountsFor(iterable $buildings, array $productionBonuses = []): array
+    private function collectAmountsFor(UserResource $resources, iterable $buildings, array $productionBonuses = []): array
     {
         $rates = $this->productionRatesFor($buildings, $productionBonuses);
+        $baseRewards = $this->dailyBaseRewardsFor($resources);
 
         return [
-            'gold' => self::DAILY_BASE_REWARDS['gold'] + ($rates['gold'] * self::DAILY_PRODUCTION_HOURS),
-            'wood' => self::DAILY_BASE_REWARDS['wood'] + ($rates['wood'] * self::DAILY_PRODUCTION_HOURS),
-            'stone' => self::DAILY_BASE_REWARDS['stone'] + ($rates['stone'] * self::DAILY_PRODUCTION_HOURS),
-            'food' => self::DAILY_BASE_REWARDS['food'] + ($rates['food'] * self::DAILY_PRODUCTION_HOURS),
+            'gold' => $baseRewards['gold'] + ($rates['gold'] * self::DAILY_PRODUCTION_HOURS),
+            'wood' => $baseRewards['wood'] + ($rates['wood'] * self::DAILY_PRODUCTION_HOURS),
+            'stone' => $baseRewards['stone'] + ($rates['stone'] * self::DAILY_PRODUCTION_HOURS),
+            'food' => $baseRewards['food'] + ($rates['food'] * self::DAILY_PRODUCTION_HOURS),
+        ];
+    }
+
+    /**
+     * @return array{gold: int, wood: int, stone: int, food: int}
+     */
+    private function dailyBaseRewardsFor(UserResource $resources): array
+    {
+        if ((int) $resources->prestiges < 1) {
+            return self::DAILY_BASE_REWARDS;
+        }
+
+        return [
+            'gold' => 100,
+            'wood' => 100,
+            'stone' => 100,
+            'food' => 100,
         ];
     }
 
