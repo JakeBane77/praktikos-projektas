@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Achievement;
 use App\Models\BuildingType;
 use App\Models\ResourceCollection;
 use App\Models\User;
+use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use Illuminate\Database\Eloquent\Collection;
@@ -32,9 +34,12 @@ class DashboardController extends Controller
         $user = $request->user();
         $resources = $this->resourcesFor($user);
         $buildings = $this->buildingsFor($user);
-        $this->applyPassiveProduction($resources, $buildings);
+        $productionBonuses = $this->productionBonusesFor($user);
+        $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
+        $achievements = $this->syncAchievementsFor($user, $resources, $buildings);
+        $productionBonuses = $this->productionBonusesFor($user);
 
-        $productionRates = $this->productionRatesFor($buildings);
+        $productionRates = $this->productionRatesFor($buildings, $productionBonuses);
         $roadLength = $this->roadLengthFor($buildings);
 
         return Inertia::render('Dashboard', [
@@ -62,19 +67,22 @@ class DashboardController extends Controller
                 'length' => $roadLength,
                 'rank' => $this->roadLeaderboardRankFor($roadLength),
             ],
+            'achievementBonuses' => $this->achievementBonusCardsFor($productionBonuses),
+            'achievementUnlocks' => $this->achievementUnlockCardsFor($achievements),
             'buildings' => $buildings->map(fn (UserBuilding $building): array => [
                 'id' => $building->id,
                 'name' => $building->buildingType->name,
                 'level' => $building->level,
                 'levelLabel' => $this->buildingLevelLabel($building),
                 'description' => $this->buildingDescription($building),
-                'production' => $this->buildingProductionLabel($building),
+                'production' => $this->buildingProductionLabel($building, $productionBonuses),
                 'upgradeCost' => $this->upgradeCostLabel($building),
                 'isRoad' => $this->isRoad($building),
                 'isMaxLevel' => $this->isMaxLevel($building),
                 'canUpgrade' => ! $this->isMaxLevel($building)
                     && $this->canAfford($resources, $this->upgradeCostsFor($building)),
             ])->values(),
+            'achievements' => $this->achievementCardsFor($achievements),
         ]);
     }
 
@@ -83,7 +91,8 @@ class DashboardController extends Controller
         $user = $request->user();
         $resources = $this->resourcesFor($user);
         $buildings = $this->buildingsFor($user);
-        $this->applyPassiveProduction($resources, $buildings);
+        $productionBonuses = $this->productionBonusesFor($user);
+        $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
 
         if (! $this->canCollect($resources)) {
             return redirect()
@@ -93,7 +102,7 @@ class DashboardController extends Controller
                 ]);
         }
 
-        $collectAmounts = $this->collectAmountsFor($buildings);
+        $collectAmounts = $this->collectAmountsFor($buildings, $productionBonuses);
 
         $resources->gold += $collectAmounts['gold'];
         $resources->wood += $collectAmounts['wood'];
@@ -106,6 +115,7 @@ class DashboardController extends Controller
         $resources->manual_collects += 1;
         $resources->last_collected_at = now();
         $resources->save();
+        $this->syncAchievementsFor($user, $resources, $buildings);
 
         ResourceCollection::create([
             'user_id' => $user->id,
@@ -132,7 +142,7 @@ class DashboardController extends Controller
 
         $resources = $this->resourcesFor($request->user());
         $buildings = $this->buildingsFor($request->user());
-        $this->applyPassiveProduction($resources, $buildings);
+        $this->applyPassiveProduction($resources, $buildings, $this->productionBonusesFor($request->user()));
         $building->load('buildingType');
         $amount = $this->isRoad($building) ? ($validated['amount'] ?? 1) : 1;
 
@@ -168,6 +178,27 @@ class DashboardController extends Controller
             $building->level += $amount;
             $building->save();
         });
+
+        $this->syncAchievementsFor($request->user(), $resources, $this->buildingsFor($request->user()));
+
+        return redirect()->route('dashboard');
+    }
+
+    public function markAchievementUnlocksSeen(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer'],
+        ]);
+
+        UserAchievement::query()
+            ->where('user_id', $request->user()->id)
+            ->whereIn('id', $validated['ids'])
+            ->whereNotNull('unlocked_at')
+            ->whereNull('notification_seen_at')
+            ->update([
+                'notification_seen_at' => now(),
+            ]);
 
         return redirect()->route('dashboard');
     }
@@ -223,9 +254,10 @@ class DashboardController extends Controller
 
     /**
      * @param  iterable<UserBuilding>  $buildings
+     * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      * @return array{gold: int, wood: int, stone: int, food: int}
      */
-    private function productionRatesFor(iterable $buildings): array
+    private function productionRatesFor(iterable $buildings, array $productionBonuses = []): array
     {
         $rates = [
             'gold' => 0,
@@ -241,7 +273,7 @@ class DashboardController extends Controller
                 continue;
             }
 
-            $rates[$resource] += $this->productionFor($building);
+            $rates[$resource] += $this->productionFor($building, $productionBonuses);
         }
 
         return $rates;
@@ -282,12 +314,236 @@ class DashboardController extends Controller
     }
 
     /**
+     * @return array{all: int, buildingTypes: array<int, int>}
+     */
+    private function productionBonusesFor(User $user): array
+    {
+        $bonuses = [
+            'all' => 0,
+            'buildingTypes' => [],
+        ];
+
+        UserAchievement::query()
+            ->with('achievement')
+            ->where('user_id', $user->id)
+            ->whereNotNull('unlocked_at')
+            ->get()
+            ->each(function (UserAchievement $userAchievement) use (&$bonuses): void {
+                $achievement = $userAchievement->achievement;
+                $bonusPercent = (int) $achievement->production_bonus_percent;
+
+                if ($bonusPercent <= 0) {
+                    return;
+                }
+
+                if ($achievement->bonus_building_type_id === null) {
+                    $bonuses['all'] += $bonusPercent;
+
+                    return;
+                }
+
+                $bonuses['buildingTypes'][$achievement->bonus_building_type_id] =
+                    ($bonuses['buildingTypes'][$achievement->bonus_building_type_id] ?? 0) + $bonusPercent;
+            });
+
+        return $bonuses;
+    }
+
+    /**
+     * @param  array{all?: int, buildingTypes?: array<int, int>}  $productionBonuses
+     */
+    private function productionBonusPercentFor(BuildingType $buildingType, array $productionBonuses): int
+    {
+        return (int) ($productionBonuses['all'] ?? 0)
+            + (int) ($productionBonuses['buildingTypes'][$buildingType->id] ?? 0);
+    }
+
+    /**
+     * @param  Collection<int, UserBuilding>  $buildings
+     * @return Collection<int, UserAchievement>
+     */
+    private function syncAchievementsFor(User $user, UserResource $resources, Collection $buildings): Collection
+    {
+        Achievement::query()
+            ->with(['buildingType', 'bonusBuildingType'])
+            ->orderBy('id')
+            ->get()
+            ->each(function (Achievement $achievement) use ($buildings, $resources, $user): void {
+                $userAchievement = UserAchievement::firstOrNew([
+                    'user_id' => $user->id,
+                    'achievement_id' => $achievement->id,
+                ]);
+
+                $userAchievement->progress = $this->achievementProgressFor($achievement, $resources, $buildings);
+
+                if ($userAchievement->unlocked_at === null && $userAchievement->progress >= $achievement->target_value) {
+                    $userAchievement->unlocked_at = now();
+                }
+
+                $userAchievement->save();
+            });
+
+        return UserAchievement::query()
+            ->with(['achievement.buildingType', 'achievement.bonusBuildingType'])
+            ->where('user_id', $user->id)
+            ->orderBy('achievement_id')
+            ->get();
+    }
+
+    /**
+     * @param  Collection<int, UserBuilding>  $buildings
+     */
+    private function achievementProgressFor(Achievement $achievement, UserResource $resources, Collection $buildings): int
+    {
+        return match ($achievement->type) {
+            'resource', 'resource_lifetime' => $this->resourceProgressFor($resources, $achievement->resource_type, true),
+            'resource_current' => $this->resourceProgressFor($resources, $achievement->resource_type, false),
+            'manual_collects' => $resources->manual_collects,
+            'building_level' => $this->buildingLevelProgressFor($achievement, $buildings),
+            'building_levels', 'total_building_levels', 'buildings_built' => $buildings->sum('level'),
+            'road_length' => $this->roadLengthFor($buildings),
+            default => 0,
+        };
+    }
+
+    private function resourceProgressFor(UserResource $resources, ?string $resourceType, bool $lifetime): int
+    {
+        if (! in_array($resourceType, ['gold', 'wood', 'stone', 'food'], true)) {
+            return 0;
+        }
+
+        $column = $lifetime ? 'lifetime_'.$resourceType : $resourceType;
+
+        return (int) $resources->{$column};
+    }
+
+    /**
+     * @param  Collection<int, UserBuilding>  $buildings
+     */
+    private function buildingLevelProgressFor(Achievement $achievement, Collection $buildings): int
+    {
+        if ($achievement->building_type_id === null) {
+            return $buildings->sum('level');
+        }
+
+        return (int) ($buildings->firstWhere('building_type_id', $achievement->building_type_id)?->level ?? 0);
+    }
+
+    /**
+     * @param  Collection<int, UserAchievement>  $userAchievements
+     * @return array<int, array<string, mixed>>
+     */
+    private function achievementCardsFor(Collection $userAchievements): array
+    {
+        return $userAchievements
+            ->map(function (UserAchievement $userAchievement): array {
+                $achievement = $userAchievement->achievement;
+                $target = max(1, (int) $achievement->target_value);
+                $progress = (int) $userAchievement->progress;
+
+                return [
+                    'id' => $achievement->id,
+                    'name' => $achievement->name,
+                    'description' => $achievement->description,
+                    'progress' => $progress,
+                    'target' => (int) $achievement->target_value,
+                    'progressLabel' => number_format(min($progress, $target)).' / '.number_format($achievement->target_value),
+                    'progressPercent' => min(100, (int) floor(($progress / $target) * 100)),
+                    'isUnlocked' => $userAchievement->unlocked_at !== null,
+                    'unlockedAt' => $userAchievement->unlocked_at?->format('Y-m-d H:i'),
+                    'rewardLabel' => $this->achievementRewardLabel($achievement),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, UserAchievement>  $userAchievements
+     * @return array<int, array<string, mixed>>
+     */
+    private function achievementUnlockCardsFor(Collection $userAchievements): array
+    {
+        return $userAchievements
+            ->filter(fn (UserAchievement $userAchievement): bool => $userAchievement->unlocked_at !== null
+                && $userAchievement->notification_seen_at === null)
+            ->map(function (UserAchievement $userAchievement): array {
+                $achievement = $userAchievement->achievement;
+
+                return [
+                    'id' => $userAchievement->id,
+                    'name' => $achievement->name,
+                    'description' => $achievement->description,
+                    'unlockedAt' => $userAchievement->unlocked_at?->format('Y-m-d H:i'),
+                    'rewardLabel' => $this->achievementRewardLabel($achievement),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function achievementRewardLabel(Achievement $achievement): string
+    {
+        $bonusPercent = (int) $achievement->production_bonus_percent;
+
+        if ($bonusPercent <= 0) {
+            return 'No production bonus';
+        }
+
+        $target = $achievement->bonusBuildingType?->name ?? 'all buildings';
+
+        return '+'.$bonusPercent.'% '.$target.' base production';
+    }
+
+    /**
+     * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
+     * @return array<int, array{id: string, label: string, bonusPercent: int, bonusLabel: string}>
+     */
+    private function achievementBonusCardsFor(array $productionBonuses): array
+    {
+        $cards = [];
+        $allBonus = (int) ($productionBonuses['all'] ?? 0);
+
+        if ($allBonus > 0) {
+            $cards[] = [
+                'id' => 'all',
+                'label' => 'All buildings',
+                'bonusPercent' => $allBonus,
+                'bonusLabel' => '+'.number_format($allBonus).'%',
+            ];
+        }
+
+        $buildingTypeBonuses = $productionBonuses['buildingTypes'] ?? [];
+        $buildingTypeNames = BuildingType::query()
+            ->whereIn('id', array_keys($buildingTypeBonuses))
+            ->pluck('name', 'id');
+
+        foreach ($buildingTypeBonuses as $buildingTypeId => $bonusPercent) {
+            $bonusPercent = (int) $bonusPercent;
+
+            if ($bonusPercent <= 0) {
+                continue;
+            }
+
+            $cards[] = [
+                'id' => 'building-'.$buildingTypeId,
+                'label' => $buildingTypeNames[$buildingTypeId] ?? 'Unknown building',
+                'bonusPercent' => $bonusPercent,
+                'bonusLabel' => '+'.number_format($bonusPercent).'%',
+            ];
+        }
+
+        return $cards;
+    }
+
+    /**
      * @param  iterable<UserBuilding>  $buildings
+     * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      * @return array{gold: int, wood: int, stone: int, food: int}
      */
-    private function collectAmountsFor(iterable $buildings): array
+    private function collectAmountsFor(iterable $buildings, array $productionBonuses = []): array
     {
-        $rates = $this->productionRatesFor($buildings);
+        $rates = $this->productionRatesFor($buildings, $productionBonuses);
 
         return [
             'gold' => self::DAILY_BASE_REWARDS['gold'] + ($rates['gold'] * self::DAILY_PRODUCTION_HOURS),
@@ -299,8 +555,9 @@ class DashboardController extends Controller
 
     /**
      * @param  iterable<UserBuilding>  $buildings
+     * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      */
-    private function applyPassiveProduction(UserResource $resources, iterable $buildings): void
+    private function applyPassiveProduction(UserResource $resources, iterable $buildings, array $productionBonuses = []): void
     {
         if ($resources->last_produced_at === null) {
             $resources->last_produced_at = now();
@@ -315,7 +572,7 @@ class DashboardController extends Controller
             return;
         }
 
-        $rates = $this->productionRatesFor($buildings);
+        $rates = $this->productionRatesFor($buildings, $productionBonuses);
         $amounts = [
             'gold' => $rates['gold'] * $elapsedHours,
             'wood' => $rates['wood'] * $elapsedHours,
@@ -347,7 +604,10 @@ class DashboardController extends Controller
         }
     }
 
-    private function productionFor(UserBuilding $building): int
+    /**
+     * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
+     */
+    private function productionFor(UserBuilding $building, array $productionBonuses = []): int
     {
         if ($building->level === 0) {
             return 0;
@@ -355,11 +615,16 @@ class DashboardController extends Controller
 
         $type = $building->buildingType;
         $multiplier = (float) ($type->production_multiplier ?? 1);
+        $bonusPercent = $this->productionBonusPercentFor($type, $productionBonuses);
+        $baseProduction = $this->baseProductionFor($type) * (1 + ($bonusPercent / 100));
 
-        return (int) ceil($this->baseProductionFor($type) * ($multiplier ** ($building->level - 1)));
+        return (int) ceil($baseProduction * ($multiplier ** ($building->level - 1)));
     }
 
-    private function buildingProductionLabel(UserBuilding $building): string
+    /**
+     * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
+     */
+    private function buildingProductionLabel(UserBuilding $building, array $productionBonuses = []): string
     {
         if ($this->isRoad($building)) {
             return number_format($building->level).' km built';
@@ -378,7 +643,7 @@ class DashboardController extends Controller
                 ->toString();
         }
 
-        return '+'.number_format($this->productionFor($building)).' '.$resource.'/hour';
+        return '+'.number_format($this->productionFor($building, $productionBonuses)).' '.$resource.'/hour';
     }
 
     private function buildingDescription(UserBuilding $building): string

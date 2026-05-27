@@ -13,7 +13,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(BuildingTypeSeeder::class);
+        $this->call([
+            BuildingTypeSeeder::class,
+            AchievementSeeder::class,
+        ]);
 
         // User::factory(10)->create();
 

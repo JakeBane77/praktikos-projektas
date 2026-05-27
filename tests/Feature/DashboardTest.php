@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\Achievement;
 use App\Models\BuildingType;
 use App\Models\ResourceCollection;
 use App\Models\User;
+use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -429,6 +431,172 @@ test('building display numbers use thousands separators', function () {
             ->where('buildings.1.production', '+2,000 gold/hour')
             ->where('buildings.1.upgradeCost', '2,000,000 wood')
         );
+});
+
+test('achievements are shown and unlock production bonuses', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $mine = BuildingType::create([
+        'name' => 'Mine',
+        'slug' => 'mine',
+        'produces_resource' => 'gold',
+        'base_production_per_hour' => 10,
+        'production_multiplier' => 1,
+        'base_costs' => ['wood' => 100],
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $mine->id,
+        'level' => 1,
+        'built_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'lifetime_gold' => 100,
+        'last_produced_at' => now(),
+    ]);
+
+    Achievement::create([
+        'name' => 'Gold Starter',
+        'slug' => 'gold-starter',
+        'description' => 'Earn 100 gold.',
+        'type' => 'resource_lifetime',
+        'resource_type' => 'gold',
+        'target_value' => 100,
+        'production_bonus_percent' => 50,
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('achievements.0.name', 'Gold Starter')
+            ->where('achievements.0.isUnlocked', true)
+            ->where('achievements.0.progressLabel', '100 / 100')
+            ->where('achievements.0.rewardLabel', '+50% all buildings base production')
+            ->where('achievementBonuses.0.label', 'All buildings')
+            ->where('achievementBonuses.0.bonusPercent', 50)
+            ->where('achievementBonuses.0.bonusLabel', '+50%')
+            ->where('achievementUnlocks.0.name', 'Gold Starter')
+            ->where('achievementUnlocks.0.rewardLabel', '+50% all buildings base production')
+            ->where('resourceRates.gold', 15)
+            ->where('buildings.0.production', '+15 gold/hour')
+        );
+});
+
+test('achievement production bonuses can target a specific building type', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $mine = BuildingType::create([
+        'name' => 'Mine',
+        'slug' => 'mine',
+        'produces_resource' => 'gold',
+        'base_production_per_hour' => 10,
+        'production_multiplier' => 1,
+        'base_costs' => ['wood' => 100],
+    ]);
+
+    $farm = BuildingType::create([
+        'name' => 'Farm',
+        'slug' => 'farm',
+        'produces_resource' => 'food',
+        'base_production_per_hour' => 10,
+        'production_multiplier' => 1,
+        'base_costs' => ['wood' => 100],
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $mine->id,
+        'level' => 1,
+        'built_at' => now(),
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $farm->id,
+        'level' => 1,
+        'built_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'last_produced_at' => now(),
+    ]);
+
+    $achievement = Achievement::create([
+        'name' => 'Better Mines',
+        'slug' => 'better-mines',
+        'description' => 'Improve mine output.',
+        'type' => 'building_level',
+        'building_type_id' => $mine->id,
+        'target_value' => 1,
+        'production_bonus_percent' => 100,
+        'bonus_building_type_id' => $mine->id,
+    ]);
+
+    UserAchievement::create([
+        'user_id' => $user->id,
+        'achievement_id' => $achievement->id,
+        'progress' => 1,
+        'unlocked_at' => now(),
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('resourceRates.gold', 20)
+            ->where('resourceRates.food', 10)
+            ->where('buildings.0.production', '+20 gold/hour')
+            ->where('buildings.1.production', '+10 food/hour')
+            ->where('achievements.0.rewardLabel', '+100% Mine base production')
+            ->where('achievementBonuses.0.label', 'Mine')
+            ->where('achievementBonuses.0.bonusPercent', 100)
+            ->where('achievementBonuses.0.bonusLabel', '+100%')
+            ->where('achievementUnlocks.0.name', 'Better Mines')
+            ->where('achievementUnlocks.0.rewardLabel', '+100% Mine base production')
+        );
+});
+
+test('users can mark achievement unlock popups as seen', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $achievement = Achievement::create([
+        'name' => 'Dedicated Collector',
+        'slug' => 'dedicated-collector',
+        'description' => 'Keep collecting.',
+        'type' => 'manual_collects',
+        'target_value' => 10,
+        'production_bonus_percent' => 5,
+    ]);
+
+    $userAchievement = UserAchievement::create([
+        'user_id' => $user->id,
+        'achievement_id' => $achievement->id,
+        'progress' => 10,
+        'unlocked_at' => now(),
+        'notification_seen_at' => null,
+    ]);
+
+    $this->post(route('dashboard.achievements.unlocks.seen'), [
+        'ids' => [$userAchievement->id],
+    ])->assertRedirect(route('dashboard'));
+
+    expect($userAchievement->fresh()->notification_seen_at)->not->toBeNull();
 });
 
 test('users can build multiple kilometers of road at once', function () {

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowUp,
+    Award,
     Building2,
+    CheckCircle2,
     Coins,
+    Lock,
     Mountain,
     PackagePlus,
     Route,
@@ -16,6 +19,7 @@ import {
 import {
     formatRate,
     getTotalResources,
+    type AchievementUnlock,
     type Building,
     type DashboardGameData,
     type ResourceKey,
@@ -39,7 +43,39 @@ const isBuildingsOpen = ref(false);
 const isCollecting = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
+const hideCompletedAchievements = ref(true);
+const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
+const activeAchievementUnlockIndex = ref(0);
 const buildings = computed<Building[]>(() => props.buildings);
+const achievements = computed(() => props.achievements);
+const achievementBonuses = computed(() => props.achievementBonuses);
+const currentAchievementUnlock = computed(
+    () => achievementUnlockQueue.value[activeAchievementUnlockIndex.value],
+);
+const achievementUnlockCount = computed(
+    () => achievementUnlockQueue.value.length,
+);
+const achievementUnlockPosition = computed(() =>
+    Math.min(
+        activeAchievementUnlockIndex.value + 1,
+        achievementUnlockCount.value,
+    ),
+);
+const achievementUnlockButtonLabel = computed(() =>
+    activeAchievementUnlockIndex.value + 1 < achievementUnlockCount.value
+        ? 'Next'
+        : 'Done',
+);
+const visibleAchievements = computed(() =>
+    hideCompletedAchievements.value
+        ? achievements.value.filter((achievement) => !achievement.isUnlocked)
+        : achievements.value,
+);
+const unlockedAchievementCount = computed(
+    () =>
+        achievements.value.filter((achievement) => achievement.isUnlocked)
+            .length,
+);
 const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
 
 const resourceIcons = {
@@ -98,6 +134,22 @@ const collectButtonLabel = computed(() => {
     return props.canCollect ? 'Collect' : 'Collected today';
 });
 
+watch(
+    () => props.achievementUnlocks,
+    (achievementUnlocks) => {
+        if (
+            achievementUnlocks.length === 0 ||
+            achievementUnlockQueue.value.length > 0
+        ) {
+            return;
+        }
+
+        achievementUnlockQueue.value = [...achievementUnlocks];
+        activeAchievementUnlockIndex.value = 0;
+    },
+    { immediate: true },
+);
+
 function collectResources() {
     router.post(
         '/dashboard/collect',
@@ -110,6 +162,35 @@ function collectResources() {
             onFinish: () => {
                 isCollecting.value = false;
             },
+        },
+    );
+}
+
+function advanceAchievementUnlockPopup() {
+    if (activeAchievementUnlockIndex.value + 1 < achievementUnlockCount.value) {
+        activeAchievementUnlockIndex.value += 1;
+
+        return;
+    }
+
+    const seenAchievementUnlockIds = achievementUnlockQueue.value.map(
+        (achievementUnlock) => achievementUnlock.id,
+    );
+
+    achievementUnlockQueue.value = [];
+    activeAchievementUnlockIndex.value = 0;
+
+    if (seenAchievementUnlockIds.length === 0) {
+        return;
+    }
+
+    router.post(
+        '/dashboard/achievements/unlocks/seen',
+        {
+            ids: seenAchievementUnlockIds,
+        },
+        {
+            preserveScroll: true,
         },
     );
 }
@@ -353,8 +434,253 @@ function upgradeBuilding(building: Building) {
                     </button>
                 </div>
             </section>
+
+            <section
+                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+            >
+                <div
+                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div class="flex items-center gap-3">
+                        <div class="rounded-md bg-[#243627] p-2 text-white">
+                            <Award class="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold">Achievements</h2>
+                            <p
+                                class="text-sm text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Production bonuses unlocked by milestones
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-4">
+                        <label
+                            class="inline-flex items-center gap-2 text-sm font-semibold text-[#5d6356] dark:text-[#c6c0b3]"
+                        >
+                            <input
+                                v-model="hideCompletedAchievements"
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-[#b7aa91] text-[#243627] focus:ring-[#47663b] dark:border-[#554f42]"
+                            />
+                            Hide completed
+                        </label>
+                        <p
+                            class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            {{ unlockedAchievementCount }} /
+                            {{ achievements.length }} unlocked
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <div
+                        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <div>
+                            <h3 class="text-sm font-semibold">
+                                Current bonuses
+                            </h3>
+                            <p
+                                class="text-sm text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Active production bonuses from unlocked
+                                achievements
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="achievementBonuses.length > 0"
+                        class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                    >
+                        <div
+                            v-for="bonus in achievementBonuses"
+                            :key="bonus.id"
+                            class="rounded-md border border-[#e4dac7] px-3 py-2 dark:border-[#35332c]"
+                        >
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <p class="text-sm font-semibold">
+                                    {{ bonus.label }}
+                                </p>
+                                <p
+                                    class="text-sm font-bold text-[#47663b] dark:text-[#9dcc84]"
+                                >
+                                    {{ bonus.bonusLabel }}
+                                </p>
+                            </div>
+                            <p
+                                class="mt-1 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
+                            >
+                                base production
+                            </p>
+                        </div>
+                    </div>
+
+                    <p
+                        v-else
+                        class="mt-3 text-sm text-[#5d6356] dark:text-[#c6c0b3]"
+                    >
+                        No active bonuses yet.
+                    </p>
+                </div>
+
+                <div
+                    v-if="visibleAchievements.length > 0"
+                    class="mt-5 grid gap-3 lg:grid-cols-2"
+                >
+                    <article
+                        v-for="achievement in visibleAchievements"
+                        :key="achievement.id"
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-semibold">
+                                        {{ achievement.name }}
+                                    </h3>
+                                    <span
+                                        :class="[
+                                            'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-semibold',
+                                            achievement.isUnlocked
+                                                ? 'bg-[#dce9d1] text-[#263f20] dark:bg-[#273820] dark:text-[#bde4a5]'
+                                                : 'bg-[#e9e1d3] text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]',
+                                        ]"
+                                    >
+                                        <CheckCircle2
+                                            v-if="achievement.isUnlocked"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <Lock v-else class="h-3.5 w-3.5" />
+                                        {{
+                                            achievement.isUnlocked
+                                                ? 'Unlocked'
+                                                : 'Locked'
+                                        }}
+                                    </span>
+                                </div>
+                                <p
+                                    v-if="achievement.description"
+                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    {{ achievement.description }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <div
+                                class="flex items-center justify-between gap-4 text-xs font-semibold text-[#7a705d] dark:text-[#aaa18f]"
+                            >
+                                <span>Progress</span>
+                                <span>{{ achievement.progressLabel }}</span>
+                            </div>
+                            <div
+                                class="mt-2 h-2 overflow-hidden rounded-full bg-[#e9e1d3] dark:bg-[#24281d]"
+                            >
+                                <div
+                                    class="h-full rounded-full bg-[#47663b] dark:bg-[#9dcc84]"
+                                    :style="{
+                                        width: `${achievement.progressPercent}%`,
+                                    }"
+                                />
+                            </div>
+                        </div>
+
+                        <p
+                            class="mt-3 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            {{ achievement.rewardLabel }}
+                        </p>
+                    </article>
+                </div>
+
+                <p
+                    v-else
+                    class="mt-5 rounded-md border border-[#e4dac7] p-4 text-sm text-[#5d6356] dark:border-[#35332c] dark:text-[#c6c0b3]"
+                >
+                    {{
+                        achievements.length > 0
+                            ? 'Completed achievements hidden.'
+                            : 'No achievements configured yet.'
+                    }}
+                </p>
+            </section>
         </div>
     </div>
+
+    <Teleport to="body">
+        <div
+            v-if="currentAchievementUnlock"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+        >
+            <section
+                class="w-full max-w-md rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <div class="flex items-start gap-4">
+                    <div class="rounded-md bg-[#243627] p-3 text-white">
+                        <Award class="h-6 w-6" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Achievement unlocked
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">
+                            {{ currentAchievementUnlock.name }}
+                        </h2>
+                        <p
+                            v-if="currentAchievementUnlock.description"
+                            class="mt-3 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
+                        >
+                            {{ currentAchievementUnlock.description }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                >
+                    <div class="flex items-center gap-2">
+                        <CheckCircle2
+                            class="h-5 w-5 text-[#47663b] dark:text-[#9dcc84]"
+                        />
+                        <p class="text-sm font-semibold">Bonus activated</p>
+                    </div>
+                    <p
+                        class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                    >
+                        {{ currentAchievementUnlock.rewardLabel }}
+                    </p>
+                </div>
+
+                <div
+                    class="mt-5 flex items-center justify-between gap-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <p
+                        class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                    >
+                        {{ achievementUnlockPosition }} /
+                        {{ achievementUnlockCount }}
+                    </p>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
+                        @click="advanceAchievementUnlockPopup"
+                    >
+                        {{ achievementUnlockButtonLabel }}
+                    </button>
+                </div>
+            </section>
+        </div>
+    </Teleport>
 
     <Teleport to="body">
         <div

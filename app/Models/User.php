@@ -46,4 +46,9 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->hasMany(UserBuilding::class);
     }
+
+    public function achievements(): HasMany
+    {
+        return $this->hasMany(UserAchievement::class);
+    }
 }

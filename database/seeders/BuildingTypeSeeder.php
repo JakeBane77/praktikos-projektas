@@ -99,7 +99,7 @@ class BuildingTypeSeeder extends Seeder
                         'gold' => 100,
                     ]),
                     'upgrade_cost_multiplier' => 1,
-                    'max_level' => null,
+                    'max_level' => 60000000,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ],

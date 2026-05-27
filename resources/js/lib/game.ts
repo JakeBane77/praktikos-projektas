@@ -17,6 +17,34 @@ export type Building = {
     canUpgrade: boolean;
 };
 
+export type Achievement = {
+    id: number;
+    name: string;
+    description: string | null;
+    progress: number;
+    target: number;
+    progressLabel: string;
+    progressPercent: number;
+    isUnlocked: boolean;
+    unlockedAt: string | null;
+    rewardLabel: string;
+};
+
+export type AchievementBonus = {
+    id: string;
+    label: string;
+    bonusPercent: number;
+    bonusLabel: string;
+};
+
+export type AchievementUnlock = {
+    id: number;
+    name: string;
+    description: string | null;
+    unlockedAt: string | null;
+    rewardLabel: string;
+};
+
 export type DashboardGameData = {
     resources: Resources;
     lifetimeResources: Resources;
@@ -27,7 +55,10 @@ export type DashboardGameData = {
         length: number;
         rank: number | null;
     };
+    achievementBonuses: AchievementBonus[];
+    achievementUnlocks: AchievementUnlock[];
     buildings: Building[];
+    achievements: Achievement[];
 };
 
 export function getTotalResources(resources: Resources): number {
