@@ -142,7 +142,7 @@ import { dashboard, login, register } from '@/routes';
                 >
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="font-semibold">Sawmill</p>
+                            <p class="font-semibold">Lumbercamp</p>
                             <p
                                 class="text-sm text-[#696250] dark:text-[#b6ae9d]"
                             >
