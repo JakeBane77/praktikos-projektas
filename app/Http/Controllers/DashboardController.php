@@ -16,6 +16,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    private const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
+
     private const DAILY_BASE_REWARDS = [
         'gold' => 0,
         'wood' => 10,
@@ -121,7 +123,7 @@ class DashboardController extends Controller
     public function upgrade(Request $request, UserBuilding $building): RedirectResponse
     {
         $validated = $request->validate([
-            'amount' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'amount' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_ROAD_BUILD_AMOUNT],
         ]);
 
         if ($building->user_id !== $request->user()->id) {
@@ -360,7 +362,7 @@ class DashboardController extends Controller
     private function buildingProductionLabel(UserBuilding $building): string
     {
         if ($this->isRoad($building)) {
-            return $building->level.' km built';
+            return number_format($building->level).' km built';
         }
 
         if ($building->level === 0) {
@@ -376,7 +378,7 @@ class DashboardController extends Controller
                 ->toString();
         }
 
-        return '+'.$this->productionFor($building).' '.$resource.'/hour';
+        return '+'.number_format($this->productionFor($building)).' '.$resource.'/hour';
     }
 
     private function buildingDescription(UserBuilding $building): string
@@ -397,7 +399,7 @@ class DashboardController extends Controller
     private function upgradeCostLabel(UserBuilding $building): string
     {
         $costs = collect($this->upgradeCostsFor($building))
-            ->map(fn (int $amount, string $resource): string => $amount.' '.$resource);
+            ->map(fn (int $amount, string $resource): string => number_format($amount).' '.$resource);
 
         return $costs->implode(', ');
     }
@@ -405,10 +407,10 @@ class DashboardController extends Controller
     private function buildingLevelLabel(UserBuilding $building): string
     {
         if ($this->isRoad($building)) {
-            return $building->level.' km';
+            return number_format($building->level).' km';
         }
 
-        return 'Level '.$building->level;
+        return 'Level '.number_format($building->level);
     }
 
     private function isMaxLevel(UserBuilding $building): bool
@@ -428,14 +430,34 @@ class DashboardController extends Controller
         $costs = [];
 
         foreach ($type->base_costs ?? [] as $resource => $baseCost) {
-            $costs[$resource] = 0;
-
-            for ($offset = 0; $offset < $amount; $offset++) {
-                $costs[$resource] += (int) ceil($baseCost * ($multiplier ** ($building->level + $offset)));
-            }
+            $costs[$resource] = $this->upgradeCostForResource(
+                (int) $baseCost,
+                $multiplier,
+                $building->level,
+                $amount,
+            );
         }
 
         return $costs;
+    }
+
+    private function upgradeCostForResource(int $baseCost, float $multiplier, int $level, int $amount): int
+    {
+        if ($amount === 1) {
+            return (int) ceil($baseCost * ($multiplier ** $level));
+        }
+
+        if ($multiplier === 1.0) {
+            return $baseCost * $amount;
+        }
+
+        $total = $baseCost * ($multiplier ** $level) * (($multiplier ** $amount) - 1) / ($multiplier - 1);
+
+        if (! is_finite($total) || $total > PHP_INT_MAX) {
+            return PHP_INT_MAX;
+        }
+
+        return (int) ceil($total);
     }
 
     /**

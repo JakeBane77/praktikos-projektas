@@ -370,6 +370,67 @@ test('max level buildings are shown as maxed and cannot be upgraded', function (
         );
 });
 
+test('building display numbers use thousands separators', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $road = BuildingType::create([
+        'name' => 'Road',
+        'slug' => 'road',
+        'produces_resource' => null,
+        'base_production_per_hour' => 0,
+        'production_multiplier' => null,
+        'effect_type' => 'road_length',
+        'base_costs' => ['wood' => 1000, 'stone' => 1500000],
+        'upgrade_cost_multiplier' => 1,
+    ]);
+
+    $mine = BuildingType::create([
+        'name' => 'Mine',
+        'slug' => 'mine',
+        'produces_resource' => 'gold',
+        'base_production_per_hour' => 1000,
+        'production_multiplier' => 2,
+        'base_costs' => ['wood' => 2000000],
+        'upgrade_cost_multiplier' => 1,
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $road->id,
+        'level' => 1000,
+        'built_at' => now(),
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $mine->id,
+        'level' => 2,
+        'built_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 2_000_000,
+        'stone' => 2_000_000,
+        'food' => 0,
+        'last_produced_at' => now(),
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('buildings.0.levelLabel', '1,000 km')
+            ->where('buildings.0.production', '1,000 km built')
+            ->where('buildings.0.upgradeCost', '1,000 wood, 1,500,000 stone')
+            ->where('buildings.1.levelLabel', 'Level 2')
+            ->where('buildings.1.production', '+2,000 gold/hour')
+            ->where('buildings.1.upgradeCost', '2,000,000 wood')
+        );
+});
+
 test('users can build multiple kilometers of road at once', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -413,6 +474,52 @@ test('users can build multiple kilometers of road at once', function () {
     $this->assertDatabaseHas('user_resources', [
         'user_id' => $user->id,
         'wood' => 30,
+    ]);
+});
+
+test('users can build up to one million kilometers of road at once', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $road = BuildingType::create([
+        'name' => 'Road',
+        'slug' => 'road',
+        'produces_resource' => null,
+        'base_production_per_hour' => 0,
+        'production_multiplier' => null,
+        'effect_type' => 'road_length',
+        'base_costs' => ['wood' => 1],
+        'upgrade_cost_multiplier' => 1,
+    ]);
+
+    $building = UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $road->id,
+        'level' => 0,
+        'built_at' => null,
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 1_000_000,
+        'stone' => 0,
+        'food' => 0,
+        'last_produced_at' => now(),
+    ]);
+
+    $this->post(route('dashboard.buildings.upgrade', $building), [
+        'amount' => 1_000_000,
+    ])->assertRedirect(route('dashboard'));
+
+    $this->assertDatabaseHas('user_buildings', [
+        'id' => $building->id,
+        'level' => 1_000_000,
+    ]);
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'wood' => 0,
     ]);
 });
 

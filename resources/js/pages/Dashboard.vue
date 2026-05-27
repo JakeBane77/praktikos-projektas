@@ -40,6 +40,7 @@ const isCollecting = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const buildings = computed<Building[]>(() => props.buildings);
+const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
 
 const resourceIcons = {
     gold: Coins,
@@ -116,7 +117,11 @@ function collectResources() {
 function roadBuildAmount(building: Building): number {
     const amount = Number(roadBuildAmounts.value[building.id] ?? 1);
 
-    return Number.isFinite(amount) ? Math.max(1, amount) : 1;
+    if (!Number.isFinite(amount)) {
+        return 1;
+    }
+
+    return Math.min(MAX_ROAD_BUILD_AMOUNT, Math.max(1, amount));
 }
 
 function upgradeBuilding(building: Building) {
@@ -427,8 +432,8 @@ function upgradeBuilding(building: Building) {
                                         "
                                         type="number"
                                         min="1"
-                                        max="100"
-                                        class="h-10 w-24 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4]"
+                                        :max="MAX_ROAD_BUILD_AMOUNT"
+                                        class="h-10 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4]"
                                         placeholder="1"
                                     />
                                 </label>
