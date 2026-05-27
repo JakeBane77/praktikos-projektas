@@ -102,8 +102,10 @@ const resourceLabels = {
     food: 'Food',
 };
 
+const resourceDisplayOrder: ResourceKey[] = ['wood', 'food', 'stone', 'gold'];
+
 const resourceCards = computed(() => [
-    ...(['gold', 'wood', 'stone', 'food'] as ResourceKey[]).map((key) => ({
+    ...resourceDisplayOrder.map((key) => ({
         key,
         label: resourceLabels[key],
         amount: props.resources[key],
@@ -114,7 +116,7 @@ const resourceCards = computed(() => [
 ]);
 
 const lifetimeResourceCards = computed(() => [
-    ...(['gold', 'wood', 'stone', 'food'] as ResourceKey[]).map((key) => ({
+    ...resourceDisplayOrder.map((key) => ({
         key,
         label: resourceLabels[key],
         amount: props.lifetimeResources[key],
