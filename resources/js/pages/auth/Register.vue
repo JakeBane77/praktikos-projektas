@@ -17,7 +17,7 @@ defineProps<{
 defineOptions({
     layout: {
         title: 'Create an account',
-        description: 'Enter your details below to create your account',
+        description: 'Create your settlement and start gathering resources.',
     },
 });
 </script>
@@ -33,7 +33,7 @@ defineOptions({
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="name">Name</Label>
+                <Label for="name" class="text-[#3b3f36] dark:text-[#f3efe4]">Name</Label>
                 <Input
                     id="name"
                     type="text"
@@ -48,7 +48,7 @@ defineOptions({
             </div>
 
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email" class="text-[#3b3f36] dark:text-[#f3efe4]">Email address</Label>
                 <Input
                     id="email"
                     type="email"
@@ -62,7 +62,7 @@ defineOptions({
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">Password</Label>
+                <Label for="password" class="text-[#3b3f36] dark:text-[#f3efe4]">Password</Label>
                 <PasswordInput
                     id="password"
                     required
@@ -76,7 +76,12 @@ defineOptions({
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation">Confirm password</Label>
+                <Label
+                    for="password_confirmation"
+                    class="text-[#3b3f36] dark:text-[#f3efe4]"
+                >
+                    Confirm password
+                </Label>
                 <PasswordInput
                     id="password_confirmation"
                     required
@@ -91,7 +96,7 @@ defineOptions({
 
             <Button
                 type="submit"
-                class="mt-2 w-full"
+                class="mt-2 w-full bg-[#243627] text-white hover:bg-[#1a291d]"
                 tabindex="5"
                 :disabled="processing"
                 data-test="register-user-button"
@@ -101,11 +106,11 @@ defineOptions({
             </Button>
         </div>
 
-        <div class="text-center text-sm text-muted-foreground">
+        <div class="text-center text-sm text-[#696250] dark:text-[#b6ae9d]">
             Already have an account?
             <TextLink
                 :href="login()"
-                class="underline underline-offset-4"
+                class="text-[#7b633d] underline underline-offset-4 hover:text-[#243627] dark:text-[#caa66c] dark:hover:text-[#f3efe4]"
                 :tabindex="6"
                 >Log in</TextLink
             >

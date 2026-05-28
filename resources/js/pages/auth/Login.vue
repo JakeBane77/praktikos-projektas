@@ -16,7 +16,7 @@ import { request } from '@/routes/password';
 defineOptions({
     layout: {
         title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
+        description: 'Enter your settlement credentials to continue playing.',
     },
 });
 
@@ -31,7 +31,7 @@ defineProps<{
 
     <div
         v-if="status"
-        class="mb-4 text-center text-sm font-medium text-green-600"
+        class="mb-4 rounded-md border border-[#9abf83] bg-[#edf6e8] px-4 py-3 text-center text-sm font-semibold text-[#2d5b28] dark:border-[#4d6f41] dark:bg-[#172214] dark:text-[#9dcc84]"
     >
         {{ status }}
     </div>
@@ -46,7 +46,7 @@ defineProps<{
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                    <Label for="email" class="text-[#3b3f36] dark:text-[#f3efe4]">Email address</Label>
                 <Input
                     id="email"
                     type="email"
@@ -62,11 +62,11 @@ defineProps<{
 
             <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
+                    <Label for="password" class="text-[#3b3f36] dark:text-[#f3efe4]">Password</Label>
                     <TextLink
                         v-if="canResetPassword"
                         :href="request()"
-                        class="text-sm"
+                        class="text-sm text-[#7b633d] underline-offset-4 hover:text-[#243627] dark:text-[#caa66c] dark:hover:text-[#f3efe4]"
                         :tabindex="5"
                     >
                         Forgot your password?
@@ -84,7 +84,7 @@ defineProps<{
             </div>
 
             <div class="flex items-center justify-between">
-                <Label for="remember" class="flex items-center space-x-3">
+                <Label for="remember" class="flex items-center space-x-3 text-[#3b3f36] dark:text-[#f3efe4]">
                     <Checkbox id="remember" name="remember" :tabindex="3" />
                     <span>Remember me</span>
                 </Label>
@@ -92,7 +92,7 @@ defineProps<{
 
             <Button
                 type="submit"
-                class="mt-4 w-full"
+                class="mt-4 w-full bg-[#243627] text-white hover:bg-[#1a291d]"
                 :tabindex="4"
                 :disabled="processing"
                 data-test="login-button"
@@ -102,9 +102,15 @@ defineProps<{
             </Button>
         </div>
 
-        <div class="text-center text-sm text-muted-foreground">
+        <div class="text-center text-sm text-[#696250] dark:text-[#b6ae9d]">
             Don't have an account?
-            <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
+            <TextLink
+                :href="register()"
+                class="text-[#7b633d] underline-offset-4 hover:text-[#243627] dark:text-[#caa66c] dark:hover:text-[#f3efe4]"
+                :tabindex="5"
+            >
+                Sign up
+            </TextLink>
         </div>
     </Form>
 </template>
