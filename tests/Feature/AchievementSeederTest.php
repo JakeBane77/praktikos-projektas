@@ -15,6 +15,10 @@ test('achievement seeder creates milestone achievements with default production 
 
     expect(DB::table('achievements')->count())->toBe(58);
 
+    $lumbercampId = DB::table('building_types')
+        ->where('slug', 'lumbercamp')
+        ->value('id');
+
     $this->assertDatabaseHas('achievements', [
         'slug' => 'gold-1000',
         'type' => 'resource_lifetime',
@@ -52,6 +56,7 @@ test('achievement seeder creates milestone achievements with default production 
         'resource_type' => 'wood',
         'target_value' => 1_000,
         'production_bonus_percent' => 5,
+        'bonus_building_type_id' => $lumbercampId,
     ]);
 
     $this->assertDatabaseHas('achievements', [

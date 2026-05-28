@@ -29,7 +29,7 @@ class AchievementSeeder extends Seeder
             ...$this->buildingLevelAchievements($now, $buildingTypes),
             ...$this->roadAchievements($now),
             ...$this->manualCollectAchievements($now),
-            ...$this->minigameAchievements($now),
+            ...$this->minigameAchievements($now, $producerIdsByResource),
             ...$this->prestigeAchievements($now),
         ];
 
@@ -163,7 +163,7 @@ class AchievementSeeder extends Seeder
         ];
     }
 
-    private function minigameAchievements(mixed $now): array
+    private function minigameAchievements(mixed $now, mixed $producerIdsByResource): array
     {
         $rows = [];
 
@@ -181,6 +181,7 @@ class AchievementSeeder extends Seeder
                     targetValue: $target,
                     now: $now,
                     resourceType: $resource,
+                    bonusBuildingTypeId: $producerIdsByResource[$resource] ?? null,
                 );
             }
         }
