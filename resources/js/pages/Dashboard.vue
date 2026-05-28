@@ -27,6 +27,10 @@ import {
     type ResourceKey,
 } from '@/lib/game';
 import { dashboard } from '@/routes';
+import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
+import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
+import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
+import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 
 defineOptions({
     layout: {
@@ -117,6 +121,12 @@ const resourceLabels = {
 };
 
 const resourceDisplayOrder: ResourceKey[] = ['wood', 'food', 'stone', 'gold'];
+const minigameComponents = {
+    gold: GoldMinigame,
+    wood: WoodMinigame,
+    stone: StoneMinigame,
+    food: FoodMinigame,
+};
 
 const resourceCards = computed(() => [
     ...resourceDisplayOrder.map((key) => ({
@@ -145,6 +155,11 @@ const selectedMinigameResourceAmount = computed(() =>
     selectedMinigame.value
         ? props.resources[selectedMinigame.value.resource]
         : 0,
+);
+const selectedMinigameComponent = computed(() =>
+    selectedMinigame.value
+        ? minigameComponents[selectedMinigame.value.resource]
+        : null,
 );
 const prestigeRankLabel = computed(
     () => `#${props.prestigeStats.rank.toLocaleString()}`,
@@ -301,7 +316,7 @@ function continueMinigame() {
     hasWonMinigame.value = false;
 }
 
-function winMinigame() {
+function completeSelectedMinigame() {
     if (!selectedMinigame.value) {
         return;
     }
@@ -1208,7 +1223,7 @@ function upgradeBuilding(building: Building) {
             @click.self="closeMinigame"
         >
             <section
-                class="max-h-[calc(100vh-3rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <header class="flex items-start justify-between gap-4">
                     <div>
@@ -1232,9 +1247,14 @@ function upgradeBuilding(building: Building) {
                     </button>
                 </header>
 
-                <div
-                    class="mt-5 flex min-h-[320px] items-center justify-center rounded-md border border-[#e4dac7] bg-[#f6f3ec] dark:border-[#35332c] dark:bg-[#12140f]"
-                ></div>
+                <component
+                    :is="selectedMinigameComponent"
+                    :is-saving="
+                        activeMinigameResource === selectedMinigame.resource
+                    "
+                    :is-completed="hasWonMinigame"
+                    @complete="completeSelectedMinigame"
+                />
 
                 <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div
@@ -1292,38 +1312,23 @@ function upgradeBuilding(building: Building) {
                 </div>
 
                 <div
+                    v-if="hasWonMinigame"
                     class="mt-5 flex flex-col gap-3 border-t border-[#e4dac7] pt-4 sm:flex-row sm:justify-end dark:border-[#35332c]"
                 >
-                    <template v-if="hasWonMinigame">
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
-                            @click="continueMinigame"
-                        >
-                            <Gamepad2 class="h-4 w-4" />
-                            Continue playing
-                        </button>
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
-                            @click="closeMinigame"
-                        >
-                            Stop playing
-                        </button>
-                    </template>
                     <button
-                        v-else
                         type="button"
                         class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="activeMinigameResource !== null"
-                        @click="winMinigame"
+                        @click="continueMinigame"
                     >
-                        <CheckCircle2 class="h-4 w-4" />
-                        {{
-                            activeMinigameResource === selectedMinigame.resource
-                                ? 'Completing...'
-                                : 'Win'
-                        }}
+                        <Gamepad2 class="h-4 w-4" />
+                        Continue playing
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                        @click="closeMinigame"
+                    >
+                        Stop playing
                     </button>
                 </div>
             </section>
