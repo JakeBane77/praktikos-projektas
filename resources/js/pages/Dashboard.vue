@@ -6,12 +6,20 @@ import {
     Award,
     Building2,
     CheckCircle2,
+    Cloud,
+    CloudDrizzle,
+    CloudFog,
+    CloudLightning,
+    CloudRain,
+    CloudSnow,
+    CloudSun,
     Coins,
     Gamepad2,
     Lock,
     Mountain,
     PackagePlus,
     RotateCcw,
+    Sun,
     TreePine,
     Trophy,
     Wheat,
@@ -218,6 +226,14 @@ const serverDateTimeLabel = computed(() =>
 const serverTimezoneLabel = computed(() =>
     props.serverTime.timezone.replaceAll('_', ' '),
 );
+const weatherIcon = computed(() =>
+    props.weather.weatherCode !== null
+        ? weatherIconFor(props.weather.weatherCode)
+        : CloudSun,
+);
+const weatherCoordinatesLabel = computed(
+    () => `${props.weather.latitude}, ${props.weather.longitude}`,
+);
 
 let serverTimeBaseMilliseconds = Date.now();
 let serverTimeClientStartedAt = Date.now();
@@ -248,6 +264,42 @@ function formatServerDateTime(milliseconds: number): string {
         parts.find((part) => part.type === type)?.value ?? '00';
 
     return `${partValue('year')}-${partValue('month')}-${partValue('day')} ${partValue('hour')}:${partValue('minute')}:${partValue('second')}`;
+}
+
+function weatherIconFor(code: number) {
+    if (code === 0) {
+        return Sun;
+    }
+
+    if ([1, 2].includes(code)) {
+        return CloudSun;
+    }
+
+    if (code === 3) {
+        return Cloud;
+    }
+
+    if ([45, 48].includes(code)) {
+        return CloudFog;
+    }
+
+    if ([51, 53, 55, 56, 57].includes(code)) {
+        return CloudDrizzle;
+    }
+
+    if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) {
+        return CloudRain;
+    }
+
+    if ([71, 73, 75, 77, 85, 86].includes(code)) {
+        return CloudSnow;
+    }
+
+    if ([95, 96, 99].includes(code)) {
+        return CloudLightning;
+    }
+
+    return CloudSun;
 }
 
 watch(
@@ -562,6 +614,55 @@ function upgradeBuilding(building: Building) {
                         {{ resource.rate }}
                     </p>
                 </article>
+            </section>
+
+            <section
+                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+            >
+                <div
+                    class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
+                >
+                    <div class="flex items-start gap-3">
+                        <div class="rounded-md bg-[#243627] p-3 text-white">
+                            <component :is="weatherIcon" class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Local weather
+                            </p>
+                            <h2 class="mt-1 text-lg font-semibold">
+                                Coordinates {{ weatherCoordinatesLabel }}
+                            </h2>
+                            <p
+                                class="mt-1 text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Saved Open-Meteo weather code for the tracked
+                                location.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="flex items-center gap-4 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <component
+                            :is="weatherIcon"
+                            class="h-10 w-10 text-[#7b633d] dark:text-[#caa66c]"
+                        />
+                        <div>
+                            <p
+                                class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Weather code
+                            </p>
+                            <p class="mt-1 text-3xl font-bold">
+                                {{ props.weather.weatherCode ?? '-' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section

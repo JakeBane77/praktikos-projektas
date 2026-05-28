@@ -79,6 +79,13 @@ export type DashboardGameData = {
         iso: string;
         timezone: string;
     };
+    weather: {
+        latitude: number;
+        longitude: number;
+        weatherCode: number | null;
+        apiTime: string | null;
+        updatedAt: string | null;
+    };
     resources: Resources;
     lifetimeResources: Resources;
     resourceRates: ResourceRates;

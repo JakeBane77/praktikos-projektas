@@ -8,7 +8,9 @@ use App\Models\User;
 use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
+use App\Models\WeatherSnapshot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -24,6 +26,47 @@ test('authenticated users can visit the dashboard', function () {
 
     $response = $this->get(route('dashboard'));
     $response->assertOk();
+});
+
+test('dashboard reads weather code from the database', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    WeatherSnapshot::create([
+        'latitude' => 54.3957,
+        'longitude' => 24.0389,
+        'weather_code' => 61,
+        'api_time' => now(),
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('weather.latitude', 54.3957)
+            ->where('weather.longitude', 24.0389)
+            ->where('weather.weatherCode', 61)
+        );
+});
+
+test('weather update command stores open meteo weather code', function () {
+    Http::fake([
+        'api.open-meteo.com/*' => Http::response([
+            'current' => [
+                'time' => '2026-05-28T12:03',
+                'weather_code' => 71,
+            ],
+        ]),
+    ]);
+
+    $this->artisan('weather:update')
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('weather_snapshots', [
+        'latitude' => 54.3957,
+        'longitude' => 24.0389,
+        'weather_code' => 71,
+    ]);
 });
 
 test('daily collect adds base rewards and six hours of building production', function () {
