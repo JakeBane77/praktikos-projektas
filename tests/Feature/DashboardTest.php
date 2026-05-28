@@ -143,6 +143,16 @@ test('minigame completion awards resources from current production and tracks co
         'built_at' => now(),
     ]);
 
+    $achievement = Achievement::create([
+        'name' => 'Wood Minigame 1',
+        'slug' => 'wood-minigame-completions-1',
+        'description' => 'Complete the wood minigame once.',
+        'type' => 'minigame_completions',
+        'resource_type' => 'wood',
+        'target_value' => 1,
+        'production_bonus_percent' => 0,
+    ]);
+
     $this->post(route('dashboard.minigames.complete', ['resource' => 'wood']))
         ->assertRedirect(route('dashboard'));
 
@@ -163,6 +173,12 @@ test('minigame completion awards resources from current production and tracks co
         'user_id' => $user->id,
         'wood' => 6,
         'source' => 'minigame_wood',
+    ]);
+
+    $this->assertDatabaseHas('user_achievements', [
+        'user_id' => $user->id,
+        'achievement_id' => $achievement->id,
+        'progress' => 1,
     ]);
 
     $this->get(route('dashboard'))

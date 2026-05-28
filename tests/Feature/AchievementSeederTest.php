@@ -13,7 +13,7 @@ test('achievement seeder creates milestone achievements with default production 
         AchievementSeeder::class,
     ]);
 
-    expect(DB::table('achievements')->count())->toBe(46);
+    expect(DB::table('achievements')->count())->toBe(58);
 
     $this->assertDatabaseHas('achievements', [
         'slug' => 'gold-1000',
@@ -42,6 +42,14 @@ test('achievement seeder creates milestone achievements with default production 
     $this->assertDatabaseHas('achievements', [
         'slug' => 'manual-collects-1000',
         'type' => 'manual_collects',
+        'target_value' => 1_000,
+        'production_bonus_percent' => 5,
+    ]);
+
+    $this->assertDatabaseHas('achievements', [
+        'slug' => 'wood-minigame-completions-1000',
+        'type' => 'minigame_completions',
+        'resource_type' => 'wood',
         'target_value' => 1_000,
         'production_bonus_percent' => 5,
     ]);

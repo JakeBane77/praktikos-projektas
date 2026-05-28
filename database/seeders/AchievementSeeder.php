@@ -29,6 +29,7 @@ class AchievementSeeder extends Seeder
             ...$this->buildingLevelAchievements($now, $buildingTypes),
             ...$this->roadAchievements($now),
             ...$this->manualCollectAchievements($now),
+            ...$this->minigameAchievements($now),
             ...$this->prestigeAchievements($now),
         ];
 
@@ -160,6 +161,31 @@ class AchievementSeeder extends Seeder
                 now: $now,
             ),
         ];
+    }
+
+    private function minigameAchievements(mixed $now): array
+    {
+        $rows = [];
+
+        foreach (['wood', 'food', 'stone', 'gold'] as $resource) {
+            $resourceName = Str::title($resource);
+
+            foreach ([10, 100, 1_000] as $target) {
+                $formattedTarget = number_format($target);
+
+                $rows[] = $this->achievementRow(
+                    name: $resourceName.' Minigame '.$formattedTarget,
+                    slug: $resource.'-minigame-completions-'.$target,
+                    description: 'Complete the '.$resource.' minigame '.$formattedTarget.' times.',
+                    type: 'minigame_completions',
+                    targetValue: $target,
+                    now: $now,
+                    resourceType: $resource,
+                );
+            }
+        }
+
+        return $rows;
     }
 
     private function prestigeAchievements(mixed $now): array

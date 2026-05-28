@@ -516,6 +516,7 @@ class DashboardController extends Controller
             'resource', 'resource_lifetime' => $this->resourceProgressFor($resources, $achievement->resource_type, true),
             'resource_current' => $this->resourceProgressFor($resources, $achievement->resource_type, false),
             'manual_collects' => $resources->manual_collects,
+            'minigame_completions' => $this->minigameCompletionProgressFor($resources->user, $achievement->resource_type),
             'prestiges' => $resources->prestiges,
             'building_level' => $this->buildingLevelProgressFor($achievement, $buildings),
             'building_levels', 'total_building_levels', 'buildings_built' => $buildings->sum('level'),
@@ -533,6 +534,18 @@ class DashboardController extends Controller
         $column = $lifetime ? 'lifetime_'.$resourceType : $resourceType;
 
         return (int) $resources->{$column};
+    }
+
+    private function minigameCompletionProgressFor(User $user, ?string $resourceType): int
+    {
+        if (! in_array($resourceType, self::RESOURCE_TYPES, true)) {
+            return 0;
+        }
+
+        return (int) Minigame::query()
+            ->where('user_id', $user->id)
+            ->where('resource', $resourceType)
+            ->value('completions');
     }
 
     /**
