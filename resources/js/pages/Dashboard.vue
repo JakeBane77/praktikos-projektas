@@ -153,12 +153,15 @@ const prestigeRequirementLabel = computed(() =>
     props.prestigeStats.requirement.toLocaleString(),
 );
 const prestigeProgressPercent = computed(() =>
-    Math.min(
-        100,
-        Math.floor(
-            (props.roadStats.length / props.prestigeStats.requirement) * 100,
-        ),
-    ),
+    props.prestigeStats.requirement > 0
+        ? Math.min(
+              100,
+              Math.floor(
+                  (props.roadStats.length / props.prestigeStats.requirement) *
+                      100,
+              ),
+          )
+        : 0,
 );
 const collectDisabled = computed(() => isCollecting.value || !props.canCollect);
 const collectButtonLabel = computed(() => {

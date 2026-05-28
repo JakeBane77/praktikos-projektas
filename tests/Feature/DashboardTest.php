@@ -718,6 +718,7 @@ test('users can build multiple kilometers of road at once', function () {
         'production_multiplier' => null,
         'effect_type' => 'road_length',
         'base_costs' => ['wood' => 10],
+        'max_level' => 10,
         'upgrade_cost_multiplier' => 2,
     ]);
 
@@ -810,6 +811,7 @@ test('roads are displayed as kilometers instead of production per hour', functio
         'production_multiplier' => null,
         'effect_type' => 'road_length',
         'base_costs' => ['wood' => 10],
+        'max_level' => 10,
     ]);
 
     UserBuilding::create([
@@ -873,11 +875,11 @@ test('roads are displayed as kilometers instead of production per hour', functio
             ->where('prestigeStats.count', 0)
             ->where('prestigeStats.rank', 2)
             ->where('prestigeStats.canPrestige', false)
-            ->where('prestigeStats.requirement', 60_000_000)
+            ->where('prestigeStats.requirement', 10)
         );
 });
 
-test('users can prestige after building sixty million kilometers of road', function () {
+test('users can prestige after building roads to the road max level', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -889,12 +891,13 @@ test('users can prestige after building sixty million kilometers of road', funct
         'production_multiplier' => null,
         'effect_type' => 'road_length',
         'base_costs' => ['wood' => 10],
+        'max_level' => 8,
     ]);
 
     $roadBuilding = UserBuilding::create([
         'user_id' => $user->id,
         'building_type_id' => $road->id,
-        'level' => 60_000_000,
+        'level' => 8,
         'built_at' => now(),
     ]);
 

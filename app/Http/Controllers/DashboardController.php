@@ -25,8 +25,6 @@ class DashboardController extends Controller
 
     private const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
 
-    private const PRESTIGE_ROAD_REQUIREMENT = 60_000_000;
-
     private const DAILY_BASE_REWARDS = [
         'gold' => 0,
         'wood' => 30,
@@ -49,6 +47,7 @@ class DashboardController extends Controller
 
         $productionRates = $this->productionRatesFor($buildings, $productionBonuses);
         $roadLength = $this->roadLengthFor($buildings);
+        $prestigeRoadRequirement = $this->prestigeRoadRequirementFor($buildings);
         $serverTime = now();
 
         return Inertia::render('Dashboard', [
@@ -82,8 +81,8 @@ class DashboardController extends Controller
             'prestigeStats' => [
                 'count' => (int) $resources->prestiges,
                 'rank' => $this->prestigeLeaderboardRankFor((int) $resources->prestiges),
-                'canPrestige' => $roadLength >= self::PRESTIGE_ROAD_REQUIREMENT,
-                'requirement' => self::PRESTIGE_ROAD_REQUIREMENT,
+                'canPrestige' => $prestigeRoadRequirement > 0 && $roadLength >= $prestigeRoadRequirement,
+                'requirement' => $prestigeRoadRequirement,
             ],
             'achievementBonuses' => $this->achievementBonusCardsFor($productionBonuses),
             'achievementUnlocks' => $this->achievementUnlockCardsFor($achievements),
@@ -251,12 +250,21 @@ class DashboardController extends Controller
         $resources = $this->resourcesFor($user);
         $buildings = $this->buildingsFor($user);
         $this->applyPassiveProduction($resources, $buildings, $this->productionBonusesFor($user));
+        $prestigeRoadRequirement = $this->prestigeRoadRequirementFor($buildings);
 
-        if ($this->roadLengthFor($buildings) < self::PRESTIGE_ROAD_REQUIREMENT) {
+        if ($prestigeRoadRequirement <= 0) {
             return redirect()
                 ->route('dashboard')
                 ->withErrors([
-                    'prestige' => 'You need 60,000,000 km of roads before you can prestige.',
+                    'prestige' => 'Road max level is not configured.',
+                ]);
+        }
+
+        if ($this->roadLengthFor($buildings) < $prestigeRoadRequirement) {
+            return redirect()
+                ->route('dashboard')
+                ->withErrors([
+                    'prestige' => 'You need '.number_format($prestigeRoadRequirement).' km of roads before you can prestige.',
                 ]);
         }
 
@@ -417,6 +425,20 @@ class DashboardController extends Controller
         foreach ($buildings as $building) {
             if ($this->isRoad($building)) {
                 return $building->level;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param  iterable<UserBuilding>  $buildings
+     */
+    private function prestigeRoadRequirementFor(iterable $buildings): int
+    {
+        foreach ($buildings as $building) {
+            if ($this->isRoad($building)) {
+                return (int) ($building->buildingType->max_level ?? 0);
             }
         }
 
