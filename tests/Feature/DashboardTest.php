@@ -123,6 +123,57 @@ test('daily collect can only be used once per day', function () {
     expect(ResourceCollection::where('user_id', $user->id)->count())->toBe(1);
 });
 
+test('minigame completion awards resources from current production and tracks completions', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $lumbercamp = BuildingType::create([
+        'name' => 'Lumbercamp',
+        'slug' => 'lumbercamp',
+        'produces_resource' => 'wood',
+        'base_production_per_hour' => 250,
+        'production_multiplier' => 1,
+        'base_costs' => ['gold' => 100],
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $lumbercamp->id,
+        'level' => 1,
+        'built_at' => now(),
+    ]);
+
+    $this->post(route('dashboard.minigames.complete', ['resource' => 'wood']))
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'wood' => 4,
+        'lifetime_wood' => 4,
+    ]);
+
+    $this->assertDatabaseHas('minigames', [
+        'user_id' => $user->id,
+        'resource' => 'wood',
+        'completions' => 1,
+        'resources_gained' => 4,
+    ]);
+
+    $this->assertDatabaseHas('resource_collections', [
+        'user_id' => $user->id,
+        'wood' => 4,
+        'source' => 'minigame_wood',
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('minigames.0.resource', 'wood')
+            ->where('minigames.0.currentProduction', 250)
+            ->where('minigames.0.reward', 4)
+            ->where('minigames.0.completions', 1)
+            ->where('minigames.0.resourcesGained', 4));
+});
+
 test('daily collect gives one hundred of each resource after first prestige', function () {
     $user = User::factory()->create();
     $this->actingAs($user);

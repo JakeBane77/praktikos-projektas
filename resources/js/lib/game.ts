@@ -45,6 +45,16 @@ export type AchievementUnlock = {
     rewardLabel: string;
 };
 
+export type Minigame = {
+    resource: ResourceKey;
+    label: string;
+    currentProduction: number;
+    reward: number;
+    rewardLabel: string;
+    completions: number;
+    resourcesGained: number;
+};
+
 export type DashboardGameData = {
     serverTime: {
         iso: string;
@@ -66,6 +76,7 @@ export type DashboardGameData = {
     };
     achievementBonuses: AchievementBonus[];
     achievementUnlocks: AchievementUnlock[];
+    minigames: Minigame[];
     buildings: Building[];
     achievements: Achievement[];
 };

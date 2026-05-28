@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Achievement;
 use App\Models\BuildingType;
+use App\Models\Minigame;
 use App\Models\ResourceCollection;
 use App\Models\User;
 use App\Models\UserAchievement;
@@ -18,6 +19,10 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    private const RESOURCE_TYPES = ['gold', 'wood', 'stone', 'food'];
+
+    private const RESOURCE_DISPLAY_ORDER = ['wood', 'food', 'stone', 'gold'];
+
     private const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
 
     private const PRESTIGE_ROAD_REQUIREMENT = 60_000_000;
@@ -39,6 +44,7 @@ class DashboardController extends Controller
         $productionBonuses = $this->productionBonusesFor($user);
         $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
         $achievements = $this->syncAchievementsFor($user, $resources, $buildings);
+        $minigames = $this->minigamesFor($user);
         $productionBonuses = $this->productionBonusesFor($user);
 
         $productionRates = $this->productionRatesFor($buildings, $productionBonuses);
@@ -81,6 +87,7 @@ class DashboardController extends Controller
             ],
             'achievementBonuses' => $this->achievementBonusCardsFor($productionBonuses),
             'achievementUnlocks' => $this->achievementUnlockCardsFor($achievements),
+            'minigames' => $this->minigameCardsFor($minigames, $productionRates),
             'buildings' => $buildings->map(fn (UserBuilding $building): array => [
                 'id' => $building->id,
                 'name' => $building->buildingType->name,
@@ -196,6 +203,48 @@ class DashboardController extends Controller
         return redirect()->route('dashboard');
     }
 
+    public function completeMinigame(Request $request, string $resource): RedirectResponse
+    {
+        if (! in_array($resource, self::RESOURCE_TYPES, true)) {
+            abort(404);
+        }
+
+        $user = $request->user();
+        $resources = $this->resourcesFor($user);
+        $buildings = $this->buildingsFor($user);
+        $productionBonuses = $this->productionBonusesFor($user);
+        $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
+        $minigame = $this->minigameFor($user, $resource);
+
+        $productionRates = $this->productionRatesFor($buildings, $productionBonuses);
+        $reward = $this->minigameRewardFor((int) $productionRates[$resource]);
+        $lifetimeColumn = 'lifetime_'.$resource;
+
+        DB::transaction(function () use ($lifetimeColumn, $minigame, $resource, $resources, $reward): void {
+            $resources->{$resource} += $reward;
+            $resources->{$lifetimeColumn} += $reward;
+            $resources->save();
+
+            $minigame->completions += 1;
+            $minigame->resources_gained += $reward;
+            $minigame->save();
+
+            ResourceCollection::create([
+                'user_id' => $resources->user_id,
+                'gold' => $resource === 'gold' ? $reward : 0,
+                'wood' => $resource === 'wood' ? $reward : 0,
+                'stone' => $resource === 'stone' ? $reward : 0,
+                'food' => $resource === 'food' ? $reward : 0,
+                'source' => 'minigame_'.$resource,
+                'collected_at' => now(),
+            ]);
+        });
+
+        $this->syncAchievementsFor($user, $resources, $buildings);
+
+        return redirect()->route('dashboard');
+    }
+
     public function prestige(Request $request): RedirectResponse
     {
         $user = $request->user();
@@ -301,6 +350,36 @@ class DashboardController extends Controller
             ->get()
             ->sortBy(fn (UserBuilding $building): int => $building->buildingType->id)
             ->values();
+    }
+
+    /**
+     * @return Collection<int, Minigame>
+     */
+    private function minigamesFor(User $user): Collection
+    {
+        foreach (self::RESOURCE_TYPES as $resource) {
+            $this->minigameFor($user, $resource);
+        }
+
+        return Minigame::query()
+            ->where('user_id', $user->id)
+            ->get()
+            ->sortBy(fn (Minigame $minigame): int => (int) array_search($minigame->resource, self::RESOURCE_DISPLAY_ORDER, true))
+            ->values();
+    }
+
+    private function minigameFor(User $user, string $resource): Minigame
+    {
+        return Minigame::firstOrCreate(
+            [
+                'user_id' => $user->id,
+                'resource' => $resource,
+            ],
+            [
+                'completions' => 0,
+                'resources_gained' => 0,
+            ],
+        );
     }
 
     /**
@@ -447,7 +526,7 @@ class DashboardController extends Controller
 
     private function resourceProgressFor(UserResource $resources, ?string $resourceType, bool $lifetime): int
     {
-        if (! in_array($resourceType, ['gold', 'wood', 'stone', 'food'], true)) {
+        if (! in_array($resourceType, self::RESOURCE_TYPES, true)) {
             return 0;
         }
 
@@ -578,6 +657,39 @@ class DashboardController extends Controller
         }
 
         return $cards;
+    }
+
+    /**
+     * @param  array{gold: int, wood: int, stone: int, food: int}  $productionRates
+     * @return array<int, array{resource: string, label: string, currentProduction: int, reward: int, rewardLabel: string, completions: int, resourcesGained: int}>
+     */
+    private function minigameCardsFor(Collection $minigames, array $productionRates): array
+    {
+        $minigamesByResource = $minigames->keyBy('resource');
+
+        return collect(self::RESOURCE_DISPLAY_ORDER)
+            ->map(function (string $resource) use ($minigamesByResource, $productionRates): array {
+                $currentProduction = (int) $productionRates[$resource];
+                $reward = $this->minigameRewardFor($currentProduction);
+                $minigame = $minigamesByResource->get($resource);
+
+                return [
+                    'resource' => $resource,
+                    'label' => str($resource)->title()->append(' minigame')->toString(),
+                    'currentProduction' => $currentProduction,
+                    'reward' => $reward,
+                    'rewardLabel' => '+'.number_format($reward).' '.$resource,
+                    'completions' => (int) ($minigame?->completions ?? 0),
+                    'resourcesGained' => (int) ($minigame?->resources_gained ?? 0),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function minigameRewardFor(int $currentProduction): int
+    {
+        return (int) ceil(1 + ($currentProduction * 0.02));
     }
 
     /**
@@ -792,7 +904,7 @@ class DashboardController extends Controller
     private function canAfford(UserResource $resources, array $costs): bool
     {
         foreach ($costs as $resource => $cost) {
-            if (! in_array($resource, ['gold', 'wood', 'stone', 'food'], true)) {
+            if (! in_array($resource, self::RESOURCE_TYPES, true)) {
                 return false;
             }
 

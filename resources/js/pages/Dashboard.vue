@@ -7,6 +7,7 @@ import {
     Building2,
     CheckCircle2,
     Coins,
+    Gamepad2,
     Lock,
     Mountain,
     PackagePlus,
@@ -22,6 +23,7 @@ import {
     type AchievementUnlock,
     type Building,
     type DashboardGameData,
+    type Minigame,
     type ResourceKey,
 } from '@/lib/game';
 import { dashboard } from '@/routes';
@@ -44,12 +46,14 @@ const isCollecting = ref(false);
 const isPrestiging = ref(false);
 const isPrestigeConfirmOpen = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
+const activeMinigameResource = ref<ResourceKey | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const hideCompletedAchievements = ref(true);
 const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
 const activeAchievementUnlockIndex = ref(0);
 const serverTimeMilliseconds = ref(Date.now());
 const buildings = computed<Building[]>(() => props.buildings);
+const minigames = computed<Minigame[]>(() => props.minigames);
 const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
 const currentAchievementUnlock = computed(
@@ -79,7 +83,7 @@ const unlockedAchievementCount = computed(
         achievements.value.filter((achievement) => achievement.isUnlocked)
             .length,
 );
-const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
+const MAX_ROAD_BUILD_AMOUNT = 10_000_000;
 
 const resourceIcons = {
     gold: Coins,
@@ -237,6 +241,22 @@ function collectResources() {
             },
             onFinish: () => {
                 isCollecting.value = false;
+            },
+        },
+    );
+}
+
+function completeMinigame(minigame: Minigame) {
+    router.post(
+        `/dashboard/minigames/${minigame.resource}/complete`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                activeMinigameResource.value = minigame.resource;
+            },
+            onFinish: () => {
+                activeMinigameResource.value = null;
             },
         },
     );
@@ -561,6 +581,113 @@ function upgradeBuilding(building: Building) {
                                 {{ building.upgradeCost }}
                             </template>
                         </p>
+                    </article>
+                </div>
+            </section>
+
+            <section
+                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+            >
+                <header
+                    class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div>
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Minigames
+                        </p>
+                        <h2 class="mt-1 text-xl font-bold">Resource runs</h2>
+                    </div>
+                    <p
+                        class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                    >
+                        1 + 1% hourly production
+                    </p>
+                </header>
+
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <article
+                        v-for="minigame in minigames"
+                        :key="minigame.resource"
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="font-semibold">
+                                    {{ minigame.label }}
+                                </h3>
+                                <p
+                                    class="mt-2 text-sm text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    {{
+                                        minigame.currentProduction.toLocaleString()
+                                    }}
+                                    /hour
+                                </p>
+                            </div>
+                            <component
+                                :is="resourceIcons[minigame.resource]"
+                                class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
+                            />
+                        </div>
+
+                        <div class="mt-4 space-y-2 text-sm">
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <span
+                                    class="text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Reward
+                                </span>
+                                <span class="font-semibold">
+                                    {{ minigame.rewardLabel }}
+                                </span>
+                            </div>
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <span
+                                    class="text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Completed
+                                </span>
+                                <span class="font-semibold">
+                                    {{ minigame.completions.toLocaleString() }}
+                                </span>
+                            </div>
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <span
+                                    class="text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Total gained
+                                </span>
+                                <span class="font-semibold">
+                                    {{
+                                        minigame.resourcesGained.toLocaleString()
+                                    }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="
+                                activeMinigameResource === minigame.resource
+                            "
+                            @click="completeMinigame(minigame)"
+                        >
+                            <Gamepad2 class="h-4 w-4" />
+                            {{
+                                activeMinigameResource === minigame.resource
+                                    ? 'Completing...'
+                                    : 'Play'
+                            }}
+                        </button>
                     </article>
                 </div>
             </section>

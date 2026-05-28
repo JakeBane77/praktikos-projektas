@@ -51,4 +51,9 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->hasMany(UserAchievement::class);
     }
+
+    public function minigames(): HasMany
+    {
+        return $this->hasMany(Minigame::class);
+    }
 }
