@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Oak tree">
+  <ellipse cx="120" cy="254" rx="62" ry="13" fill="#5f4425" opacity=".38"/>
+  <path d="M96 112h48l14 132c1 11-7 20-18 20h-40c-11 0-19-9-18-20l14-132z" fill="#8d5f32"/>
+  <path d="M108 122h15v132h-15z" fill="#744821" opacity=".45"/>
+  <path d="M132 125h9l9 120h-18z" fill="#b07a42" opacity=".34"/>
+  <circle cx="86" cy="106" r="52" fill="#4d8846"/>
+  <circle cx="143" cy="98" r="58" fill="#3d733c"/>
+  <circle cx="119" cy="61" r="55" fill="#5a994c"/>
+  <circle cx="169" cy="125" r="43" fill="#2f6634"/>
+  <circle cx="70" cy="137" r="38" fill="#326f38"/>
+  <path d="M73 93c28-30 77-42 116 0-25-16-63-13-116 0z" fill="#78b45d" opacity=".42"/>
+</svg>

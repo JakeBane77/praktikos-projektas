@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-label="Pine tree">
+  <ellipse cx="120" cy="254" rx="55" ry="12" fill="#4d3720" opacity=".38"/>
+  <path d="M101 118h38l12 126c1 11-7 20-18 20h-26c-11 0-19-9-18-20l12-126z" fill="#83552d"/>
+  <path d="M114 126h10v128h-10z" fill="#633d1e" opacity=".45"/>
+  <path d="M120 13 42 129h39L33 196h174l-48-67h39L120 13z" fill="#2f6f42"/>
+  <path d="m120 13 78 116h-39l48 67h-87V13z" fill="#245c37"/>
+  <path d="M88 104h64l-32-51-32 51z" fill="#4c9255" opacity=".36"/>
+  <path d="M76 176h88l-45-64-43 64z" fill="#66a765" opacity=".25"/>
+</svg>

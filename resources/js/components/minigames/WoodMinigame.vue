@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { woodTrees, type WoodTreeDefinition } from './woodTrees';
 
 const props = defineProps<{
     isSaving: boolean;
@@ -18,13 +19,8 @@ const maxHealth = ref(0);
 const lastResult = ref<'perfect' | 'hit' | 'miss' | null>(null);
 const cooldownUntil = ref(0);
 const cooldownRemainingMilliseconds = ref(0);
+const activeTree = ref<WoodTreeDefinition>(woodTrees[0]);
 
-const MIN_SPEED = 45;
-const MAX_SPEED = 95;
-const MIN_HEALTH = 5;
-const MAX_HEALTH = 8;
-const PERFECT_RADIUS = 3;
-const HIT_RADIUS = 10;
 const MISS_COOLDOWN_MILLISECONDS = 500;
 
 const healthPercent = computed(() =>
@@ -88,11 +84,19 @@ function randomInteger(minimum: number, maximum: number): number {
 }
 
 function randomSpeed(): number {
-    return randomInteger(MIN_SPEED, MAX_SPEED);
+    return randomInteger(activeTree.value.minSpeed, activeTree.value.maxSpeed);
+}
+
+function randomTree(): WoodTreeDefinition {
+    return woodTrees[randomInteger(0, woodTrees.length - 1)];
 }
 
 function resetGame() {
-    const nextHealth = randomInteger(MIN_HEALTH, MAX_HEALTH);
+    activeTree.value = randomTree();
+    const nextHealth = randomInteger(
+        activeTree.value.minHealth,
+        activeTree.value.maxHealth,
+    );
 
     maxHealth.value = nextHealth;
     health.value = nextHealth;
@@ -178,10 +182,10 @@ function hit() {
     const distanceFromCenter = Math.abs(linePercent.value - 50);
     let damage = 0;
 
-    if (distanceFromCenter <= PERFECT_RADIUS) {
+    if (distanceFromCenter <= activeTree.value.perfectHitRadius) {
         damage = 2;
         lastResult.value = 'perfect';
-    } else if (distanceFromCenter <= HIT_RADIUS) {
+    } else if (distanceFromCenter <= activeTree.value.hitRadius) {
         damage = 1;
         lastResult.value = 'hit';
     } else {
@@ -230,26 +234,12 @@ function hit() {
             ></div>
 
             <div class="relative z-10 flex flex-col items-center">
-                <div class="relative h-48 w-56 sm:h-64 sm:w-72">
-                    <div
-                        class="absolute bottom-0 left-1/2 h-24 w-10 -translate-x-1/2 rounded-t-lg bg-[#8d5f32] shadow-inner dark:bg-[#6e4726]"
-                    ></div>
-                    <div
-                        class="absolute bottom-16 left-1/2 h-20 w-28 -translate-x-1/2 rounded-full bg-[#3d733c] shadow-lg dark:bg-[#28552c]"
-                    ></div>
-                    <div
-                        class="absolute bottom-24 left-5 h-20 w-24 rounded-full bg-[#4d8846] shadow-md dark:bg-[#326235]"
-                    ></div>
-                    <div
-                        class="absolute right-4 bottom-24 h-20 w-24 rounded-full bg-[#2f6634] shadow-md dark:bg-[#214b29]"
-                    ></div>
-                    <div
-                        class="absolute bottom-[7.75rem] left-1/2 h-24 w-28 -translate-x-1/2 rounded-full bg-[#5a994c] shadow-md dark:bg-[#3d7138]"
-                    ></div>
-                    <div
-                        class="absolute bottom-8 left-1/2 h-4 w-20 -translate-x-1/2 rounded-full bg-[#71451f]/50"
-                    ></div>
-                </div>
+                <img
+                    :src="activeTree.image"
+                    :alt="activeTree.name"
+                    class="h-56 w-56 object-contain drop-shadow-xl sm:h-72 sm:w-72"
+                    draggable="false"
+                />
                 <div
                     class="mt-3 w-44 overflow-hidden rounded-full border border-[#7d5b36] bg-[#f4e8c6] dark:border-[#80633f] dark:bg-[#211d14]"
                 >
@@ -271,8 +261,8 @@ function hit() {
             class="flex w-full items-center justify-between gap-3 border-t border-[#d6cab6] bg-[#f9f4e8] px-4 py-3 text-sm font-semibold dark:border-[#35332c] dark:bg-[#151910]"
         >
             <span>{{ statusLabel }}</span>
-            <span class="text-[#637447] dark:text-[#b7d38e]">
-                Speed {{ speed.toLocaleString() }}
+            <span class="text-right text-[#637447] dark:text-[#b7d38e]">
+                {{ activeTree.name }} | Speed {{ speed.toLocaleString() }}
             </span>
         </div>
     </button>
