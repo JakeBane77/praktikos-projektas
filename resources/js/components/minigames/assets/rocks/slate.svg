@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Slate rock">
+  <ellipse cx="160" cy="213" rx="118" ry="17" fill="#172027" opacity=".28"/>
+  <path d="M49 165 91 72l89-34 84 47 22 77-53 42-115 2z" fill="#55636d"/>
+  <path d="m91 72 89-34-19 61-76 34z" fill="#74818a"/>
+  <path d="m180 38 84 47-103 14z" fill="#46545f"/>
+  <path d="m161 99 103-14 22 77-81 10z" fill="#66737c"/>
+  <path d="m49 165 36-32 76-34-43 107z" fill="#3f4d56"/>
+  <path d="m161 99 44 73-87 34z" fill="#2f3d46"/>
+  <path d="m205 172 81-10-53 42-115 2z" fill="#4b5861"/>
+  <path d="M83 149c58-22 113-38 169-48" fill="none" stroke="#dce4e6" stroke-linecap="round" stroke-width="7" opacity=".22"/>
+  <path d="M108 93c45-15 91-25 135-29" fill="none" stroke="#2b3740" stroke-linecap="round" stroke-width="6" opacity=".26"/>
+</svg>

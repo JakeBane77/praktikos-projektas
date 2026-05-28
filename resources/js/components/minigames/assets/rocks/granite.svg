@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Granite rock">
+  <ellipse cx="160" cy="215" rx="112" ry="18" fill="#1d2525" opacity=".28"/>
+  <path d="M57 175 76 91l64-50 82 18 51 72-25 61-78 21-78-6z" fill="#818a8d"/>
+  <path d="m76 91 64-50 31 72-63 21z" fill="#9ba3a4"/>
+  <path d="m140 41 82 18-51 54z" fill="#6f787c"/>
+  <path d="m171 113 51-54 51 72-76 14z" fill="#8f9799"/>
+  <path d="m57 175 51-41 63-21-15 95-64-1z" fill="#6d7779"/>
+  <path d="m171 113 26 32-41 63z" fill="#596366"/>
+  <path d="m197 145 76-14-25 61-92 16z" fill="#737d80"/>
+  <path d="M91 104c24-22 45-34 71-47" fill="none" stroke="#d7dddd" stroke-linecap="round" stroke-width="8" opacity=".28"/>
+  <path d="m203 71 34 48" fill="none" stroke="#394245" stroke-linecap="round" stroke-width="6" opacity=".32"/>
+  <path d="m91 188 45 4" fill="none" stroke="#394245" stroke-linecap="round" stroke-width="7" opacity=".26"/>
+</svg>

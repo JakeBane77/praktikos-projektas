@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Basalt rock">
+  <ellipse cx="160" cy="214" rx="110" ry="18" fill="#0a0d0e" opacity=".34"/>
+  <path d="M62 177 82 82l71-40 82 24 42 83-44 52-105 13z" fill="#33383a"/>
+  <path d="m82 82 71-40 10 77-56 37z" fill="#4c5354"/>
+  <path d="m153 42 82 24-72 53z" fill="#252b2d"/>
+  <path d="m163 119 72-53 42 83-79 13z" fill="#414849"/>
+  <path d="m62 177 45-21 56-37-35 95z" fill="#242a2c"/>
+  <path d="m163 119 35 43-70 52z" fill="#171c1f"/>
+  <path d="m198 162 79-13-44 52-105 13z" fill="#2b3032"/>
+  <path d="M109 83c18 47 20 83 6 117" fill="none" stroke="#697273" stroke-linecap="round" stroke-width="7" opacity=".24"/>
+  <path d="M204 76c-17 47-22 85-15 114" fill="none" stroke="#0d1113" stroke-linecap="round" stroke-width="7" opacity=".34"/>
+</svg>

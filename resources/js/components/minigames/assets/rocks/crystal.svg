@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Crystal ore">
+  <ellipse cx="160" cy="214" rx="113" ry="18" fill="#17212b" opacity=".25"/>
+  <path d="M50 175 72 104l50-46 44 20 39-47 52 81 14 55-64 42-100 3z" fill="#5f7590"/>
+  <path d="m72 104 50-46 7 82-79 35z" fill="#7f95ad"/>
+  <path d="m122 58 44 20-37 62z" fill="#c2dae7"/>
+  <path d="m166 78 39-47 52 81-70 34z" fill="#8ba8c0"/>
+  <path d="m187 146 70-34 14 55-64 42z" fill="#4f6680"/>
+  <path d="m50 175 79-35 78 69-100 3z" fill="#455b73"/>
+  <path d="m129 140 37-62 21 68 20 63z" fill="#6f8ba4"/>
+  <path d="M198 49 180 130" fill="none" stroke="#f1fbff" stroke-linecap="round" stroke-width="7" opacity=".44"/>
+  <path d="m95 107 36-34" fill="none" stroke="#f1fbff" stroke-linecap="round" stroke-width="6" opacity=".34"/>
+  <path d="m218 121 28 35" fill="none" stroke="#26374d" stroke-linecap="round" stroke-width="7" opacity=".28"/>
+</svg>
