@@ -23,6 +23,7 @@ import {
     type AchievementUnlock,
     type Building,
     type DashboardGameData,
+    type Leaderboard,
     type Minigame,
     type ResourceKey,
 } from '@/lib/game';
@@ -49,10 +50,12 @@ const isBuildingsOpen = ref(false);
 const isCollecting = ref(false);
 const isPrestiging = ref(false);
 const isPrestigeConfirmOpen = ref(false);
+const isLeaderboardOpen = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const activeMinigameResource = ref<ResourceKey | null>(null);
 const selectedMinigameResource = ref<ResourceKey | null>(null);
 const hasWonMinigame = ref(false);
+const selectedLeaderboardKey = ref(props.leaderboards.defaultKey);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const hideCompletedAchievements = ref(true);
 const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
@@ -60,6 +63,7 @@ const activeAchievementUnlockIndex = ref(0);
 const serverTimeMilliseconds = ref(Date.now());
 const buildings = computed<Building[]>(() => props.buildings);
 const minigames = computed<Minigame[]>(() => props.minigames);
+const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
 const selectedMinigame = computed<Minigame | null>(() =>
     selectedMinigameResource.value
         ? (minigames.value.find(
@@ -161,8 +165,30 @@ const selectedMinigameComponent = computed(() =>
         ? minigameComponents[selectedMinigame.value.resource]
         : null,
 );
+const defaultLeaderboard = computed<Leaderboard | null>(
+    () =>
+        leaderboards.value.find(
+            (leaderboard) =>
+                leaderboard.key === props.leaderboards.defaultKey,
+        ) ??
+        leaderboards.value[0] ??
+        null,
+);
+const selectedLeaderboard = computed<Leaderboard | null>(
+    () =>
+        leaderboards.value.find(
+            (leaderboard) => leaderboard.key === selectedLeaderboardKey.value,
+        ) ??
+        defaultLeaderboard.value ??
+        null,
+);
 const prestigeRankLabel = computed(
     () => `#${props.prestigeStats.rank.toLocaleString()}`,
+);
+const defaultLeaderboardRankLabel = computed(() =>
+    defaultLeaderboard.value
+        ? `#${defaultLeaderboard.value.currentRank.toLocaleString()}`
+        : '#-',
 );
 const prestigeRequirementLabel = computed(() =>
     props.prestigeStats.requirement.toLocaleString(),
@@ -246,6 +272,7 @@ watch(currentAchievementUnlock, (achievementUnlock) => {
     if (achievementUnlock) {
         isBuildingsOpen.value = false;
         isPrestigeConfirmOpen.value = false;
+        isLeaderboardOpen.value = false;
     }
 });
 
@@ -367,6 +394,18 @@ function openPrestigeConfirm() {
 
 function closePrestigeConfirm() {
     isPrestigeConfirmOpen.value = false;
+}
+
+function openLeaderboard(leaderboardKey = defaultLeaderboard.value?.key) {
+    if (leaderboardKey) {
+        selectedLeaderboardKey.value = leaderboardKey;
+    }
+
+    isLeaderboardOpen.value = true;
+}
+
+function closeLeaderboard() {
+    isLeaderboardOpen.value = false;
 }
 
 function prestige() {
@@ -814,6 +853,85 @@ function upgradeBuilding(building: Building) {
                 </div>
             </section>
 
+            <section>
+                <button
+                    type="button"
+                    class="w-full rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#c9b995] hover:shadow-md dark:border-[#38362f] dark:bg-[#1a1d15] dark:hover:border-[#5a523f]"
+                    @click="openLeaderboard()"
+                >
+                    <div
+                        class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-md bg-[#243627] p-2 text-white">
+                                <Trophy class="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p
+                                    class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                                >
+                                    Leaderboard
+                                </p>
+                                <h2 class="mt-1 text-lg font-semibold">
+                                    Your current spot
+                                </h2>
+                                <p
+                                    class="mt-1 text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Open the top 50 rankings and swap between
+                                    prestige, manual collects, and minigame
+                                    completions.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="defaultLeaderboard"
+                            class="grid gap-3 sm:grid-cols-3 lg:min-w-[28rem]"
+                        >
+                            <div
+                                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                            >
+                                <p
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Default board
+                                </p>
+                                <p class="mt-2 text-xl font-bold">
+                                    {{ defaultLeaderboard.label }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                            >
+                                <p
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Rank
+                                </p>
+                                <p class="mt-2 text-xl font-bold">
+                                    {{ defaultLeaderboardRankLabel }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                            >
+                                <p
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Score
+                                </p>
+                                <p class="mt-2 text-xl font-bold">
+                                    {{
+                                        defaultLeaderboard.currentValueLabel
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </button>
+            </section>
+
             <section
                 class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
             >
@@ -1211,6 +1329,139 @@ function upgradeBuilding(building: Building) {
                             isPrestiging ? 'Prestiging...' : 'Confirm prestige'
                         }}
                     </button>
+                </div>
+            </section>
+        </div>
+    </Teleport>
+
+    <Teleport to="body">
+        <div
+            v-if="isLeaderboardOpen && selectedLeaderboard"
+            class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
+            @click.self="closeLeaderboard"
+        >
+            <section
+                class="max-h-[calc(100vh-3rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Leaderboard
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">Top 50 players</h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close leaderboard"
+                        @click="closeLeaderboard"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <button
+                        v-for="leaderboard in leaderboards"
+                        :key="leaderboard.key"
+                        type="button"
+                        class="rounded-md border px-3 py-2 text-sm font-semibold transition"
+                        :class="
+                            selectedLeaderboard.key === leaderboard.key
+                                ? 'border-[#243627] bg-[#243627] text-white'
+                                : 'border-[#d7cbb8] text-[#4f574b] hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]'
+                        "
+                        @click="selectedLeaderboardKey = leaderboard.key"
+                    >
+                        {{ leaderboard.label }}
+                    </button>
+                </div>
+
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Your rank
+                        </p>
+                        <p class="mt-2 text-2xl font-bold">
+                            #{{ selectedLeaderboard.currentRank.toLocaleString() }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Your score
+                        </p>
+                        <p class="mt-2 text-2xl font-bold">
+                            {{ selectedLeaderboard.currentValueLabel }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Metric
+                        </p>
+                        <p class="mt-2 text-2xl font-bold">
+                            {{ selectedLeaderboard.metricLabel }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-5 overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c]">
+                    <div
+                        class="grid grid-cols-[4.5rem_1fr_8rem] gap-3 border-b border-[#e4dac7] bg-[#f6f0e5] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:bg-[#151910] dark:text-[#b6ae9d]"
+                    >
+                        <span>Rank</span>
+                        <span>Player</span>
+                        <span class="text-right">Score</span>
+                    </div>
+
+                    <div
+                        v-if="selectedLeaderboard.entries.length === 0"
+                        class="px-4 py-8 text-center text-sm font-medium text-[#696250] dark:text-[#b6ae9d]"
+                    >
+                        No players on this leaderboard yet.
+                    </div>
+
+                    <div v-else class="divide-y divide-[#e4dac7] dark:divide-[#35332c]">
+                        <div
+                            v-for="entry in selectedLeaderboard.entries"
+                            :key="`${selectedLeaderboard.key}-${entry.userId}`"
+                            class="grid grid-cols-[4.5rem_1fr_8rem] items-center gap-3 px-4 py-3 text-sm"
+                            :class="
+                                entry.isCurrentUser
+                                    ? 'bg-[#edf6e8] text-[#243627] dark:bg-[#1d2a17] dark:text-[#d7edc5]'
+                                    : ''
+                            "
+                        >
+                            <span class="font-bold">
+                                #{{ entry.rank.toLocaleString() }}
+                            </span>
+                            <span class="min-w-0 truncate font-semibold">
+                                {{ entry.userName }}
+                                <span
+                                    v-if="entry.isCurrentUser"
+                                    class="ml-2 rounded-sm bg-[#243627] px-2 py-0.5 text-xs text-white"
+                                >
+                                    You
+                                </span>
+                            </span>
+                            <span class="text-right font-bold">
+                                {{ entry.valueLabel }}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>

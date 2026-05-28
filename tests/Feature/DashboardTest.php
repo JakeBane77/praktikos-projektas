@@ -2,6 +2,7 @@
 
 use App\Models\Achievement;
 use App\Models\BuildingType;
+use App\Models\Minigame;
 use App\Models\ResourceCollection;
 use App\Models\User;
 use App\Models\UserAchievement;
@@ -876,6 +877,64 @@ test('roads are displayed as kilometers instead of production per hour', functio
             ->where('prestigeStats.rank', 2)
             ->where('prestigeStats.canPrestige', false)
             ->where('prestigeStats.requirement', 10)
+        );
+});
+
+test('dashboard includes prestige manual collect and minigame leaderboards', function () {
+    $user = User::factory()->create(['name' => 'Current Player']);
+    $this->actingAs($user);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'manual_collects' => 3,
+        'prestiges' => 2,
+        'last_produced_at' => now(),
+    ]);
+
+    Minigame::create([
+        'user_id' => $user->id,
+        'resource' => 'wood',
+        'completions' => 4,
+        'resources_gained' => 12,
+    ]);
+
+    $leader = User::factory()->create(['name' => 'Top Player']);
+    UserResource::create([
+        'user_id' => $leader->id,
+        'gold' => 0,
+        'wood' => 0,
+        'stone' => 0,
+        'food' => 0,
+        'manual_collects' => 8,
+        'prestiges' => 5,
+        'last_produced_at' => now(),
+    ]);
+
+    Minigame::create([
+        'user_id' => $leader->id,
+        'resource' => 'wood',
+        'completions' => 9,
+        'resources_gained' => 40,
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('leaderboards.defaultKey', 'prestige')
+            ->where('leaderboards.boards.0.key', 'prestige')
+            ->where('leaderboards.boards.0.currentRank', 2)
+            ->where('leaderboards.boards.0.entries.0.userName', 'Top Player')
+            ->where('leaderboards.boards.0.entries.1.userName', 'Current Player')
+            ->where('leaderboards.boards.1.key', 'manual_collects')
+            ->where('leaderboards.boards.1.currentRank', 2)
+            ->where('leaderboards.boards.2.key', 'wood_minigame')
+            ->where('leaderboards.boards.2.currentRank', 2)
+            ->where('leaderboards.boards.2.entries.0.value', 9)
         );
 });
 

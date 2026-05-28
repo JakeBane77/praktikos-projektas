@@ -55,6 +55,25 @@ export type Minigame = {
     resourcesGained: number;
 };
 
+export type LeaderboardEntry = {
+    rank: number;
+    userId: number;
+    userName: string;
+    value: number;
+    valueLabel: string;
+    isCurrentUser: boolean;
+};
+
+export type Leaderboard = {
+    key: string;
+    label: string;
+    metricLabel: string;
+    currentRank: number;
+    currentValue: number;
+    currentValueLabel: string;
+    entries: LeaderboardEntry[];
+};
+
 export type DashboardGameData = {
     serverTime: {
         iso: string;
@@ -76,6 +95,10 @@ export type DashboardGameData = {
     };
     achievementBonuses: AchievementBonus[];
     achievementUnlocks: AchievementUnlock[];
+    leaderboards: {
+        defaultKey: string;
+        boards: Leaderboard[];
+    };
     minigames: Minigame[];
     buildings: Building[];
     achievements: Achievement[];
