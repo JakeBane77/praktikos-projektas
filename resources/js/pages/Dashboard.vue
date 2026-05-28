@@ -47,6 +47,8 @@ const isPrestiging = ref(false);
 const isPrestigeConfirmOpen = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const activeMinigameResource = ref<ResourceKey | null>(null);
+const selectedMinigameResource = ref<ResourceKey | null>(null);
+const hasWonMinigame = ref(false);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const hideCompletedAchievements = ref(true);
 const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
@@ -54,6 +56,14 @@ const activeAchievementUnlockIndex = ref(0);
 const serverTimeMilliseconds = ref(Date.now());
 const buildings = computed<Building[]>(() => props.buildings);
 const minigames = computed<Minigame[]>(() => props.minigames);
+const selectedMinigame = computed<Minigame | null>(() =>
+    selectedMinigameResource.value
+        ? (minigames.value.find(
+              (minigame) =>
+                  minigame.resource === selectedMinigameResource.value,
+          ) ?? null)
+        : null,
+);
 const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
 const currentAchievementUnlock = computed(
@@ -130,6 +140,11 @@ const lifetimeResourceCards = computed(() => [
 
 const lifetimeTotalResources = computed(() =>
     getTotalResources(props.lifetimeResources),
+);
+const selectedMinigameResourceAmount = computed(() =>
+    selectedMinigame.value
+        ? props.resources[selectedMinigame.value.resource]
+        : 0,
 );
 const prestigeRankLabel = computed(
     () => `#${props.prestigeStats.rank.toLocaleString()}`,
@@ -255,11 +270,40 @@ function completeMinigame(minigame: Minigame) {
             onStart: () => {
                 activeMinigameResource.value = minigame.resource;
             },
+            onSuccess: () => {
+                hasWonMinigame.value = true;
+            },
             onFinish: () => {
                 activeMinigameResource.value = null;
             },
         },
     );
+}
+
+function openMinigame(minigame: Minigame) {
+    selectedMinigameResource.value = minigame.resource;
+    hasWonMinigame.value = false;
+}
+
+function closeMinigame() {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+}
+
+function continueMinigame() {
+    hasWonMinigame.value = false;
+}
+
+function winMinigame() {
+    if (!selectedMinigame.value) {
+        return;
+    }
+
+    completeMinigame(selectedMinigame.value);
 }
 
 function advanceAchievementUnlockPopup() {
@@ -602,7 +646,7 @@ function upgradeBuilding(building: Building) {
                     <p
                         class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
                     >
-                        1 + 1% hourly production
+                        1 + 2% hourly production
                     </p>
                 </header>
 
@@ -679,7 +723,7 @@ function upgradeBuilding(building: Building) {
                             :disabled="
                                 activeMinigameResource === minigame.resource
                             "
-                            @click="completeMinigame(minigame)"
+                            @click="openMinigame(minigame)"
                         >
                             <Gamepad2 class="h-4 w-4" />
                             {{
@@ -1147,6 +1191,135 @@ function upgradeBuilding(building: Building) {
                         <RotateCcw class="h-4 w-4" />
                         {{
                             isPrestiging ? 'Prestiging...' : 'Confirm prestige'
+                        }}
+                    </button>
+                </div>
+            </section>
+        </div>
+    </Teleport>
+
+    <Teleport to="body">
+        <div
+            v-if="selectedMinigame"
+            class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
+            @click.self="closeMinigame"
+        >
+            <section
+                class="max-h-[calc(100vh-3rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Minigame
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">
+                            {{ selectedMinigame.label }}
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close minigame"
+                        :disabled="activeMinigameResource !== null"
+                        @click="closeMinigame"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div
+                    class="mt-5 flex min-h-[320px] items-center justify-center rounded-md border border-[#e4dac7] bg-[#f6f3ec] dark:border-[#35332c] dark:bg-[#12140f]"
+                ></div>
+
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Reward
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{ selectedMinigame.rewardLabel }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Current resources
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{
+                                selectedMinigameResourceAmount.toLocaleString()
+                            }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Completions
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{ selectedMinigame.completions.toLocaleString() }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Total gained
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{
+                                selectedMinigame.resourcesGained.toLocaleString()
+                            }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 flex flex-col gap-3 border-t border-[#e4dac7] pt-4 sm:flex-row sm:justify-end dark:border-[#35332c]"
+                >
+                    <template v-if="hasWonMinigame">
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
+                            @click="continueMinigame"
+                        >
+                            <Gamepad2 class="h-4 w-4" />
+                            Continue playing
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                            @click="closeMinigame"
+                        >
+                            Stop playing
+                        </button>
+                    </template>
+                    <button
+                        v-else
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="activeMinigameResource !== null"
+                        @click="winMinigame"
+                    >
+                        <CheckCircle2 class="h-4 w-4" />
+                        {{
+                            activeMinigameResource === selectedMinigame.resource
+                                ? 'Completing...'
+                                : 'Win'
                         }}
                     </button>
                 </div>

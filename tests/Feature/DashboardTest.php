@@ -148,20 +148,20 @@ test('minigame completion awards resources from current production and tracks co
 
     $this->assertDatabaseHas('user_resources', [
         'user_id' => $user->id,
-        'wood' => 4,
-        'lifetime_wood' => 4,
+        'wood' => 6,
+        'lifetime_wood' => 6,
     ]);
 
     $this->assertDatabaseHas('minigames', [
         'user_id' => $user->id,
         'resource' => 'wood',
         'completions' => 1,
-        'resources_gained' => 4,
+        'resources_gained' => 6,
     ]);
 
     $this->assertDatabaseHas('resource_collections', [
         'user_id' => $user->id,
-        'wood' => 4,
+        'wood' => 6,
         'source' => 'minigame_wood',
     ]);
 
@@ -169,9 +169,9 @@ test('minigame completion awards resources from current production and tracks co
         ->assertInertia(fn (Assert $page) => $page
             ->where('minigames.0.resource', 'wood')
             ->where('minigames.0.currentProduction', 250)
-            ->where('minigames.0.reward', 4)
+            ->where('minigames.0.reward', 6)
             ->where('minigames.0.completions', 1)
-            ->where('minigames.0.resourcesGained', 4));
+            ->where('minigames.0.resourcesGained', 6));
 });
 
 test('daily collect gives one hundred of each resource after first prestige', function () {
