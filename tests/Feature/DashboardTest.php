@@ -46,12 +46,42 @@ test('dashboard reads weather code from the database', function () {
             ->where('weather.latitude', 54.3957)
             ->where('weather.longitude', 24.0389)
             ->where('weather.weatherCode', 61)
+            ->where('weather.conditions.sunny', false)
+            ->where('weather.conditions.raining', true)
+            ->where('weather.conditions.foggy', false)
+            ->where('weather.conditions.thunderstorm', false)
+            ->where('weather.conditions.snowing', false)
+        );
+});
+
+test('dashboard exposes simplified weather conditions for later immersive mode use', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    WeatherSnapshot::create([
+        'latitude' => 54.3957,
+        'longitude' => 24.0389,
+        'weather_code' => 71,
+        'api_time' => now(),
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('weather.weatherCode', 71)
+            ->where('weather.conditions.sunny', false)
+            ->where('weather.conditions.raining', false)
+            ->where('weather.conditions.foggy', false)
+            ->where('weather.conditions.thunderstorm', false)
+            ->where('weather.conditions.snowing', true)
         );
 });
 
 test('weather update command stores open meteo weather code', function () {
     Http::fake([
         'api.open-meteo.com/*' => Http::response([
+            'timezone' => 'Europe/Vilnius',
             'current' => [
                 'time' => '2026-05-28T12:03',
                 'weather_code' => 71,
@@ -66,6 +96,7 @@ test('weather update command stores open meteo weather code', function () {
         'latitude' => 54.3957,
         'longitude' => 24.0389,
         'weather_code' => 71,
+        'api_time' => '2026-05-28 09:03:00',
     ]);
 });
 

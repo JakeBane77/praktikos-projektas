@@ -6,20 +6,12 @@ import {
     Award,
     Building2,
     CheckCircle2,
-    Cloud,
-    CloudDrizzle,
-    CloudFog,
-    CloudLightning,
-    CloudRain,
-    CloudSnow,
-    CloudSun,
     Coins,
     Gamepad2,
     Lock,
     Mountain,
     PackagePlus,
     RotateCcw,
-    Sun,
     TreePine,
     Trophy,
     Wheat,
@@ -35,6 +27,10 @@ import {
     type Minigame,
     type ResourceKey,
 } from '@/lib/game';
+import {
+    weatherConditionLabel as getWeatherConditionLabel,
+    weatherIconFor,
+} from '@/lib/weather';
 import { dashboard } from '@/routes';
 import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
 import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
@@ -227,12 +223,13 @@ const serverTimezoneLabel = computed(() =>
     props.serverTime.timezone.replaceAll('_', ' '),
 );
 const weatherIcon = computed(() =>
-    props.weather.weatherCode !== null
-        ? weatherIconFor(props.weather.weatherCode)
-        : CloudSun,
+    weatherIconFor(props.weather.weatherCode, props.weather.conditions),
 );
 const weatherCoordinatesLabel = computed(
     () => `${props.weather.latitude}, ${props.weather.longitude}`,
+);
+const weatherConditionLabel = computed(() =>
+    getWeatherConditionLabel(props.weather.conditions),
 );
 
 let serverTimeBaseMilliseconds = Date.now();
@@ -264,42 +261,6 @@ function formatServerDateTime(milliseconds: number): string {
         parts.find((part) => part.type === type)?.value ?? '00';
 
     return `${partValue('year')}-${partValue('month')}-${partValue('day')} ${partValue('hour')}:${partValue('minute')}:${partValue('second')}`;
-}
-
-function weatherIconFor(code: number) {
-    if (code === 0) {
-        return Sun;
-    }
-
-    if ([1, 2].includes(code)) {
-        return CloudSun;
-    }
-
-    if (code === 3) {
-        return Cloud;
-    }
-
-    if ([45, 48].includes(code)) {
-        return CloudFog;
-    }
-
-    if ([51, 53, 55, 56, 57].includes(code)) {
-        return CloudDrizzle;
-    }
-
-    if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) {
-        return CloudRain;
-    }
-
-    if ([71, 73, 75, 77, 85, 86].includes(code)) {
-        return CloudSnow;
-    }
-
-    if ([95, 96, 99].includes(code)) {
-        return CloudLightning;
-    }
-
-    return CloudSun;
 }
 
 watch(
@@ -659,6 +620,11 @@ function upgradeBuilding(building: Building) {
                             </p>
                             <p class="mt-1 text-3xl font-bold">
                                 {{ props.weather.weatherCode ?? '-' }}
+                            </p>
+                            <p
+                                class="mt-1 text-sm font-semibold text-[#7a705d] dark:text-[#aaa18f]"
+                            >
+                                {{ weatherConditionLabel }}
                             </p>
                         </div>
                     </div>

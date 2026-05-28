@@ -1,3 +1,5 @@
+import type { WeatherSnapshot } from '@/lib/weather';
+
 export type ResourceKey = 'gold' | 'wood' | 'stone' | 'food';
 
 export type Resources = Record<ResourceKey, number>;
@@ -79,13 +81,7 @@ export type DashboardGameData = {
         iso: string;
         timezone: string;
     };
-    weather: {
-        latitude: number;
-        longitude: number;
-        weatherCode: number | null;
-        apiTime: string | null;
-        updatedAt: string | null;
-    };
+    weather: WeatherSnapshot;
     resources: Resources;
     lifetimeResources: Resources;
     resourceRates: ResourceRates;

@@ -11,6 +11,7 @@ use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
+use App\Support\Weather;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,10 +35,6 @@ class DashboardController extends Controller
     ];
 
     private const DAILY_PRODUCTION_HOURS = 6;
-
-    private const WEATHER_LATITUDE = 54.3957;
-
-    private const WEATHER_LONGITUDE = 24.0389;
 
     public function index(Request $request): Response
     {
@@ -460,19 +457,20 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return array{latitude: float, longitude: float, weatherCode: int|null, apiTime: string|null, updatedAt: string|null}
+     * @return array{latitude: float, longitude: float, weatherCode: int|null, conditions: array{sunny: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}, apiTime: string|null, updatedAt: string|null}
      */
     private function weatherSnapshotCard(): array
     {
         $snapshot = WeatherSnapshot::query()
-            ->where('latitude', self::WEATHER_LATITUDE)
-            ->where('longitude', self::WEATHER_LONGITUDE)
+            ->where('latitude', Weather::LATITUDE)
+            ->where('longitude', Weather::LONGITUDE)
             ->first();
 
         return [
-            'latitude' => self::WEATHER_LATITUDE,
-            'longitude' => self::WEATHER_LONGITUDE,
+            'latitude' => Weather::LATITUDE,
+            'longitude' => Weather::LONGITUDE,
             'weatherCode' => $snapshot?->weather_code,
+            'conditions' => Weather::conditionsFor($snapshot?->weather_code),
             'apiTime' => $snapshot?->api_time?->format('Y-m-d H:i'),
             'updatedAt' => $snapshot?->updated_at?->format('Y-m-d H:i'),
         ];
