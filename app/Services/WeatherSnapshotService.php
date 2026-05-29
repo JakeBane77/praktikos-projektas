@@ -9,11 +9,43 @@ use Illuminate\Support\Facades\Http;
 
 class WeatherSnapshotService
 {
-    public function update(float $latitude, float $longitude): WeatherSnapshot
+    public function update(float $latitude, float $longitude, ?int $userId = null): WeatherSnapshot
     {
         $latitude = Weather::normalizeCoordinate($latitude);
         $longitude = Weather::normalizeCoordinate($longitude);
+        $currentWeather = $this->fetchCurrentWeather($latitude, $longitude);
 
+        return WeatherSnapshot::updateOrCreate(
+            $userId === null
+                ? [
+                    'user_id' => null,
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                ]
+                : [
+                    'user_id' => $userId,
+                ],
+            [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'weather_code' => $currentWeather['weather_code'],
+                'api_time' => $currentWeather['api_time'],
+            ],
+        );
+    }
+
+    public function updateStoredSnapshots(): int
+    {
+        $this->update(Weather::LATITUDE, Weather::LONGITUDE);
+
+        return 1;
+    }
+
+    /**
+     * @return array{weather_code: int|null, api_time: CarbonImmutable|null}
+     */
+    private function fetchCurrentWeather(float $latitude, float $longitude): array
+    {
         $response = Http::timeout(10)
             ->withoutVerifying()
             ->retry(2, 500)
@@ -33,18 +65,12 @@ class WeatherSnapshotService
                 ->setTimezone(config('app.timezone'))
             : null;
 
-        return WeatherSnapshot::updateOrCreate(
-            [
-                'user_id' => null,
-                'latitude' => $latitude,
-                'longitude' => $longitude,
-            ],
-            [
-                'weather_code' => isset($current['weather_code'])
-                    ? (int) $current['weather_code']
-                    : null,
-                'api_time' => $apiTime,
-            ],
-        );
+        return [
+            'weather_code' => isset($current['weather_code'])
+                ? (int) $current['weather_code']
+                : null,
+            'api_time' => $apiTime,
+        ];
     }
+
 }

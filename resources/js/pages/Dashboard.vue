@@ -263,6 +263,9 @@ type OpenMeteoCurrentWeatherResponse = {
 let serverTimeBaseMilliseconds = Date.now();
 let serverTimeClientStartedAt = Date.now();
 let serverTimeInterval: number | undefined;
+let clientWeatherRefreshTimeout: number | undefined;
+
+const WEATHER_REFRESH_MINUTES = [3, 18, 33, 48];
 
 function syncServerTime() {
     const parsedServerTime = Date.parse(props.serverTime.iso);
@@ -309,6 +312,18 @@ watch(
 
 watch(() => props.serverTime.iso, syncServerTime, { immediate: true });
 
+watch(
+    () => [
+        props.weather.isUsingGeolocation,
+        props.weather.latitude,
+        props.weather.longitude,
+        props.serverTime.iso,
+    ],
+    () => {
+        scheduleNextClientWeatherRefresh();
+    },
+);
+
 watch(currentAchievementUnlock, (achievementUnlock) => {
     if (achievementUnlock) {
         isBuildingsOpen.value = false;
@@ -331,6 +346,8 @@ onMounted(() => {
             serverTimeBaseMilliseconds +
             (Date.now() - serverTimeClientStartedAt);
     }, 1000);
+
+    scheduleNextClientWeatherRefresh();
 });
 
 onBeforeUnmount(() => {
@@ -343,6 +360,8 @@ onBeforeUnmount(() => {
     if (serverTimeInterval !== undefined) {
         window.clearInterval(serverTimeInterval);
     }
+
+    clearClientWeatherRefreshTimeout();
 });
 
 function collectResources() {
@@ -403,6 +422,7 @@ function updateWeatherLocation() {
                         },
                         onFinish: () => {
                             isUpdatingWeatherLocation.value = false;
+                            scheduleNextClientWeatherRefresh();
                         },
                     },
                 );
@@ -410,6 +430,7 @@ function updateWeatherLocation() {
                 isUpdatingWeatherLocation.value = false;
                 weatherLocationStatus.value =
                     'Weather could not be fetched from this device.';
+                scheduleNextClientWeatherRefresh();
             }
         },
         (error) => {
@@ -418,6 +439,7 @@ function updateWeatherLocation() {
                 error.code === error.PERMISSION_DENIED
                     ? 'Location permission was denied.'
                     : 'Current location could not be detected.';
+            scheduleNextClientWeatherRefresh();
         },
         {
             enableHighAccuracy: false,
@@ -456,6 +478,90 @@ async function fetchCurrentWeather(latitude: number, longitude: number) {
     };
 }
 
+async function refreshWeatherFromSavedBrowserLocation() {
+    if (!props.weather.isUsingGeolocation || isUpdatingWeatherLocation.value) {
+        scheduleNextClientWeatherRefresh();
+
+        return;
+    }
+
+    isUpdatingWeatherLocation.value = true;
+
+    try {
+        const currentWeather = await fetchCurrentWeather(
+            props.weather.latitude,
+            props.weather.longitude,
+        );
+
+        router.post(
+            '/dashboard/weather-location',
+            {
+                latitude: props.weather.latitude,
+                longitude: props.weather.longitude,
+                weather_code: currentWeather.weatherCode,
+                api_time: currentWeather.apiTime,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => {
+                    weatherLocationStatus.value =
+                        'Automatic weather refresh failed.';
+                },
+                onFinish: () => {
+                    isUpdatingWeatherLocation.value = false;
+                    scheduleNextClientWeatherRefresh();
+                },
+            },
+        );
+    } catch {
+        isUpdatingWeatherLocation.value = false;
+        weatherLocationStatus.value = 'Automatic weather refresh failed.';
+        scheduleNextClientWeatherRefresh();
+    }
+}
+
+function scheduleNextClientWeatherRefresh() {
+    clearClientWeatherRefreshTimeout();
+
+    if (!props.weather.isUsingGeolocation) {
+        return;
+    }
+
+    clientWeatherRefreshTimeout = window.setTimeout(
+        refreshWeatherFromSavedBrowserLocation,
+        millisecondsUntilNextWeatherRefresh(),
+    );
+}
+
+function clearClientWeatherRefreshTimeout() {
+    if (clientWeatherRefreshTimeout !== undefined) {
+        window.clearTimeout(clientWeatherRefreshTimeout);
+        clientWeatherRefreshTimeout = undefined;
+    }
+}
+
+function millisecondsUntilNextWeatherRefresh(): number {
+    const currentServerDate = new Date(
+        serverTimeBaseMilliseconds + (Date.now() - serverTimeClientStartedAt),
+    );
+    const currentMinute = currentServerDate.getMinutes();
+    const currentSecond = currentServerDate.getSeconds();
+    const currentMillisecond = currentServerDate.getMilliseconds();
+    const currentMinuteMilliseconds =
+        currentMinute * 60_000 + currentSecond * 1000 + currentMillisecond;
+
+    for (const refreshMinute of WEATHER_REFRESH_MINUTES) {
+        const refreshMinuteMilliseconds = refreshMinute * 60_000;
+
+        if (refreshMinuteMilliseconds > currentMinuteMilliseconds) {
+            return refreshMinuteMilliseconds - currentMinuteMilliseconds;
+        }
+    }
+
+    return 60 * 60_000 - currentMinuteMilliseconds + WEATHER_REFRESH_MINUTES[0] * 60_000;
+}
+
 function useDefaultWeatherLocation() {
     isUpdatingWeatherLocation.value = true;
     weatherLocationStatus.value = 'Switching to default location...';
@@ -467,6 +573,7 @@ function useDefaultWeatherLocation() {
             preserveScroll: true,
             onSuccess: () => {
                 weatherLocationStatus.value = 'Default location restored.';
+                clearClientWeatherRefreshTimeout();
             },
             onError: () => {
                 weatherLocationStatus.value =
@@ -474,6 +581,7 @@ function useDefaultWeatherLocation() {
             },
             onFinish: () => {
                 isUpdatingWeatherLocation.value = false;
+                scheduleNextClientWeatherRefresh();
             },
         },
     );
