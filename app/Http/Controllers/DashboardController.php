@@ -26,7 +26,7 @@ class DashboardController extends Controller
 
     private const RESOURCE_DISPLAY_ORDER = ['wood', 'food', 'stone', 'gold'];
 
-    private const MAX_ROAD_BUILD_AMOUNT = 1_000_000;
+    private const MAX_ROAD_BUILD_AMOUNT = 10_000_000;
 
     private const DAILY_BASE_REWARDS = [
         'gold' => 0,
