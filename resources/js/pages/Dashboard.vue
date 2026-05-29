@@ -2084,14 +2084,25 @@ function upgradeBuilding(building: Building) {
                     </div>
                 </header>
 
-                <component
-                    :is="selectedMinigameComponent"
-                    :is-saving="
-                        activeMinigameResource === selectedMinigame.resource
-                    "
-                    :is-completed="hasWonMinigame"
-                    @complete="completeSelectedMinigame"
-                />
+                <div class="relative">
+                    <component
+                        :is="selectedMinigameComponent"
+                        :is-saving="
+                            activeMinigameResource === selectedMinigame.resource
+                        "
+                        :is-completed="hasWonMinigame"
+                        @complete="completeSelectedMinigame"
+                    />
+                    <button
+                        v-if="
+                            hasWonMinigame && activeMinigameResource === null
+                        "
+                        type="button"
+                        class="absolute inset-0 z-50 cursor-pointer rounded-md bg-transparent"
+                        aria-label="Continue playing"
+                        @click="continueMinigame"
+                    ></button>
+                </div>
 
                 <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div
