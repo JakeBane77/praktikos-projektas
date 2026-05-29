@@ -714,102 +714,6 @@ function upgradeBuilding(building: Building) {
             </section>
 
             <section
-                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
-            >
-                <div
-                    class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
-                >
-                    <div class="flex items-start gap-3">
-                        <div class="rounded-md bg-[#243627] p-3 text-white">
-                            <component :is="weatherIcon" class="h-6 w-6" />
-                        </div>
-                        <div>
-                            <p
-                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                            >
-                                Local weather
-                            </p>
-                            <h2 class="mt-1 text-lg font-semibold">
-                                Coordinates {{ weatherCoordinatesLabel }}
-                            </h2>
-                            <p
-                                class="mt-1 text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
-                            >
-                                Saved Open-Meteo weather code for the tracked
-                                location.
-                            </p>
-                            <div class="mt-3 flex flex-wrap items-center gap-3">
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
-                                    :disabled="isUpdatingWeatherLocation"
-                                    @click="updateWeatherLocation"
-                                >
-                                    <LocateFixed class="h-4 w-4" />
-                                    {{
-                                        isUpdatingWeatherLocation
-                                            ? 'Locating...'
-                                            : 'Use my location'
-                                    }}
-                                </button>
-                                <button
-                                    v-if="props.weather.isUsingGeolocation"
-                                    type="button"
-                                    class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
-                                    :disabled="isUpdatingWeatherLocation"
-                                    @click="useDefaultWeatherLocation"
-                                >
-                                    <RotateCcw class="h-4 w-4" />
-                                    Use default location
-                                </button>
-                                <span
-                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                                >
-                                    {{ weatherLocationLabel }}
-                                </span>
-                                <span
-                                    v-if="weatherLocationUpdatedLabel"
-                                    class="text-sm font-semibold text-[#7a705d] dark:text-[#aaa18f]"
-                                >
-                                    {{ weatherLocationUpdatedLabel }}
-                                </span>
-                            </div>
-                            <p
-                                v-if="weatherLocationStatus"
-                                class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                            >
-                                {{ weatherLocationStatus }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div
-                        class="flex items-center gap-4 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <component
-                            :is="weatherIcon"
-                            class="h-10 w-10 text-[#7b633d] dark:text-[#caa66c]"
-                        />
-                        <div>
-                            <p
-                                class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                            >
-                                Weather code
-                            </p>
-                            <p class="mt-1 text-3xl font-bold">
-                                {{ props.weather.weatherCode ?? '-' }}
-                            </p>
-                            <p
-                                class="mt-1 text-sm font-semibold text-[#7a705d] dark:text-[#aaa18f]"
-                            >
-                                {{ weatherConditionLabel }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section
                 v-if="isBuildingsOpen"
                 class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
             >
@@ -928,6 +832,102 @@ function upgradeBuilding(building: Building) {
                             </template>
                         </p>
                     </article>
+                </div>
+            </section>
+
+            <section
+                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+            >
+                <div
+                    class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
+                >
+                    <div class="flex items-start gap-3">
+                        <div class="rounded-md bg-[#243627] p-3 text-white">
+                            <component :is="weatherIcon" class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Local weather
+                            </p>
+                            <h2 class="mt-1 text-lg font-semibold">
+                                Coordinates {{ weatherCoordinatesLabel }}
+                            </h2>
+                            <p
+                                class="mt-1 text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Saved Open-Meteo weather code for the tracked
+                                location.
+                            </p>
+                            <div class="mt-3 flex flex-wrap items-center gap-3">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                                    :disabled="isUpdatingWeatherLocation"
+                                    @click="updateWeatherLocation"
+                                >
+                                    <LocateFixed class="h-4 w-4" />
+                                    {{
+                                        isUpdatingWeatherLocation
+                                            ? 'Locating...'
+                                            : 'Use my location'
+                                    }}
+                                </button>
+                                <button
+                                    v-if="props.weather.isUsingGeolocation"
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                                    :disabled="isUpdatingWeatherLocation"
+                                    @click="useDefaultWeatherLocation"
+                                >
+                                    <RotateCcw class="h-4 w-4" />
+                                    Use default location
+                                </button>
+                                <span
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    {{ weatherLocationLabel }}
+                                </span>
+                                <span
+                                    v-if="weatherLocationUpdatedLabel"
+                                    class="text-sm font-semibold text-[#7a705d] dark:text-[#aaa18f]"
+                                >
+                                    {{ weatherLocationUpdatedLabel }}
+                                </span>
+                            </div>
+                            <p
+                                v-if="weatherLocationStatus"
+                                class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                            >
+                                {{ weatherLocationStatus }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="flex items-center gap-4 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <component
+                            :is="weatherIcon"
+                            class="h-10 w-10 text-[#7b633d] dark:text-[#caa66c]"
+                        />
+                        <div>
+                            <p
+                                class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Weather code
+                            </p>
+                            <p class="mt-1 text-3xl font-bold">
+                                {{ props.weather.weatherCode ?? '-' }}
+                            </p>
+                            <p
+                                class="mt-1 text-sm font-semibold text-[#7a705d] dark:text-[#aaa18f]"
+                            >
+                                {{ weatherConditionLabel }}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
