@@ -55,7 +55,7 @@ const isBuildingsOpen = ref(false);
 const isCollecting = ref(false);
 const isPrestiging = ref(false);
 const isPrestigeConfirmOpen = ref(false);
-const isLeaderboardOpen = ref(false);
+const activeGameModal = ref<'leaderboard' | 'minigame' | null>(null);
 const upgradingBuildingId = ref<number | null>(null);
 const activeMinigameResource = ref<ResourceKey | null>(null);
 const selectedMinigameResource = ref<ResourceKey | null>(null);
@@ -189,6 +189,16 @@ const selectedLeaderboard = computed<Leaderboard | null>(
         defaultLeaderboard.value ??
         null,
 );
+const isMinigameOpen = computed(
+    () =>
+        activeGameModal.value === 'minigame' &&
+        selectedMinigame.value !== null,
+);
+const isLeaderboardModalOpen = computed(
+    () =>
+        activeGameModal.value === 'leaderboard' &&
+        selectedLeaderboard.value !== null,
+);
 const prestigeRankLabel = computed(
     () => `#${props.prestigeStats.rank.toLocaleString()}`,
 );
@@ -303,11 +313,19 @@ watch(currentAchievementUnlock, (achievementUnlock) => {
     if (achievementUnlock) {
         isBuildingsOpen.value = false;
         isPrestigeConfirmOpen.value = false;
-        isLeaderboardOpen.value = false;
+        activeGameModal.value = null;
+        selectedMinigameResource.value = null;
+        hasWonMinigame.value = false;
     }
 });
 
 onMounted(() => {
+    document.addEventListener(
+        'pointerdown',
+        handleDocumentGameLauncherPointerDown,
+        true,
+    );
+
     serverTimeInterval = window.setInterval(() => {
         serverTimeMilliseconds.value =
             serverTimeBaseMilliseconds +
@@ -316,6 +334,12 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    document.removeEventListener(
+        'pointerdown',
+        handleDocumentGameLauncherPointerDown,
+        true,
+    );
+
     if (serverTimeInterval !== undefined) {
         window.clearInterval(serverTimeInterval);
     }
@@ -475,8 +499,15 @@ function completeMinigame(minigame: Minigame) {
 }
 
 function openMinigame(minigame: Minigame) {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isBuildingsOpen.value = false;
+    isPrestigeConfirmOpen.value = false;
     selectedMinigameResource.value = minigame.resource;
     hasWonMinigame.value = false;
+    activeGameModal.value = 'minigame';
 }
 
 function closeMinigame() {
@@ -486,6 +517,9 @@ function closeMinigame() {
 
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
+    if (activeGameModal.value === 'minigame') {
+        activeGameModal.value = null;
+    }
 }
 
 function continueMinigame() {
@@ -530,6 +564,8 @@ function advanceAchievementUnlockPopup() {
 }
 
 function openBuildings() {
+    activeGameModal.value = null;
+    isPrestigeConfirmOpen.value = false;
     isBuildingsOpen.value = true;
 }
 
@@ -546,15 +582,111 @@ function closePrestigeConfirm() {
 }
 
 function openLeaderboard(leaderboardKey = defaultLeaderboard.value?.key) {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isBuildingsOpen.value = false;
+    isPrestigeConfirmOpen.value = false;
     if (leaderboardKey) {
         selectedLeaderboardKey.value = leaderboardKey;
     }
 
-    isLeaderboardOpen.value = true;
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'leaderboard';
 }
 
 function closeLeaderboard() {
-    isLeaderboardOpen.value = false;
+    if (activeGameModal.value === 'leaderboard') {
+        activeGameModal.value = null;
+    }
+}
+
+function closeActiveGameModal() {
+    if (isBuildingsOpen.value) {
+        closeBuildings();
+
+        return;
+    }
+
+    if (activeGameModal.value === 'leaderboard') {
+        closeLeaderboard();
+
+        return;
+    }
+
+    closeMinigame();
+}
+
+function handleDocumentGameLauncherPointerDown(event: PointerEvent) {
+    if (
+        activeGameModal.value === null ||
+        activeMinigameResource.value !== null ||
+        currentAchievementUnlock.value
+    ) {
+        return;
+    }
+
+    const target = event.target as Element | null;
+
+    if (target?.closest('button, a, input, select, textarea, [role="button"]')) {
+        return;
+    }
+
+    const launcher = findGameLauncherBehindModal(event);
+
+    if (!launcher) {
+        return;
+    }
+
+    if (launcher.dataset.gameModalLauncher === 'leaderboard') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openLeaderboard();
+
+        return;
+    }
+
+    if (launcher.dataset.gameModalLauncher !== 'minigame') {
+        return;
+    }
+
+    const minigame = minigames.value.find(
+        (entry) => entry.resource === launcher.dataset.resource,
+    );
+
+    if (!minigame) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openMinigame(minigame);
+}
+
+function findGameLauncherBehindModal(event: PointerEvent): HTMLElement | null {
+    const layers = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-game-modal-layer]'),
+    );
+    const previousPointerEvents = layers.map((layer) => layer.style.pointerEvents);
+
+    layers.forEach((layer) => {
+        layer.style.pointerEvents = 'none';
+    });
+
+    const elementBelow = document.elementFromPoint(
+        event.clientX,
+        event.clientY,
+    );
+
+    layers.forEach((layer, index) => {
+        layer.style.pointerEvents = previousPointerEvents[index] ?? '';
+    });
+
+    return (
+        elementBelow?.closest<HTMLElement>('[data-game-modal-launcher]') ?? null
+    );
 }
 
 function prestige() {
@@ -711,128 +843,6 @@ function upgradeBuilding(building: Building) {
                         {{ resource.rate }}
                     </p>
                 </article>
-            </section>
-
-            <section
-                v-if="isBuildingsOpen"
-                class="rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
-            >
-                <header class="flex items-start justify-between gap-4">
-                    <div>
-                        <p
-                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                        >
-                            Buildings
-                        </p>
-                        <h2 class="mt-1 text-2xl font-bold">
-                            Manage structures
-                        </h2>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close buildings"
-                        @click="closeBuildings"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div class="mt-5 grid gap-3">
-                    <article
-                        v-for="building in buildings"
-                        :key="building.name"
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <div
-                            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <h3 class="font-semibold">
-                                        {{ building.name }}
-                                    </h3>
-                                    <span
-                                        class="rounded-sm bg-[#e9e1d3] px-2 py-1 text-xs font-semibold text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]"
-                                    >
-                                        {{ building.levelLabel }}
-                                    </span>
-                                </div>
-                                <p
-                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
-                                >
-                                    {{ building.description }}
-                                </p>
-                                <p
-                                    class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                                >
-                                    {{ building.production }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-col gap-2 sm:items-end">
-                                <label
-                                    v-if="
-                                        building.isRoad && !building.isMaxLevel
-                                    "
-                                    class="flex items-center gap-2 text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
-                                >
-                                    km
-                                    <input
-                                        v-model.number="
-                                            roadBuildAmounts[building.id]
-                                        "
-                                        type="number"
-                                        min="1"
-                                        :max="MAX_ROAD_BUILD_AMOUNT"
-                                        class="h-10 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4]"
-                                        placeholder="1"
-                                    />
-                                </label>
-
-                                <div
-                                    v-if="building.isMaxLevel"
-                                    class="inline-flex items-center justify-center rounded-md border border-[#cfc1a8] bg-[#e9e1d3] px-4 py-2.5 text-sm font-semibold text-[#4e432f] dark:border-[#4a4438] dark:bg-[#24281d] dark:text-[#d8ccb8]"
-                                >
-                                    Max level
-                                </div>
-                                <button
-                                    v-else
-                                    type="button"
-                                    class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                                    :disabled="
-                                        !building.canUpgrade ||
-                                        upgradingBuildingId === building.id
-                                    "
-                                    @click="upgradeBuilding(building)"
-                                >
-                                    <ArrowUp class="h-4 w-4" />
-                                    {{
-                                        upgradingBuildingId === building.id
-                                            ? 'Building...'
-                                            : building.isRoad
-                                              ? 'Build road'
-                                              : building.level === 0
-                                                ? 'Build'
-                                                : 'Upgrade'
-                                    }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <p
-                            class="mt-3 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
-                        >
-                            <template v-if="building.isMaxLevel">
-                                No further upgrades available.
-                            </template>
-                            <template v-else>
-                                {{ building.isRoad ? 'Next km cost' : 'Cost' }}:
-                                {{ building.upgradeCost }}
-                            </template>
-                        </p>
-                    </article>
-                </div>
             </section>
 
             <section
@@ -1021,6 +1031,8 @@ function upgradeBuilding(building: Building) {
 
                         <button
                             type="button"
+                            data-game-modal-launcher="minigame"
+                            :data-resource="minigame.resource"
                             class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="
                                 activeMinigameResource === minigame.resource
@@ -1101,6 +1113,7 @@ function upgradeBuilding(building: Building) {
             <section>
                 <button
                     type="button"
+                    data-game-modal-launcher="leaderboard"
                     class="w-full rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#c9b995] hover:shadow-md dark:border-[#38362f] dark:bg-[#1a1d15] dark:hover:border-[#5a523f]"
                     @click="openLeaderboard()"
                 >
@@ -1581,11 +1594,134 @@ function upgradeBuilding(building: Building) {
 
     <Teleport to="body">
         <div
-            v-if="isLeaderboardOpen && selectedLeaderboard"
+            v-if="isBuildingsOpen || isLeaderboardModalOpen || isMinigameOpen"
+            data-game-modal-layer
             class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
-            @click.self="closeLeaderboard"
+            @click.self="closeActiveGameModal"
         >
             <section
+                v-if="isBuildingsOpen"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Buildings
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">
+                            Manage structures
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close buildings"
+                        @click="closeBuildings"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div class="mt-5 grid gap-3">
+                    <article
+                        v-for="building in buildings"
+                        :key="building.name"
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <div
+                            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-semibold">
+                                        {{ building.name }}
+                                    </h3>
+                                    <span
+                                        class="rounded-sm bg-[#e9e1d3] px-2 py-1 text-xs font-semibold text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]"
+                                    >
+                                        {{ building.levelLabel }}
+                                    </span>
+                                </div>
+                                <p
+                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    {{ building.description }}
+                                </p>
+                                <p
+                                    class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                                >
+                                    {{ building.production }}
+                                </p>
+                            </div>
+
+                            <div class="flex flex-col gap-2 sm:items-end">
+                                <label
+                                    v-if="
+                                        building.isRoad && !building.isMaxLevel
+                                    "
+                                    class="flex items-center gap-2 text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    km
+                                    <input
+                                        v-model.number="
+                                            roadBuildAmounts[building.id]
+                                        "
+                                        type="number"
+                                        min="1"
+                                        :max="MAX_ROAD_BUILD_AMOUNT"
+                                        class="h-10 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4]"
+                                        placeholder="1"
+                                    />
+                                </label>
+
+                                <div
+                                    v-if="building.isMaxLevel"
+                                    class="inline-flex items-center justify-center rounded-md border border-[#cfc1a8] bg-[#e9e1d3] px-4 py-2.5 text-sm font-semibold text-[#4e432f] dark:border-[#4a4438] dark:bg-[#24281d] dark:text-[#d8ccb8]"
+                                >
+                                    Max level
+                                </div>
+                                <button
+                                    v-else
+                                    type="button"
+                                    class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                                    :disabled="
+                                        !building.canUpgrade ||
+                                        upgradingBuildingId === building.id
+                                    "
+                                    @click="upgradeBuilding(building)"
+                                >
+                                    <ArrowUp class="h-4 w-4" />
+                                    {{
+                                        upgradingBuildingId === building.id
+                                            ? 'Building...'
+                                            : building.isRoad
+                                              ? 'Build road'
+                                              : building.level === 0
+                                                ? 'Build'
+                                                : 'Upgrade'
+                                    }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <p
+                            class="mt-3 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
+                        >
+                            <template v-if="building.isMaxLevel">
+                                No further upgrades available.
+                            </template>
+                            <template v-else>
+                                {{ building.isRoad ? 'Next km cost' : 'Cost' }}:
+                                {{ building.upgradeCost }}
+                            </template>
+                        </p>
+                    </article>
+                </div>
+            </section>
+            <section
+                v-else-if="isLeaderboardModalOpen && selectedLeaderboard"
                 class="max-h-[calc(100vh-3rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <header class="flex items-start justify-between gap-4">
@@ -1597,14 +1733,27 @@ function upgradeBuilding(building: Building) {
                         </p>
                         <h2 class="mt-1 text-2xl font-bold">Top 50 players</h2>
                     </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close leaderboard"
-                        @click="closeLeaderboard"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                            v-for="minigame in minigames"
+                            :key="`leaderboard-${minigame.resource}`"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                            :disabled="activeMinigameResource !== null"
+                            @click="openMinigame(minigame)"
+                        >
+                            <Gamepad2 class="h-4 w-4" />
+                            {{ resourceLabels[minigame.resource] }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                            aria-label="Close leaderboard"
+                            @click="closeLeaderboard"
+                        >
+                            <X class="h-5 w-5" />
+                        </button>
+                    </div>
                 </header>
 
                 <div class="mt-5 flex flex-wrap gap-2">
@@ -1709,16 +1858,8 @@ function upgradeBuilding(building: Building) {
                     </div>
                 </div>
             </section>
-        </div>
-    </Teleport>
-
-    <Teleport to="body">
-        <div
-            v-if="selectedMinigame"
-            class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
-            @click.self="closeMinigame"
-        >
             <section
+                v-else-if="isMinigameOpen && selectedMinigame"
                 class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <header class="flex items-start justify-between gap-4">
@@ -1732,15 +1873,26 @@ function upgradeBuilding(building: Building) {
                             {{ selectedMinigame.label }}
                         </h2>
                     </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close minigame"
-                        :disabled="activeMinigameResource !== null"
-                        @click="closeMinigame"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
+                    <div class="flex items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                            :disabled="activeMinigameResource !== null"
+                            @click="openLeaderboard()"
+                        >
+                            <Trophy class="h-4 w-4" />
+                            Leaderboard
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                            aria-label="Close minigame"
+                            :disabled="activeMinigameResource !== null"
+                            @click="closeMinigame"
+                        >
+                            <X class="h-5 w-5" />
+                        </button>
+                    </div>
                 </header>
 
                 <component
