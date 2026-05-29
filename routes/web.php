@@ -15,6 +15,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('dashboard/buildings/{building}/upgrade', [DashboardController::class, 'upgrade'])->name('dashboard.buildings.upgrade');
     Route::post('dashboard/achievements/unlocks/seen', [DashboardController::class, 'markAchievementUnlocksSeen'])
         ->name('dashboard.achievements.unlocks.seen');
+    Route::post('dashboard/weather-location', [DashboardController::class, 'updateWeatherLocation'])
+        ->name('dashboard.weather-location');
+    Route::post('dashboard/weather-location/default', [DashboardController::class, 'resetWeatherLocation'])
+        ->name('dashboard.weather-location.default');
 });
 
 require __DIR__.'/settings.php';

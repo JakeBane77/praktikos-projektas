@@ -8,6 +8,7 @@ import {
     CheckCircle2,
     Coins,
     Gamepad2,
+    LocateFixed,
     Lock,
     Mountain,
     PackagePlus,
@@ -65,6 +66,8 @@ const hideCompletedAchievements = ref(true);
 const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
 const activeAchievementUnlockIndex = ref(0);
 const serverTimeMilliseconds = ref(Date.now());
+const isUpdatingWeatherLocation = ref(false);
+const weatherLocationStatus = ref<string | null>(null);
 const buildings = computed<Building[]>(() => props.buildings);
 const minigames = computed<Minigame[]>(() => props.minigames);
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
@@ -228,9 +231,24 @@ const weatherIcon = computed(() =>
 const weatherCoordinatesLabel = computed(
     () => `${props.weather.latitude}, ${props.weather.longitude}`,
 );
+const weatherLocationLabel = computed(() =>
+    props.weather.isUsingGeolocation ? 'Browser location' : 'Default location',
+);
+const weatherLocationUpdatedLabel = computed(() =>
+    props.weather.locationUpdatedAt
+        ? `Updated ${props.weather.locationUpdatedAt}`
+        : null,
+);
 const weatherConditionLabel = computed(() =>
     getWeatherConditionLabel(props.weather.conditions),
 );
+
+type OpenMeteoCurrentWeatherResponse = {
+    current?: {
+        time?: string;
+        weather_code?: number;
+    };
+};
 
 let serverTimeBaseMilliseconds = Date.now();
 let serverTimeClientStartedAt = Date.now();
@@ -314,6 +332,124 @@ function collectResources() {
             },
             onFinish: () => {
                 isCollecting.value = false;
+            },
+        },
+    );
+}
+
+function updateWeatherLocation() {
+    if (!navigator.geolocation) {
+        weatherLocationStatus.value = 'Geolocation is not supported here.';
+
+        return;
+    }
+
+    isUpdatingWeatherLocation.value = true;
+    weatherLocationStatus.value = 'Waiting for permission...';
+
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            try {
+                weatherLocationStatus.value =
+                    'Fetching weather from this device...';
+                const currentWeather = await fetchCurrentWeather(
+                    position.coords.latitude,
+                    position.coords.longitude,
+                );
+
+                weatherLocationStatus.value = 'Saving weather...';
+
+                router.post(
+                    '/dashboard/weather-location',
+                    {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        weather_code: currentWeather.weatherCode,
+                        api_time: currentWeather.apiTime,
+                    },
+                    {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            weatherLocationStatus.value =
+                                'Weather location updated.';
+                        },
+                        onError: () => {
+                            weatherLocationStatus.value =
+                                'Weather location could not be updated.';
+                        },
+                        onFinish: () => {
+                            isUpdatingWeatherLocation.value = false;
+                        },
+                    },
+                );
+            } catch {
+                isUpdatingWeatherLocation.value = false;
+                weatherLocationStatus.value =
+                    'Weather could not be fetched from this device.';
+            }
+        },
+        (error) => {
+            isUpdatingWeatherLocation.value = false;
+            weatherLocationStatus.value =
+                error.code === error.PERMISSION_DENIED
+                    ? 'Location permission was denied.'
+                    : 'Current location could not be detected.';
+        },
+        {
+            enableHighAccuracy: false,
+            maximumAge: 300000,
+            timeout: 10000,
+        },
+    );
+}
+
+async function fetchCurrentWeather(latitude: number, longitude: number) {
+    const parameters = new URLSearchParams({
+        latitude: String(latitude),
+        longitude: String(longitude),
+        current: 'weather_code',
+        timezone: 'UTC',
+    });
+    const response = await fetch(
+        `https://api.open-meteo.com/v1/forecast?${parameters.toString()}`,
+    );
+
+    if (!response.ok) {
+        throw new Error('Open-Meteo request failed.');
+    }
+
+    const data = (await response.json()) as OpenMeteoCurrentWeatherResponse;
+    const weatherCode = Number(data.current?.weather_code);
+    const apiTime = data.current?.time;
+
+    if (!Number.isInteger(weatherCode) || !apiTime) {
+        throw new Error('Open-Meteo response is missing current weather.');
+    }
+
+    return {
+        weatherCode,
+        apiTime: apiTime.endsWith('Z') ? apiTime : `${apiTime}Z`,
+    };
+}
+
+function useDefaultWeatherLocation() {
+    isUpdatingWeatherLocation.value = true;
+    weatherLocationStatus.value = 'Switching to default location...';
+
+    router.post(
+        '/dashboard/weather-location/default',
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                weatherLocationStatus.value = 'Default location restored.';
+            },
+            onError: () => {
+                weatherLocationStatus.value =
+                    'Default location could not be restored.';
+            },
+            onFinish: () => {
+                isUpdatingWeatherLocation.value = false;
             },
         },
     );
@@ -601,6 +737,48 @@ function upgradeBuilding(building: Building) {
                             >
                                 Saved Open-Meteo weather code for the tracked
                                 location.
+                            </p>
+                            <div class="mt-3 flex flex-wrap items-center gap-3">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                                    :disabled="isUpdatingWeatherLocation"
+                                    @click="updateWeatherLocation"
+                                >
+                                    <LocateFixed class="h-4 w-4" />
+                                    {{
+                                        isUpdatingWeatherLocation
+                                            ? 'Locating...'
+                                            : 'Use my location'
+                                    }}
+                                </button>
+                                <button
+                                    v-if="props.weather.isUsingGeolocation"
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                                    :disabled="isUpdatingWeatherLocation"
+                                    @click="useDefaultWeatherLocation"
+                                >
+                                    <RotateCcw class="h-4 w-4" />
+                                    Use default location
+                                </button>
+                                <span
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    {{ weatherLocationLabel }}
+                                </span>
+                                <span
+                                    v-if="weatherLocationUpdatedLabel"
+                                    class="text-sm font-semibold text-[#7a705d] dark:text-[#aaa18f]"
+                                >
+                                    {{ weatherLocationUpdatedLabel }}
+                                </span>
+                            </div>
+                            <p
+                                v-if="weatherLocationStatus"
+                                class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                            >
+                                {{ weatherLocationStatus }}
                             </p>
                         </div>
                     </div>

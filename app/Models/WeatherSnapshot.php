@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class WeatherSnapshot extends Model
 {
     protected $fillable = [
+        'user_id',
         'latitude',
         'longitude',
         'weather_code',

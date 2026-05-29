@@ -20,6 +20,8 @@ export type WeatherConditions = {
 export type WeatherSnapshot = {
     latitude: number;
     longitude: number;
+    isUsingGeolocation: boolean;
+    locationUpdatedAt: string | null;
     weatherCode: number | null;
     conditions: WeatherConditions;
     apiTime: string | null;

@@ -9,6 +9,7 @@ use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
+use App\Support\Weather;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -33,8 +34,8 @@ test('dashboard reads weather code from the database', function () {
     $this->actingAs($user);
 
     WeatherSnapshot::create([
-        'latitude' => 54.3957,
-        'longitude' => 24.0389,
+        'latitude' => Weather::LATITUDE,
+        'longitude' => Weather::LONGITUDE,
         'weather_code' => 61,
         'api_time' => now(),
     ]);
@@ -43,8 +44,8 @@ test('dashboard reads weather code from the database', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard')
-            ->where('weather.latitude', 54.3957)
-            ->where('weather.longitude', 24.0389)
+            ->where('weather.latitude', Weather::LATITUDE)
+            ->where('weather.longitude', Weather::LONGITUDE)
             ->where('weather.weatherCode', 61)
             ->where('weather.conditions.sunny', false)
             ->where('weather.conditions.raining', true)
@@ -59,8 +60,8 @@ test('dashboard exposes simplified weather conditions for later immersive mode u
     $this->actingAs($user);
 
     WeatherSnapshot::create([
-        'latitude' => 54.3957,
-        'longitude' => 24.0389,
+        'latitude' => Weather::LATITUDE,
+        'longitude' => Weather::LONGITUDE,
         'weather_code' => 71,
         'api_time' => now(),
     ]);
@@ -93,10 +94,121 @@ test('weather update command stores open meteo weather code', function () {
         ->assertSuccessful();
 
     $this->assertDatabaseHas('weather_snapshots', [
-        'latitude' => 54.3957,
-        'longitude' => 24.0389,
+        'latitude' => Weather::LATITUDE,
+        'longitude' => Weather::LONGITUDE,
         'weather_code' => 71,
         'api_time' => '2026-05-28 09:03:00',
+    ]);
+});
+
+test('users can save browser supplied coordinates and weather', function () {
+    Http::fake();
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $this->post(route('dashboard.weather-location'), [
+        'latitude' => 55.1234,
+        'longitude' => 24.9876,
+        'weather_code' => 45,
+        'api_time' => '2026-05-29T06:18Z',
+    ])->assertRedirect(route('dashboard'));
+
+    $this->assertDatabaseHas('weather_snapshots', [
+        'user_id' => $user->id,
+        'latitude' => 55.1234,
+        'longitude' => 24.9876,
+        'weather_code' => 45,
+        'api_time' => '2026-05-29 06:18:00',
+    ]);
+
+    Http::assertNothingSent();
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('weather.latitude', 55.1234)
+            ->where('weather.longitude', 24.9876)
+            ->where('weather.isUsingGeolocation', true)
+            ->whereNot('weather.locationUpdatedAt', null)
+            ->where('weather.weatherCode', 45)
+            ->where('weather.conditions.foggy', true)
+        );
+});
+
+test('users can switch weather back to default location', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    WeatherSnapshot::create([
+        'user_id' => $user->id,
+        'latitude' => 55.1234,
+        'longitude' => 24.9876,
+        'weather_code' => 45,
+        'api_time' => now(),
+    ]);
+
+    WeatherSnapshot::create([
+        'latitude' => Weather::LATITUDE,
+        'longitude' => Weather::LONGITUDE,
+        'weather_code' => 0,
+        'api_time' => now(),
+    ]);
+
+    $this->post(route('dashboard.weather-location.default'))
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertDatabaseMissing('weather_snapshots', [
+        'user_id' => $user->id,
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('weather.latitude', Weather::LATITUDE)
+            ->where('weather.longitude', Weather::LONGITUDE)
+            ->where('weather.isUsingGeolocation', false)
+            ->where('weather.locationUpdatedAt', null)
+            ->where('weather.weatherCode', 0)
+        );
+});
+
+test('weather update command only refreshes the default server weather location', function () {
+    Http::fake([
+        'api.open-meteo.com/*' => Http::response([
+            'timezone' => 'Europe/Vilnius',
+            'current' => [
+                'time' => '2026-05-29T09:18',
+                'weather_code' => 95,
+            ],
+        ]),
+    ]);
+
+    $user = User::factory()->create();
+    WeatherSnapshot::create([
+        'user_id' => $user->id,
+        'latitude' => 55.1234,
+        'longitude' => 24.9876,
+        'weather_code' => 45,
+        'api_time' => now(),
+    ]);
+
+    $this->artisan('weather:update')
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('weather_snapshots', [
+        'latitude' => Weather::LATITUDE,
+        'longitude' => Weather::LONGITUDE,
+        'weather_code' => 95,
+    ]);
+
+    $this->assertDatabaseHas('weather_snapshots', [
+        'user_id' => $user->id,
+        'latitude' => 55.1234,
+        'longitude' => 24.9876,
+        'weather_code' => 45,
     ]);
 });
 

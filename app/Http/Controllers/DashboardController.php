@@ -12,6 +12,7 @@ use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
 use App\Support\Weather;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -57,7 +58,7 @@ class DashboardController extends Controller
                 'iso' => $serverTime->toIso8601String(),
                 'timezone' => $serverTime->timezoneName,
             ],
-            'weather' => $this->weatherSnapshotCard(),
+            'weather' => $this->weatherSnapshotCard($user),
             'resources' => [
                 'gold' => $resources->gold,
                 'wood' => $resources->wood,
@@ -314,6 +315,43 @@ class DashboardController extends Controller
         return redirect()->route('dashboard');
     }
 
+    public function updateWeatherLocation(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'weather_code' => ['required', 'integer', 'between:0,99'],
+            'api_time' => ['required', 'date'],
+        ]);
+
+        $latitude = Weather::normalizeCoordinate($validated['latitude']);
+        $longitude = Weather::normalizeCoordinate($validated['longitude']);
+
+        WeatherSnapshot::updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+            ],
+            [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'weather_code' => (int) $validated['weather_code'],
+                'api_time' => CarbonImmutable::parse($validated['api_time'], 'UTC')
+                    ->setTimezone(config('app.timezone')),
+            ],
+        );
+
+        return redirect()->route('dashboard');
+    }
+
+    public function resetWeatherLocation(Request $request): RedirectResponse
+    {
+        WeatherSnapshot::query()
+            ->where('user_id', $request->user()->id)
+            ->delete();
+
+        return redirect()->route('dashboard');
+    }
+
     private function resourcesFor(User $user): UserResource
     {
         return UserResource::firstOrCreate(
@@ -459,16 +497,28 @@ class DashboardController extends Controller
     /**
      * @return array{latitude: float, longitude: float, weatherCode: int|null, conditions: array{sunny: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}, apiTime: string|null, updatedAt: string|null}
      */
-    private function weatherSnapshotCard(): array
+    private function weatherSnapshotCard(User $user): array
     {
-        $snapshot = WeatherSnapshot::query()
+        $userSnapshot = WeatherSnapshot::query()
+            ->where('user_id', $user->id)
+            ->first();
+        $snapshot = $userSnapshot ?? WeatherSnapshot::query()
+            ->whereNull('user_id')
             ->where('latitude', Weather::LATITUDE)
             ->where('longitude', Weather::LONGITUDE)
             ->first();
+        $latitude = $userSnapshot
+            ? Weather::normalizeCoordinate($userSnapshot->latitude)
+            : Weather::LATITUDE;
+        $longitude = $userSnapshot
+            ? Weather::normalizeCoordinate($userSnapshot->longitude)
+            : Weather::LONGITUDE;
 
         return [
-            'latitude' => Weather::LATITUDE,
-            'longitude' => Weather::LONGITUDE,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'isUsingGeolocation' => $userSnapshot !== null,
+            'locationUpdatedAt' => $userSnapshot?->updated_at?->format('Y-m-d H:i'),
             'weatherCode' => $snapshot?->weather_code,
             'conditions' => Weather::conditionsFor($snapshot?->weather_code),
             'apiTime' => $snapshot?->api_time?->format('Y-m-d H:i'),
