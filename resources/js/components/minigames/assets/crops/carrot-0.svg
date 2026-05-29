@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Carrot sprout">
+  <ellipse cx="80" cy="132" rx="47" ry="11" fill="#5e4425" opacity=".25"/>
+  <path d="M44 126h72l-12 20H56z" fill="#7a5530"/>
+  <path d="M50 118c18 8 43 10 60 0 4 4 5 9 3 13H47c-2-5-1-9 3-13z" fill="#8c6239"/>
+  <path d="M80 122V91" stroke="#4b8d35" stroke-width="5" stroke-linecap="round"/>
+  <path d="M79 104c-11-5-18-13-20-24 11 3 18 11 20 24z" fill="#63a94a"/>
+  <path d="M82 104c12-5 20-14 22-25-12 3-19 12-22 25z" fill="#78b853"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Young wheat">
+  <ellipse cx="80" cy="132" rx="47" ry="11" fill="#5e4425" opacity=".25"/>
+  <path d="M44 126h72l-12 20H56z" fill="#7a5530"/>
+  <path d="M50 118c18 8 43 10 60 0 4 4 5 9 3 13H47c-2-5-1-9 3-13z" fill="#8c6239"/>
+  <path d="M80 121V70" stroke="#6e8f34" stroke-width="6" stroke-linecap="round"/>
+  <path d="M80 98c-16-8-25-20-27-34 14 5 23 16 27 34z" fill="#7faa41"/>
+  <path d="M81 105c18-9 28-22 30-39-16 6-26 18-30 39z" fill="#94bb4d"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Ripe wheat">
+  <ellipse cx="80" cy="132" rx="47" ry="11" fill="#5e4425" opacity=".25"/>
+  <path d="M44 126h72l-12 20H56z" fill="#7a5530"/>
+  <path d="M50 118c18 8 43 10 60 0 4 4 5 9 3 13H47c-2-5-1-9 3-13z" fill="#8c6239"/>
+  <path d="M80 122V31" stroke="#b28c30" stroke-width="6" stroke-linecap="round"/>
+  <path d="M79 74c-22-8-35-23-39-45 20 6 33 20 39 45z" fill="#d6b34d"/>
+  <path d="M83 79c23-9 37-25 40-49-21 7-35 22-40 49z" fill="#e0c05b"/>
+  <path d="M80 32c-13 7-21 18-25 34" fill="none" stroke="#f1d476" stroke-width="6" stroke-linecap="round"/>
+  <path d="M82 32c14 7 24 19 28 36" fill="none" stroke="#f4db83" stroke-width="6" stroke-linecap="round"/>
+  <path d="M69 47h22M64 58h31M61 68h36" stroke="#ad7b24" stroke-width="4" stroke-linecap="round"/>
+</svg>
