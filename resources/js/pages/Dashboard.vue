@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
+import { toast } from 'vue-sonner';
 import {
     ArrowUp,
     Award,
@@ -679,6 +680,11 @@ function completeMinigame(minigame: Minigame) {
             },
             onSuccess: () => {
                 hasWonMinigame.value = true;
+            },
+            onError: (errors) => {
+                if (errors.minigame) {
+                    toast.error(errors.minigame);
+                }
             },
             onFinish: () => {
                 activeMinigameResource.value = null;

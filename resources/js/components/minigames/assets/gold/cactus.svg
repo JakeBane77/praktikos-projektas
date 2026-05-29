@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" role="img" aria-label="Cactus">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7">
+    <path d="M45 76V19c0-7 10-7 10 0v14c0 8 13 8 13 0V25" stroke="#276746"/>
+    <path d="M45 49c-9 0-15-5-15-14V26" stroke="#276746"/>
+    <path d="M32 76h38" stroke="#6f4f2b"/>
+    <path d="M45 76V19c0-7 10-7 10 0v57z" fill="#338653" stroke="#276746"/>
+  </g>
+</svg>

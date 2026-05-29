@@ -12,6 +12,7 @@ use App\Models\WeatherSnapshot;
 use App\Support\Weather;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -375,6 +376,30 @@ test('minigame completion awards resources from current production and tracks co
             ->where('minigames.0.reward', 6)
             ->where('minigames.0.completions', 1)
             ->where('minigames.0.resourcesGained', 6));
+});
+
+test('minigame completions are rate limited per user and resource', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    RateLimiter::clear('minigame:'.$user->id.':gold:minute');
+    RateLimiter::clear('minigame:'.$user->id.':gold:hour');
+
+    for ($attempt = 0; $attempt < 20; $attempt += 1) {
+        $this->post(route('dashboard.minigames.complete', ['resource' => 'gold']))
+            ->assertRedirect(route('dashboard'))
+            ->assertSessionHasNoErrors();
+    }
+
+    $this->post(route('dashboard.minigames.complete', ['resource' => 'gold']))
+        ->assertRedirect(route('dashboard'))
+        ->assertSessionHasErrors('minigame');
+
+    $this->assertDatabaseHas('minigames', [
+        'user_id' => $user->id,
+        'resource' => 'gold',
+        'completions' => 20,
+    ]);
 });
 
 test('daily collect gives one hundred of each resource after first prestige', function () {

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" role="img" aria-label="Tumbleweed">
+  <g fill="none" stroke="#9a6a35" stroke-linecap="round" stroke-width="5">
+    <circle cx="45" cy="47" r="28"/>
+    <path d="M19 47h52M45 19v56M26 28l38 38M64 28 26 66M23 55c12-7 27-10 44-9M31 23c3 20 9 36 25 50"/>
+  </g>
+</svg>

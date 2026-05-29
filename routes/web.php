@@ -10,6 +10,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('immersive', 'Immersive')->name('immersive');
     Route::post('dashboard/collect', [DashboardController::class, 'collect'])->name('dashboard.collect');
     Route::post('dashboard/minigames/{resource}/complete', [DashboardController::class, 'completeMinigame'])
+        ->middleware('throttle:minigames')
         ->name('dashboard.minigames.complete');
     Route::post('dashboard/prestige', [DashboardController::class, 'prestige'])->name('dashboard.prestige');
     Route::post('dashboard/buildings/{building}/upgrade', [DashboardController::class, 'upgrade'])->name('dashboard.buildings.upgrade');
