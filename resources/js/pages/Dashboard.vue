@@ -339,12 +339,6 @@ watch(currentAchievementUnlock, (achievementUnlock) => {
 });
 
 onMounted(() => {
-    document.addEventListener(
-        'pointerdown',
-        handleDocumentGameLauncherPointerDown,
-        true,
-    );
-
     serverTimeInterval = window.setInterval(() => {
         serverTimeMilliseconds.value =
             serverTimeBaseMilliseconds +
@@ -355,12 +349,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-    document.removeEventListener(
-        'pointerdown',
-        handleDocumentGameLauncherPointerDown,
-        true,
-    );
-
     if (serverTimeInterval !== undefined) {
         window.clearInterval(serverTimeInterval);
     }
@@ -812,76 +800,6 @@ function closeActiveGameModal() {
     }
 
     closeMinigame();
-}
-
-function handleDocumentGameLauncherPointerDown(event: PointerEvent) {
-    if (
-        activeGameModal.value === null ||
-        activeMinigameResource.value !== null ||
-        currentAchievementUnlock.value
-    ) {
-        return;
-    }
-
-    const target = event.target as Element | null;
-
-    if (target?.closest('button, a, input, select, textarea, [role="button"]')) {
-        return;
-    }
-
-    const launcher = findGameLauncherBehindModal(event);
-
-    if (!launcher) {
-        return;
-    }
-
-    if (launcher.dataset.gameModalLauncher === 'leaderboard') {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        openLeaderboard();
-
-        return;
-    }
-
-    if (launcher.dataset.gameModalLauncher !== 'minigame') {
-        return;
-    }
-
-    const minigame = minigames.value.find(
-        (entry) => entry.resource === launcher.dataset.resource,
-    );
-
-    if (!minigame) {
-        return;
-    }
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    openMinigame(minigame);
-}
-
-function findGameLauncherBehindModal(event: PointerEvent): HTMLElement | null {
-    const layers = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-game-modal-layer]'),
-    );
-    const previousPointerEvents = layers.map((layer) => layer.style.pointerEvents);
-
-    layers.forEach((layer) => {
-        layer.style.pointerEvents = 'none';
-    });
-
-    const elementBelow = document.elementFromPoint(
-        event.clientX,
-        event.clientY,
-    );
-
-    layers.forEach((layer, index) => {
-        layer.style.pointerEvents = previousPointerEvents[index] ?? '';
-    });
-
-    return (
-        elementBelow?.closest<HTMLElement>('[data-game-modal-launcher]') ?? null
-    );
 }
 
 function prestige() {
@@ -1928,18 +1846,7 @@ function upgradeBuilding(building: Building) {
                         </p>
                         <h2 class="mt-1 text-2xl font-bold">Top 50 players</h2>
                     </div>
-                    <div class="flex flex-wrap items-center justify-end gap-2">
-                        <button
-                            v-for="minigame in minigames"
-                            :key="`leaderboard-${minigame.resource}`"
-                            type="button"
-                            class="inline-flex items-center gap-2 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                            :disabled="activeMinigameResource !== null"
-                            @click="openMinigame(minigame)"
-                        >
-                            <Gamepad2 class="h-4 w-4" />
-                            {{ resourceLabels[minigame.resource] }}
-                        </button>
+                    <div class="flex items-center justify-end">
                         <button
                             type="button"
                             class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
