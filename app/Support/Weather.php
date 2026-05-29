@@ -10,7 +10,9 @@ final class Weather
 
     public const COORDINATE_PRECISION = 4;
 
-    private const SUNNY_CODES = [0, 1, 2];
+    private const CLEAR_CODES = [0];
+
+    private const CLOUDY_CODES = [1, 2, 3];
 
     private const RAIN_CODES = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82];
 
@@ -21,12 +23,13 @@ final class Weather
     private const SNOW_CODES = [71, 73, 75, 77, 85, 86];
 
     /**
-     * @return array{sunny: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}
+     * @return array{clear: bool, cloudy: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}
      */
     public static function conditionsFor(?int $weatherCode): array
     {
         return [
-            'sunny' => $weatherCode !== null && in_array($weatherCode, self::SUNNY_CODES, true),
+            'clear' => $weatherCode !== null && in_array($weatherCode, self::CLEAR_CODES, true),
+            'cloudy' => $weatherCode !== null && in_array($weatherCode, self::CLOUDY_CODES, true),
             'raining' => $weatherCode !== null && in_array($weatherCode, self::RAIN_CODES, true),
             'foggy' => $weatherCode !== null && in_array($weatherCode, self::FOG_CODES, true),
             'thunderstorm' => $weatherCode !== null && in_array($weatherCode, self::THUNDERSTORM_CODES, true),

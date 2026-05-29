@@ -495,7 +495,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return array{latitude: float, longitude: float, weatherCode: int|null, conditions: array{sunny: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}, apiTime: string|null, apiTimeIso: string|null, updatedAt: string|null, updatedAtIso: string|null}
+     * @return array{latitude: float, longitude: float, weatherCode: int|null, conditions: array{clear: bool, cloudy: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}, apiTime: string|null, apiTimeIso: string|null, updatedAt: string|null, updatedAtIso: string|null}
      */
     private function weatherSnapshotCard(User $user): array
     {

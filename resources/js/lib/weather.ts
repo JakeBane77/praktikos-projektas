@@ -10,7 +10,8 @@ import {
 } from 'lucide-vue-next';
 
 export type WeatherConditions = {
-    sunny: boolean;
+    clear: boolean;
+    cloudy: boolean;
     raining: boolean;
     foggy: boolean;
     thunderstorm: boolean;
@@ -47,15 +48,19 @@ export function weatherConditionLabel(conditions: WeatherConditions): string {
         return 'Foggy';
     }
 
-    if (conditions.sunny) {
-        return 'Sunny';
+    if (conditions.cloudy) {
+        return 'Cloudy';
+    }
+
+    if (conditions.clear) {
+        return 'Clear';
     }
 
     return 'Unknown';
 }
 
 export function weatherIconFor(
-    weatherCode: number | null,
+    _weatherCode: number | null,
     conditions: WeatherConditions,
 ): Component {
     if (conditions.thunderstorm) {
@@ -74,15 +79,11 @@ export function weatherIconFor(
         return CloudFog;
     }
 
-    if (weatherCode === 0) {
+    if (conditions.clear) {
         return Sun;
     }
 
-    if (conditions.sunny) {
-        return CloudSun;
-    }
-
-    if (weatherCode === 3) {
+    if (conditions.cloudy) {
         return Cloud;
     }
 
