@@ -35,6 +35,7 @@ const harvests = ref(0);
 const targetHarvests = ref(0);
 const lastResult = ref<HarvestResult>(null);
 const lastHarvestedCrop = ref<string | null>(null);
+const hasSubmittedCompletion = ref(false);
 
 const harvestPercent = computed(() =>
     targetHarvests.value > 0
@@ -119,6 +120,7 @@ function resetGame() {
     targetHarvests.value = Math.ceil(plotCount * 1.5);
     lastResult.value = null;
     lastHarvestedCrop.value = null;
+    hasSubmittedCompletion.value = false;
     plots.value = Array.from({ length: plotCount }, (_, index) => ({
         id: index + 1,
         crop: randomCrop(),
@@ -186,7 +188,7 @@ function resowPlot(plot: CropPlot) {
 }
 
 function harvest(plotId: number) {
-    if (props.isSaving || props.isCompleted) {
+    if (props.isSaving || props.isCompleted || hasSubmittedCompletion.value) {
         return;
     }
 
@@ -215,6 +217,7 @@ function harvest(plotId: number) {
 
     if (harvests.value >= targetHarvests.value) {
         clearPlotTimers();
+        hasSubmittedCompletion.value = true;
         emit('complete');
 
         return;
@@ -263,7 +266,7 @@ function isPlotRipe(plot: CropPlot): boolean {
                             ? 'border-[#8ea85d] shadow-[0_0_0_2px_rgba(142,168,93,0.2)] dark:border-[#9dcc84]'
                             : 'border-[#d6cab6] dark:border-[#35332c]'
                     "
-                    :disabled="isSaving || isCompleted"
+                    :disabled="isSaving || isCompleted || hasSubmittedCompletion"
                     :aria-label="`Harvest ${plot.crop.name} plot`"
                     @click="harvest(plot.id)"
                 >

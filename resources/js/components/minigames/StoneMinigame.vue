@@ -28,6 +28,7 @@ const previousMarkedSpot = ref<SpotPosition | null>(null);
 const lastResult = ref<MiningResult>(null);
 const cooldownUntil = ref(0);
 const cooldownRemainingMilliseconds = ref(0);
+const hasSubmittedCompletion = ref(false);
 
 const healthPercent = computed(() =>
     maxHealth.value > 0
@@ -144,10 +145,11 @@ function resetGame() {
     lastResult.value = null;
     cooldownUntil.value = 0;
     cooldownRemainingMilliseconds.value = 0;
+    hasSubmittedCompletion.value = false;
 }
 
 function canMine(): boolean {
-    if (props.isSaving || props.isCompleted) {
+    if (props.isSaving || props.isCompleted || hasSubmittedCompletion.value) {
         return false;
     }
 
@@ -166,6 +168,7 @@ function applyDamage(damage: number) {
     health.value = Math.max(0, health.value - damage);
 
     if (health.value <= 0) {
+        hasSubmittedCompletion.value = true;
         emit('complete');
     }
 }
@@ -210,7 +213,7 @@ function mineMarkedSpot() {
                 <button
                     type="button"
                     class="absolute inset-0 cursor-crosshair rounded-[42%] transition disabled:cursor-not-allowed"
-                    :disabled="isSaving || isCompleted"
+                    :disabled="isSaving || isCompleted || hasSubmittedCompletion"
                     aria-label="Mine rock"
                     @click="mineRock"
                 >
@@ -225,7 +228,7 @@ function mineMarkedSpot() {
                 <button
                     type="button"
                     class="absolute z-20 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-[#f7f0c8] bg-[#b9543d] text-[#fff7d8] shadow-[0_0_18px_rgba(185,84,61,0.45)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="isSaving || isCompleted"
+                    :disabled="isSaving || isCompleted || hasSubmittedCompletion"
                     :style="{
                         left: `${markedSpot.x}%`,
                         top: `${markedSpot.y}%`,

@@ -16,12 +16,13 @@ const direction = ref(1);
 const speed = ref(0);
 const health = ref(0);
 const maxHealth = ref(0);
-const lastResult = ref<'perfect' | 'hit' | 'miss' | null>(null);
+const lastResult = ref<'perfect' | 'hit' | 'miss' | 'cooldown' | null>(null);
 const cooldownUntil = ref(0);
 const cooldownRemainingMilliseconds = ref(0);
 const activeTree = ref<WoodTreeDefinition>(woodTrees[0]);
+const hasSubmittedCompletion = ref(false);
 
-const MISS_COOLDOWN_MILLISECONDS = 500;
+const CLICK_COOLDOWN_MILLISECONDS = 500;
 
 const healthPercent = computed(() =>
     maxHealth.value > 0
@@ -35,7 +36,7 @@ const statusLabel = computed(() => {
     }
 
     if (cooldownRemainingMilliseconds.value > 0) {
-        return `Miss cooldown ${Math.ceil(cooldownRemainingMilliseconds.value / 1000)}s`;
+        return `Axe cooldown ${Math.ceil(cooldownRemainingMilliseconds.value / 1000)}s`;
     }
 
     if (lastResult.value === 'perfect') {
@@ -48,6 +49,10 @@ const statusLabel = computed(() => {
 
     if (lastResult.value === 'miss') {
         return 'Miss';
+    }
+
+    if (lastResult.value === 'cooldown') {
+        return 'Axe is recovering';
     }
 
     return 'Ready';
@@ -106,6 +111,7 @@ function resetGame() {
     lastResult.value = null;
     cooldownUntil.value = 0;
     cooldownRemainingMilliseconds.value = 0;
+    hasSubmittedCompletion.value = false;
 }
 
 function startAnimation() {
@@ -169,15 +175,20 @@ function animate(timestamp: number) {
 }
 
 function hit() {
-    if (props.isSaving || props.isCompleted) {
+    if (props.isSaving || props.isCompleted || hasSubmittedCompletion.value) {
         return;
     }
 
     const now = Date.now();
 
     if (now < cooldownUntil.value) {
+        lastResult.value = 'cooldown';
+
         return;
     }
+
+    cooldownUntil.value = now + CLICK_COOLDOWN_MILLISECONDS;
+    cooldownRemainingMilliseconds.value = CLICK_COOLDOWN_MILLISECONDS;
 
     const distanceFromCenter = Math.abs(linePercent.value - 50);
     let damage = 0;
@@ -190,8 +201,6 @@ function hit() {
         lastResult.value = 'hit';
     } else {
         lastResult.value = 'miss';
-        cooldownUntil.value = now + MISS_COOLDOWN_MILLISECONDS;
-        cooldownRemainingMilliseconds.value = MISS_COOLDOWN_MILLISECONDS;
 
         return;
     }
@@ -199,6 +208,7 @@ function hit() {
     health.value = Math.max(0, health.value - damage);
 
     if (health.value <= 0) {
+        hasSubmittedCompletion.value = true;
         emit('complete');
     }
 }
@@ -208,7 +218,7 @@ function hit() {
     <button
         type="button"
         class="mt-5 flex min-h-[420px] w-full cursor-crosshair flex-col overflow-hidden rounded-md border border-[#d6cab6] bg-[#eef0df] text-left transition hover:border-[#b9aa8f] disabled:cursor-not-allowed sm:min-h-[520px] dark:border-[#35332c] dark:bg-[#10140e] dark:hover:border-[#56503f]"
-        :disabled="isSaving || isCompleted"
+        :disabled="isSaving || isCompleted || hasSubmittedCompletion"
         @click="hit"
     >
         <div

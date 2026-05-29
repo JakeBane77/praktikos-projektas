@@ -1,14 +1,35 @@
 <script setup lang="ts">
 import { CheckCircle2 } from 'lucide-vue-next';
+import { ref, watch } from 'vue';
 
-defineProps<{
+const props = defineProps<{
     isSaving: boolean;
     isCompleted: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
     complete: [];
 }>();
+
+const hasSubmittedCompletion = ref(false);
+
+watch(
+    () => props.isCompleted,
+    (isCompleted) => {
+        if (!isCompleted) {
+            hasSubmittedCompletion.value = false;
+        }
+    },
+);
+
+function complete() {
+    if (props.isSaving || props.isCompleted || hasSubmittedCompletion.value) {
+        return;
+    }
+
+    hasSubmittedCompletion.value = true;
+    emit('complete');
+}
 </script>
 
 <template>
@@ -18,8 +39,8 @@ defineEmits<{
         <button
             type="button"
             class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="isSaving || isCompleted"
-            @click="$emit('complete')"
+            :disabled="isSaving || isCompleted || hasSubmittedCompletion"
+            @click="complete"
         >
             <CheckCircle2 class="h-4 w-4" />
             {{ isSaving ? 'Completing...' : 'Win' }}
