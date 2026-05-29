@@ -264,8 +264,10 @@ let serverTimeBaseMilliseconds = Date.now();
 let serverTimeClientStartedAt = Date.now();
 let serverTimeInterval: number | undefined;
 let clientWeatherRefreshTimeout: number | undefined;
+let lastRequestedWeatherRefreshSlotMilliseconds: number | undefined;
 
 const WEATHER_REFRESH_MINUTES = [3, 18, 33, 48];
+const WEATHER_REFRESH_HOUR_MILLISECONDS = 60 * 60_000;
 
 function syncServerTime() {
     const parsedServerTime = Date.parse(props.serverTime.iso);
@@ -317,6 +319,7 @@ watch(
         props.weather.isUsingGeolocation,
         props.weather.latitude,
         props.weather.longitude,
+        props.weather.updatedAtIso,
         props.serverTime.iso,
     ],
     () => {
@@ -485,6 +488,8 @@ async function refreshWeatherFromSavedBrowserLocation() {
         return;
     }
 
+    lastRequestedWeatherRefreshSlotMilliseconds =
+        latestWeatherRefreshSlotMilliseconds();
     isUpdatingWeatherLocation.value = true;
 
     try {
@@ -528,6 +533,15 @@ function scheduleNextClientWeatherRefresh() {
         return;
     }
 
+    if (shouldRefreshClientWeatherNow()) {
+        clientWeatherRefreshTimeout = window.setTimeout(
+            refreshWeatherFromSavedBrowserLocation,
+            0,
+        );
+
+        return;
+    }
+
     clientWeatherRefreshTimeout = window.setTimeout(
         refreshWeatherFromSavedBrowserLocation,
         millisecondsUntilNextWeatherRefresh(),
@@ -541,15 +555,35 @@ function clearClientWeatherRefreshTimeout() {
     }
 }
 
-function millisecondsUntilNextWeatherRefresh(): number {
-    const currentServerDate = new Date(
-        serverTimeBaseMilliseconds + (Date.now() - serverTimeClientStartedAt),
+function shouldRefreshClientWeatherNow(): boolean {
+    const latestRefreshSlotMilliseconds =
+        latestWeatherRefreshSlotMilliseconds();
+
+    if (
+        lastRequestedWeatherRefreshSlotMilliseconds !== undefined &&
+        lastRequestedWeatherRefreshSlotMilliseconds >=
+            latestRefreshSlotMilliseconds
+    ) {
+        return false;
+    }
+
+    const updatedAtMilliseconds = props.weather.updatedAtIso
+        ? Date.parse(props.weather.updatedAtIso)
+        : Number.NaN;
+
+    return (
+        Number.isNaN(updatedAtMilliseconds) ||
+        updatedAtMilliseconds < latestRefreshSlotMilliseconds
     );
-    const currentMinute = currentServerDate.getMinutes();
-    const currentSecond = currentServerDate.getSeconds();
-    const currentMillisecond = currentServerDate.getMilliseconds();
+}
+
+function millisecondsUntilNextWeatherRefresh(): number {
+    const currentServerMilliseconds = currentServerTimeMilliseconds();
+    const { minute, second, millisecond } = serverTimeParts(
+        currentServerMilliseconds,
+    );
     const currentMinuteMilliseconds =
-        currentMinute * 60_000 + currentSecond * 1000 + currentMillisecond;
+        minute * 60_000 + second * 1000 + millisecond;
 
     for (const refreshMinute of WEATHER_REFRESH_MINUTES) {
         const refreshMinuteMilliseconds = refreshMinute * 60_000;
@@ -559,7 +593,53 @@ function millisecondsUntilNextWeatherRefresh(): number {
         }
     }
 
-    return 60 * 60_000 - currentMinuteMilliseconds + WEATHER_REFRESH_MINUTES[0] * 60_000;
+    return (
+        WEATHER_REFRESH_HOUR_MILLISECONDS -
+        currentMinuteMilliseconds +
+        WEATHER_REFRESH_MINUTES[0] * 60_000
+    );
+}
+
+function latestWeatherRefreshSlotMilliseconds(): number {
+    const currentServerMilliseconds = currentServerTimeMilliseconds();
+    const { minute, second, millisecond } = serverTimeParts(
+        currentServerMilliseconds,
+    );
+    const latestRefreshMinute =
+        [...WEATHER_REFRESH_MINUTES]
+            .reverse()
+            .find((refreshMinute) => refreshMinute <= minute) ??
+        WEATHER_REFRESH_MINUTES[WEATHER_REFRESH_MINUTES.length - 1];
+    const elapsedSinceLatestRefresh =
+        latestRefreshMinute <= minute
+            ? (minute - latestRefreshMinute) * 60_000 +
+              second * 1000 +
+              millisecond
+            : (minute + 60 - latestRefreshMinute) * 60_000 +
+              second * 1000 +
+              millisecond;
+
+    return currentServerMilliseconds - elapsedSinceLatestRefresh;
+}
+
+function currentServerTimeMilliseconds(): number {
+    return serverTimeBaseMilliseconds + (Date.now() - serverTimeClientStartedAt);
+}
+
+function serverTimeParts(milliseconds: number) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: props.serverTime.timezone,
+        minute: '2-digit',
+        second: '2-digit',
+    }).formatToParts(new Date(milliseconds));
+    const partValue = (type: string) =>
+        Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+    return {
+        minute: partValue('minute'),
+        second: partValue('second'),
+        millisecond: milliseconds % 1000,
+    };
 }
 
 function useDefaultWeatherLocation() {
@@ -573,6 +653,7 @@ function useDefaultWeatherLocation() {
             preserveScroll: true,
             onSuccess: () => {
                 weatherLocationStatus.value = 'Default location restored.';
+                lastRequestedWeatherRefreshSlotMilliseconds = undefined;
                 clearClientWeatherRefreshTimeout();
             },
             onError: () => {

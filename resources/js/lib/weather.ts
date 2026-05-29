@@ -25,7 +25,9 @@ export type WeatherSnapshot = {
     weatherCode: number | null;
     conditions: WeatherConditions;
     apiTime: string | null;
+    apiTimeIso: string | null;
     updatedAt: string | null;
+    updatedAtIso: string | null;
 };
 
 export function weatherConditionLabel(conditions: WeatherConditions): string {

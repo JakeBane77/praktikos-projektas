@@ -495,7 +495,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return array{latitude: float, longitude: float, weatherCode: int|null, conditions: array{sunny: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}, apiTime: string|null, updatedAt: string|null}
+     * @return array{latitude: float, longitude: float, weatherCode: int|null, conditions: array{sunny: bool, raining: bool, foggy: bool, thunderstorm: bool, snowing: bool}, apiTime: string|null, apiTimeIso: string|null, updatedAt: string|null, updatedAtIso: string|null}
      */
     private function weatherSnapshotCard(User $user): array
     {
@@ -522,7 +522,9 @@ class DashboardController extends Controller
             'weatherCode' => $snapshot?->weather_code,
             'conditions' => Weather::conditionsFor($snapshot?->weather_code),
             'apiTime' => $snapshot?->api_time?->format('Y-m-d H:i'),
+            'apiTimeIso' => $snapshot?->api_time?->toIso8601String(),
             'updatedAt' => $snapshot?->updated_at?->format('Y-m-d H:i'),
+            'updatedAtIso' => $snapshot?->updated_at?->toIso8601String(),
         ];
     }
 
