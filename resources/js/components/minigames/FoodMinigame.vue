@@ -90,6 +90,18 @@ function randomInteger(minimum: number, maximum: number): number {
     return Math.floor(Math.random() * (maximum - minimum + 1)) + minimum;
 }
 
+function randomEvenInteger(minimum: number, maximum: number): number {
+    const evenNumbers = [];
+
+    for (let value = minimum; value <= maximum; value += 1) {
+        if (value % 2 === 0) {
+            evenNumbers.push(value);
+        }
+    }
+
+    return evenNumbers[randomInteger(0, evenNumbers.length - 1)];
+}
+
 function randomCrop(): FoodCropDefinition {
     return foodCrops[randomInteger(0, foodCrops.length - 1)];
 }
@@ -101,7 +113,7 @@ function randomStageDuration(crop: FoodCropDefinition): number {
 function resetGame() {
     clearPlotTimers();
 
-    const plotCount = randomInteger(MIN_PLOTS, MAX_PLOTS);
+    const plotCount = randomEvenInteger(MIN_PLOTS, MAX_PLOTS);
 
     harvests.value = 0;
     targetHarvests.value = Math.ceil(plotCount * 1.5);
@@ -240,12 +252,12 @@ function isPlotRipe(plot: CropPlot): boolean {
                 class="absolute inset-x-0 bottom-16 h-24 bg-gradient-to-t from-[#c7d5a8] to-transparent dark:from-[#1d2918]"
             ></div>
 
-            <div class="relative z-10 flex flex-1 items-stretch gap-3 overflow-x-auto pb-2">
+            <div class="relative z-10 grid flex-1 grid-cols-2 gap-3 lg:grid-cols-3">
                 <button
                     v-for="plot in plots"
                     :key="plot.id"
                     type="button"
-                    class="flex min-h-36 min-w-[9rem] flex-1 cursor-pointer flex-col items-center justify-end rounded-md border bg-[#f0e4c7]/75 p-3 text-center transition hover:-translate-y-0.5 hover:border-[#b9aa8f] disabled:cursor-not-allowed disabled:opacity-70 dark:bg-[#1c2015]/80 dark:hover:border-[#56503f]"
+                    class="flex min-h-36 cursor-pointer flex-col items-center justify-end rounded-md border bg-[#f0e4c7]/75 p-3 text-center transition hover:-translate-y-0.5 hover:border-[#b9aa8f] disabled:cursor-not-allowed disabled:opacity-70 dark:bg-[#1c2015]/80 dark:hover:border-[#56503f]"
                     :class="
                         isPlotRipe(plot)
                             ? 'border-[#8ea85d] shadow-[0_0_0_2px_rgba(142,168,93,0.2)] dark:border-[#9dcc84]'
