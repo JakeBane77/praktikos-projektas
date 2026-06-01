@@ -176,8 +176,7 @@ const selectedMinigameComponent = computed(() =>
 const defaultLeaderboard = computed<Leaderboard | null>(
     () =>
         leaderboards.value.find(
-            (leaderboard) =>
-                leaderboard.key === props.leaderboards.defaultKey,
+            (leaderboard) => leaderboard.key === props.leaderboards.defaultKey,
         ) ??
         leaderboards.value[0] ??
         null,
@@ -192,8 +191,7 @@ const selectedLeaderboard = computed<Leaderboard | null>(
 );
 const isMinigameOpen = computed(
     () =>
-        activeGameModal.value === 'minigame' &&
-        selectedMinigame.value !== null,
+        activeGameModal.value === 'minigame' && selectedMinigame.value !== null,
 );
 const isLeaderboardModalOpen = computed(
     () =>
@@ -602,7 +600,9 @@ function latestWeatherRefreshSlotMilliseconds(): number {
 }
 
 function currentServerTimeMilliseconds(): number {
-    return serverTimeBaseMilliseconds + (Date.now() - serverTimeClientStartedAt);
+    return (
+        serverTimeBaseMilliseconds + (Date.now() - serverTimeClientStartedAt)
+    );
 }
 
 function serverTimeParts(milliseconds: number) {
@@ -1283,9 +1283,7 @@ function upgradeBuilding(building: Building) {
                                     Score
                                 </p>
                                 <p class="mt-2 text-xl font-bold">
-                                    {{
-                                        defaultLeaderboard.currentValueLabel
-                                    }}
+                                    {{ defaultLeaderboard.currentValueLabel }}
                                 </p>
                             </div>
                         </div>
@@ -1875,7 +1873,9 @@ function upgradeBuilding(building: Building) {
                             Your rank
                         </p>
                         <p class="mt-2 text-2xl font-bold">
-                            #{{ selectedLeaderboard.currentRank.toLocaleString() }}
+                            #{{
+                                selectedLeaderboard.currentRank.toLocaleString()
+                            }}
                         </p>
                     </div>
                     <div
@@ -1904,7 +1904,9 @@ function upgradeBuilding(building: Building) {
                     </div>
                 </div>
 
-                <div class="mt-5 overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c]">
+                <div
+                    class="mt-5 overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c]"
+                >
                     <div
                         class="grid grid-cols-[4.5rem_1fr_8rem] gap-3 border-b border-[#e4dac7] bg-[#f6f0e5] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:bg-[#151910] dark:text-[#b6ae9d]"
                     >
@@ -1920,7 +1922,10 @@ function upgradeBuilding(building: Building) {
                         No players on this leaderboard yet.
                     </div>
 
-                    <div v-else class="divide-y divide-[#e4dac7] dark:divide-[#35332c]">
+                    <div
+                        v-else
+                        class="divide-y divide-[#e4dac7] dark:divide-[#35332c]"
+                    >
                         <div
                             v-for="entry in selectedLeaderboard.entries"
                             :key="`${selectedLeaderboard.key}-${entry.userId}`"
@@ -1997,9 +2002,7 @@ function upgradeBuilding(building: Building) {
                         @complete="completeSelectedMinigame"
                     />
                     <button
-                        v-if="
-                            hasWonMinigame && activeMinigameResource === null
-                        "
+                        v-if="hasWonMinigame && activeMinigameResource === null"
                         type="button"
                         class="absolute inset-0 z-50 cursor-pointer rounded-md bg-transparent"
                         aria-label="Continue playing"

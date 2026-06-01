@@ -7,7 +7,7 @@ Route::inertia('/', 'Welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::inertia('immersive', 'Immersive')->name('immersive');
+    Route::get('immersive', [DashboardController::class, 'immersive'])->name('immersive');
     Route::post('dashboard/collect', [DashboardController::class, 'collect'])->name('dashboard.collect');
     Route::post('dashboard/minigames/{resource}/complete', [DashboardController::class, 'completeMinigame'])
         ->middleware('throttle:minigames')

@@ -30,6 +30,21 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
+test('authenticated users can visit immersive mode with game data', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $this->get(route('immersive'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Immersive')
+            ->has('weather')
+            ->has('buildings')
+            ->has('roadStats')
+            ->has('serverTime')
+        );
+});
+
 test('dashboard reads weather code from the database', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -48,7 +63,7 @@ test('dashboard reads weather code from the database', function () {
             ->where('weather.latitude', Weather::LATITUDE)
             ->where('weather.longitude', Weather::LONGITUDE)
             ->where('weather.weatherCode', 61)
-            ->where('weather.conditions.sunny', false)
+            ->where('weather.conditions.clear', false)
             ->where('weather.conditions.raining', true)
             ->where('weather.conditions.foggy', false)
             ->where('weather.conditions.thunderstorm', false)
@@ -72,7 +87,7 @@ test('dashboard exposes simplified weather conditions for later immersive mode u
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard')
             ->where('weather.weatherCode', 71)
-            ->where('weather.conditions.sunny', false)
+            ->where('weather.conditions.clear', false)
             ->where('weather.conditions.raining', false)
             ->where('weather.conditions.foggy', false)
             ->where('weather.conditions.thunderstorm', false)

@@ -39,7 +39,19 @@ class DashboardController extends Controller
 
     public function index(Request $request): Response
     {
-        $user = $request->user();
+        return Inertia::render('Dashboard', $this->gameDataFor($request->user()));
+    }
+
+    public function immersive(Request $request): Response
+    {
+        return Inertia::render('Immersive', $this->gameDataFor($request->user()));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function gameDataFor(User $user): array
+    {
         $resources = $this->resourcesFor($user);
         $buildings = $this->buildingsFor($user);
         $productionBonuses = $this->productionBonusesFor($user);
@@ -53,7 +65,7 @@ class DashboardController extends Controller
         $prestigeRoadRequirement = $this->prestigeRoadRequirementFor($buildings);
         $serverTime = now();
 
-        return Inertia::render('Dashboard', [
+        return [
             'serverTime' => [
                 'iso' => $serverTime->toIso8601String(),
                 'timezone' => $serverTime->timezoneName,
@@ -106,7 +118,7 @@ class DashboardController extends Controller
                     && $this->canAfford($resources, $this->upgradeCostsFor($building)),
             ])->values(),
             'achievements' => $this->achievementCardsFor($achievements),
-        ]);
+        ];
     }
 
     public function collect(Request $request): RedirectResponse
