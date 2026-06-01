@@ -195,6 +195,7 @@ const props = defineProps<DashboardGameData>();
 
 const userTime = ref<UserSystemTime>(getUserSystemTime());
 const timeOverride = ref('');
+const settlementStageOverride = ref('');
 const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
 let userTimeInterval: number | undefined;
@@ -240,23 +241,19 @@ const settlementStage = computed(() =>
     ),
 );
 
+const displayedSettlementStage = computed(() => {
+    if (settlementStageOverride.value === '') {
+        return settlementStage.value;
+    }
+
+    return clamp(Number(settlementStageOverride.value) || 0, 0, 6);
+});
+
 const roadLabel = computed(() => {
     const roads = buildingLevels.value.road;
 
-    if (roads >= 5_000_000) {
-        return 'Paved kingdom roads';
-    }
-
-    if (roads >= 100_000) {
-        return 'Stone roads';
-    }
-
-    if (roads >= 1_000) {
-        return 'Gravel roads';
-    }
-
     if (roads > 0) {
-        return 'Dirt tracks';
+        return `${compactNumber(roads)} km built`;
     }
 
     return 'No roads built';
@@ -287,8 +284,9 @@ const isSunVisible = computed(
 );
 
 const activeBackgroundAsset = computed(() =>
-    backgroundAsset(
-        isSunVisible.value ? 'background0Day.png' : 'background0Night.png',
+    stagedBackgroundAsset(
+        isSunVisible.value ? 'day' : 'night',
+        displayedSettlementStage.value,
     ),
 );
 
@@ -406,6 +404,19 @@ function settlementStageForLevel(level: number): number {
 
 function backgroundAsset(filename: string): string {
     return backgroundAssets[`./assets/backgrounds/${filename}`] ?? emptyAsset;
+}
+
+function stagedBackgroundAsset(period: 'day' | 'night', stage: number): string {
+    for (let currentStage = stage; currentStage >= 0; currentStage -= 1) {
+        const filename = `${period}_background_${String(currentStage).padStart(2, '0')}.png`;
+        const asset = backgroundAssets[`./assets/backgrounds/${filename}`];
+
+        if (asset) {
+            return asset;
+        }
+    }
+
+    return emptyAsset;
 }
 
 function cloudAsset(filename: string): string {
@@ -584,7 +595,7 @@ function timeFromInputValue(value: string): Date {
                         <div>
                             <p class="text-[#b8c2b0]">Settlement</p>
                             <p class="mt-1 font-semibold">
-                                Stage {{ settlementStage }}
+                                Stage {{ displayedSettlementStage }}
                             </p>
                         </div>
                         <div>
@@ -657,11 +668,31 @@ function timeFromInputValue(value: string): Date {
                                 />
                             </label>
                         </div>
+                        <div class="grid grid-cols-[1fr_2.5rem] gap-2">
+                            <label>
+                                <span class="text-sm text-[#b8c2b0]"
+                                    >Test settlement stage</span
+                                >
+                                <input
+                                    v-model="settlementStageOverride"
+                                    type="number"
+                                    min="0"
+                                    max="6"
+                                    step="1"
+                                    class="mt-1 w-full rounded-md border border-white/15 bg-[#0a0f0b]/80 px-3 py-2 text-sm font-semibold text-[#f3efe4] outline-none transition focus:border-[#caa66c]"
+                                />
+                            </label>
+                            <button
+                                type="button"
+                                class="mt-6 inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 text-[#f3efe4] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                                :disabled="!settlementStageOverride"
+                                aria-label="Use calculated settlement stage"
+                                @click="settlementStageOverride = ''"
+                            >
+                                <RotateCcw class="h-4 w-4" />
+                            </button>
+                        </div>
                     </div>
-                </div>
-
-                <div class="kingdom-label">
-                    {{ compactNumber(props.roadStats.length) }} km roads
                 </div>
             </div>
         </section>
@@ -727,18 +758,6 @@ function timeFromInputValue(value: string): Date {
 
 .immersive-scene-dusk .immersive-background {
     filter: brightness(0.82) saturate(0.88);
-}
-
-.kingdom-label {
-    align-self: flex-end;
-    padding: 0.55rem 0.7rem;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #fff8e8;
-    background: rgb(20 28 19 / 0.76);
-    border: 1px solid rgb(255 255 255 / 0.16);
-    border-radius: 0.5rem;
-    backdrop-filter: blur(8px);
 }
 
 @keyframes cloud-drift {
