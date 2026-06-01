@@ -328,16 +328,6 @@ watch(
     },
 );
 
-watch(currentAchievementUnlock, (achievementUnlock) => {
-    if (achievementUnlock) {
-        isBuildingsOpen.value = false;
-        isPrestigeConfirmOpen.value = false;
-        activeGameModal.value = null;
-        selectedMinigameResource.value = null;
-        hasWonMinigame.value = false;
-    }
-});
-
 onMounted(() => {
     serverTimeInterval = window.setInterval(() => {
         serverTimeMilliseconds.value =
@@ -2099,10 +2089,10 @@ function upgradeBuilding(building: Building) {
     <Teleport to="body">
         <div
             v-if="currentAchievementUnlock"
-            class="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
+            class="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[calc(100%-2rem)] max-w-md items-end justify-end sm:right-6 sm:bottom-6"
         >
             <section
-                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+                class="pointer-events-auto max-h-[calc(100vh-3rem)] w-full overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <div class="flex items-start gap-4">
                     <div class="rounded-md bg-[#243627] p-3 text-white">
