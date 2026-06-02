@@ -198,6 +198,14 @@ const isLeaderboardModalOpen = computed(
         activeGameModal.value === 'leaderboard' &&
         selectedLeaderboard.value !== null,
 );
+const isAchievementUnlockModalOpen = computed(
+    () =>
+        Boolean(currentAchievementUnlock.value) &&
+        !isBuildingsOpen.value &&
+        !isLeaderboardModalOpen.value &&
+        !isMinigameOpen.value &&
+        !isPrestigeConfirmOpen.value,
+);
 const prestigeRankLabel = computed(
     () => `#${props.prestigeStats.rank.toLocaleString()}`,
 );
@@ -1695,7 +1703,12 @@ function upgradeBuilding(building: Building) {
 
     <Teleport to="body">
         <div
-            v-if="isBuildingsOpen || isLeaderboardModalOpen || isMinigameOpen"
+            v-if="
+                isBuildingsOpen ||
+                isLeaderboardModalOpen ||
+                isMinigameOpen ||
+                isAchievementUnlockModalOpen
+            "
             data-game-modal-layer
             class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
             @click.self="closeActiveGameModal"
@@ -2086,16 +2099,11 @@ function upgradeBuilding(building: Building) {
                     </button>
                 </div>
             </section>
-        </div>
-    </Teleport>
-
-    <Teleport to="body">
-        <div
-            v-if="currentAchievementUnlock"
-            class="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[calc(100%-2rem)] max-w-md items-end justify-end sm:right-6 sm:bottom-6"
-        >
             <section
-                class="pointer-events-auto max-h-[calc(100vh-3rem)] w-full overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+                v-else-if="
+                    isAchievementUnlockModalOpen && currentAchievementUnlock
+                "
+                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <div class="flex items-start gap-4">
                     <div class="rounded-md bg-[#243627] p-3 text-white">

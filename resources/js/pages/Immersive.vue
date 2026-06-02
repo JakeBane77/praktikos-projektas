@@ -379,7 +379,14 @@ const upgradeReadyBuildings = computed(() =>
     props.buildings.filter((building) => building.canUpgrade),
 );
 
+const actionUpgradeReadyBuildings = computed(() =>
+    upgradeReadyBuildings.value.filter((building) => !building.isRoad),
+);
+
 const hasUpgradeReady = computed(() => upgradeReadyBuildings.value.length > 0);
+const hasActionUpgradeReady = computed(
+    () => actionUpgradeReadyBuildings.value.length > 0,
+);
 
 const visibleUpgradeBuildings = computed(() =>
     showOnlyAvailableUpgrades.value
@@ -492,6 +499,13 @@ const isLeaderboardModalOpen = computed(
 const isAchievementsModalOpen = computed(
     () => activeGameModal.value === 'achievements',
 );
+const isAchievementUnlockModalOpen = computed(
+    () =>
+        Boolean(currentAchievementUnlock.value) &&
+        !isAchievementsModalOpen.value &&
+        !isLeaderboardModalOpen.value &&
+        !isMinigameOpen.value,
+);
 
 const prestigeRequirementLabel = computed(() =>
     props.prestigeStats.requirement.toLocaleString(),
@@ -522,7 +536,7 @@ const leaderboardButtonLabel = computed(() =>
 );
 
 const actionButtonClass = computed(() => {
-    if (props.canCollect && hasUpgradeReady.value) {
+    if (props.canCollect && hasActionUpgradeReady.value) {
         return 'border-[#8fd8ff]/60 bg-[#12313d]/88 text-[#d9f5ff] shadow-[0_0_28px_rgb(83_186_219/0.32)]';
     }
 
@@ -530,7 +544,7 @@ const actionButtonClass = computed(() => {
         return 'border-[#9fe58d]/60 bg-[#15351c]/88 text-[#e8ffe3] shadow-[0_0_28px_rgb(126_214_111/0.3)]';
     }
 
-    if (hasUpgradeReady.value) {
+    if (hasActionUpgradeReady.value) {
         return 'border-[#e0b461]/60 bg-[#3a2a10]/88 text-[#fff0c8] shadow-[0_0_28px_rgb(224_180_97/0.28)]';
     }
 
@@ -538,7 +552,7 @@ const actionButtonClass = computed(() => {
 });
 
 const actionButtonLabel = computed(() => {
-    if (props.canCollect && hasUpgradeReady.value) {
+    if (props.canCollect && hasActionUpgradeReady.value) {
         return 'Collection and upgrades ready';
     }
 
@@ -546,7 +560,7 @@ const actionButtonLabel = computed(() => {
         return 'Collection ready';
     }
 
-    if (hasUpgradeReady.value) {
+    if (hasActionUpgradeReady.value) {
         return 'Building upgrades ready';
     }
 
@@ -1845,7 +1859,7 @@ function timeFromInputValue(value: string): Date {
                             <Hammer
                                 class="h-4 w-4"
                                 :class="
-                                    hasUpgradeReady
+                                    hasActionUpgradeReady
                                         ? 'text-[#e0b461]'
                                         : 'text-[#8d9487]'
                                 "
@@ -1854,17 +1868,17 @@ function timeFromInputValue(value: string): Date {
                         </div>
                         <p class="mt-1 text-[#696250] dark:text-[#b8c2b0]">
                             {{
-                                hasUpgradeReady
-                                    ? `${upgradeReadyBuildings.length} upgrade${upgradeReadyBuildings.length === 1 ? '' : 's'} available.`
+                                hasActionUpgradeReady
+                                    ? `${actionUpgradeReadyBuildings.length} upgrade${actionUpgradeReadyBuildings.length === 1 ? '' : 's'} available.`
                                     : 'No building upgrades are currently affordable.'
                             }}
                         </p>
                         <div
-                            v-if="hasUpgradeReady"
+                            v-if="hasActionUpgradeReady"
                             class="mt-2 flex flex-wrap gap-1.5"
                         >
                             <span
-                                v-for="building in upgradeReadyBuildings"
+                                v-for="building in actionUpgradeReadyBuildings"
                                 :key="building.id"
                                 class="rounded border border-[#b99145]/35 bg-[#ead9b6] px-2 py-1 text-xs font-semibold text-[#5a4320] dark:border-[#e0b461]/25 dark:bg-[#e0b461]/10 dark:text-[#fff0c8]"
                             >
@@ -1895,7 +1909,8 @@ function timeFromInputValue(value: string): Date {
             v-if="
                 isAchievementsModalOpen ||
                 isLeaderboardModalOpen ||
-                isMinigameOpen
+                isMinigameOpen ||
+                isAchievementUnlockModalOpen
             "
             data-game-modal-layer
             class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
@@ -2328,16 +2343,11 @@ function timeFromInputValue(value: string): Date {
                     </button>
                 </div>
             </section>
-        </div>
-    </Teleport>
-
-    <Teleport to="body">
-        <div
-            v-if="currentAchievementUnlock"
-            class="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[calc(100%-2rem)] max-w-md items-end justify-end sm:right-6 sm:bottom-6"
-        >
             <section
-                class="pointer-events-auto max-h-[calc(100vh-3rem)] w-full overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+                v-else-if="
+                    isAchievementUnlockModalOpen && currentAchievementUnlock
+                "
+                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <div class="flex items-start gap-4">
                     <div class="rounded-md bg-[#243627] p-3 text-white">
