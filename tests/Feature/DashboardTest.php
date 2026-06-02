@@ -326,6 +326,22 @@ test('daily collect can only be used once per day', function () {
     expect(ResourceCollection::where('user_id', $user->id)->count())->toBe(1);
 });
 
+test('daily collect returns to immersive mode when submitted from immersive mode', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $this->from(route('immersive'))
+        ->post(route('dashboard.collect'))
+        ->assertRedirect(route('immersive'));
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'wood' => 30,
+        'food' => 20,
+        'manual_collects' => 1,
+    ]);
+});
+
 test('minigame completion awards resources from current production and tracks completions', function () {
     $user = User::factory()->create();
     $this->actingAs($user);

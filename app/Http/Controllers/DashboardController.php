@@ -131,7 +131,7 @@ class DashboardController extends Controller
 
         if (! $this->canCollect($resources)) {
             return redirect()
-                ->route('dashboard')
+                ->to(url()->previous(route('dashboard')))
                 ->withErrors([
                     'collect' => 'You have already collected resources today.',
                 ]);
@@ -162,7 +162,7 @@ class DashboardController extends Controller
             'collected_at' => now(),
         ]);
 
-        return redirect()->route('dashboard');
+        return redirect()->to(url()->previous(route('dashboard')));
     }
 
     public function upgrade(Request $request, UserBuilding $building): RedirectResponse

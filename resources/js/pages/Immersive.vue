@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { LayoutGrid, Pause, Play, RotateCcw } from 'lucide-vue-next';
+import { Head, Link, router } from '@inertiajs/vue3';
+import {
+    Bell,
+    CheckCircle2,
+    Coins,
+    Hammer,
+    LayoutGrid,
+    Pause,
+    Play,
+    RotateCcw,
+    Sparkles,
+    X,
+} from 'lucide-vue-next';
 import type { DashboardGameData } from '@/lib/game';
 import { getUserSystemTime, type UserSystemTime } from '@/lib/userSystemTime';
 import { weatherConditionLabel, weatherIconFor } from '@/lib/weather';
@@ -42,6 +53,23 @@ const cloudsBox = {
     width: 100,
     height: 30,
 };
+
+const collectButtonPosition = {
+    left: 44,
+    top: 74,
+};
+
+const resourcesButtonPosition = {
+    left: 41,
+    top: 74,
+};
+
+const resourceRows = [
+    { key: 'wood', label: 'Wood' },
+    { key: 'food', label: 'Food' },
+    { key: 'stone', label: 'Stone' },
+    { key: 'gold', label: 'Gold' },
+] as const;
 
 type CloudPlacement = {
     id: string;
@@ -196,6 +224,9 @@ const props = defineProps<DashboardGameData>();
 const userTime = ref<UserSystemTime>(getUserSystemTime());
 const timeOverride = ref('');
 const settlementStageOverride = ref('');
+const isActionMenuOpen = ref(false);
+const isResourcesMenuOpen = ref(false);
+const isCollecting = ref(false);
 const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
 let userTimeInterval: number | undefined;
@@ -247,6 +278,95 @@ const displayedSettlementStage = computed(() => {
     }
 
     return clamp(Number(settlementStageOverride.value) || 0, 0, 6);
+});
+
+const upgradeReadyBuildings = computed(() =>
+    props.buildings.filter((building) => building.canUpgrade),
+);
+
+const hasUpgradeReady = computed(() => upgradeReadyBuildings.value.length > 0);
+
+const actionButtonClass = computed(() => {
+    if (props.canCollect && hasUpgradeReady.value) {
+        return 'border-[#8fd8ff]/60 bg-[#12313d]/88 text-[#d9f5ff] shadow-[0_0_28px_rgb(83_186_219/0.32)]';
+    }
+
+    if (props.canCollect) {
+        return 'border-[#9fe58d]/60 bg-[#15351c]/88 text-[#e8ffe3] shadow-[0_0_28px_rgb(126_214_111/0.3)]';
+    }
+
+    if (hasUpgradeReady.value) {
+        return 'border-[#e0b461]/60 bg-[#3a2a10]/88 text-[#fff0c8] shadow-[0_0_28px_rgb(224_180_97/0.28)]';
+    }
+
+    return 'border-white/15 bg-[#10140f]/82 text-[#f3efe4]';
+});
+
+const actionButtonLabel = computed(() => {
+    if (props.canCollect && hasUpgradeReady.value) {
+        return 'Collection and upgrades ready';
+    }
+
+    if (props.canCollect) {
+        return 'Collection ready';
+    }
+
+    if (hasUpgradeReady.value) {
+        return 'Building upgrades ready';
+    }
+
+    return 'Kingdom actions';
+});
+
+const collectButtonClass = computed(() => {
+    if (props.canCollect) {
+        return 'border-[#9fe58d]/60 bg-[#15351c]/88 text-[#e8ffe3] shadow-[0_0_28px_rgb(126_214_111/0.3)] hover:bg-[#1d4625]/90';
+    }
+
+    return 'border-white/15 bg-[#10140f]/72 text-[#b8c2b0] opacity-70';
+});
+
+const collectButtonStyle = computed(() => ({
+    left: `${collectButtonPosition.left}%`,
+    top: `${collectButtonPosition.top}%`,
+}));
+
+const resourcesButtonStyle = computed(() => ({
+    left: `${resourcesButtonPosition.left}%`,
+    top: `${resourcesButtonPosition.top}%`,
+}));
+
+const collectButtonLabel = computed(() => {
+    if (isCollecting.value) {
+        return 'Collecting...';
+    }
+
+    if (props.canCollect) {
+        return 'Ready to collect';
+    }
+
+    return `Collect on cooldown ${collectCooldownLabel.value}`;
+});
+
+const collectCooldownLabel = computed(() => {
+    const nextMidnight = new Date(userTime.value.date);
+
+    nextMidnight.setDate(nextMidnight.getDate() + 1);
+    nextMidnight.setHours(0, 0, 0, 0);
+
+    const remainingMilliseconds = Math.max(
+        0,
+        nextMidnight.getTime() - userTime.value.timestamp,
+    );
+    const totalMinutes = Math.ceil(remainingMilliseconds / 60_000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+
+    return `${minutes}m`;
 });
 
 const roadLabel = computed(() => {
@@ -374,6 +494,10 @@ function compactNumber(value: number): string {
     }).format(value);
 }
 
+function formatNumber(value: number): string {
+    return new Intl.NumberFormat('en').format(value);
+}
+
 function settlementStageForLevel(level: number): number {
     if (level >= 25) {
         return 6;
@@ -446,6 +570,26 @@ function useEmptyAsset(event: Event): void {
     if (image.src !== emptyAsset) {
         image.src = emptyAsset;
     }
+}
+
+function collectResources(): void {
+    if (!props.canCollect || isCollecting.value) {
+        return;
+    }
+
+    router.post(
+        '/dashboard/collect',
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isCollecting.value = true;
+            },
+            onFinish: () => {
+                isCollecting.value = false;
+            },
+        },
+    );
 }
 
 function incrementTestTime(minutes: number): void {
@@ -546,6 +690,88 @@ function timeFromInputValue(value: string): Date {
                     draggable="false"
                     @error="useEmptyAsset"
                 />
+            </div>
+
+            <button
+                type="button"
+                class="absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:hover:scale-100"
+                :class="collectButtonClass"
+                :style="collectButtonStyle"
+                :disabled="!props.canCollect || isCollecting"
+                :aria-label="collectButtonLabel"
+                :title="collectButtonLabel"
+                @click="collectResources"
+            >
+                <Sparkles class="h-5 w-5" />
+            </button>
+
+            <div
+                class="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+                :style="resourcesButtonStyle"
+            >
+                <button
+                    type="button"
+                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#8fd8ff]/50 bg-[#12313d]/88 text-[#d9f5ff] shadow-[0_0_24px_rgb(83_186_219/0.24)] transition hover:scale-105 hover:bg-[#173f4e]/90"
+                    aria-label="Show resources and production"
+                    title="Resources and production"
+                    @click="isResourcesMenuOpen = !isResourcesMenuOpen"
+                >
+                    <Coins class="h-5 w-5" />
+                </button>
+
+                <div
+                    v-if="isResourcesMenuOpen"
+                    class="absolute bottom-14 left-1/2 w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-white/15 bg-[#10140f]/92 p-4 text-sm shadow-2xl backdrop-blur"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-xs font-semibold tracking-wider text-[#caa66c] uppercase"
+                            >
+                                Resources
+                            </p>
+                            <h2 class="mt-1 text-lg font-bold">
+                                Current output
+                            </h2>
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 text-[#f3efe4] transition hover:bg-white/10"
+                            aria-label="Close resources menu"
+                            @click="isResourcesMenuOpen = false"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div class="mt-4 grid gap-2">
+                        <div
+                            v-for="resource in resourceRows"
+                            :key="resource.key"
+                            class="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-white/10 bg-white/[0.04] p-3"
+                        >
+                            <div>
+                                <p class="font-semibold">
+                                    {{ resource.label }}
+                                </p>
+                                <p class="mt-1 text-xs text-[#b8c2b0]">
+                                    +{{
+                                        formatNumber(
+                                            props.resourceRates[resource.key],
+                                        )
+                                    }}/hour
+                                </p>
+                            </div>
+                            <p class="self-center text-base font-bold">
+                                {{
+                                    formatNumber(
+                                        props.resources[resource.key],
+                                    )
+                                }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div
@@ -694,6 +920,132 @@ function timeFromInputValue(value: string): Date {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="absolute right-4 bottom-4 z-30">
+                <div
+                    v-if="isActionMenuOpen"
+                    class="mb-3 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-white/15 bg-[#10140f]/90 p-4 text-sm shadow-2xl backdrop-blur"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-xs font-semibold tracking-wider text-[#caa66c] uppercase"
+                            >
+                                Actions
+                            </p>
+                            <h2 class="mt-1 text-lg font-bold">
+                                Kingdom status
+                            </h2>
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 text-[#f3efe4] transition hover:bg-white/10"
+                            aria-label="Close actions menu"
+                            @click="isActionMenuOpen = false"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div class="mt-4 grid gap-3">
+                        <div
+                            class="rounded-md border border-white/10 bg-white/[0.04] p-3"
+                        >
+                            <div class="flex items-center gap-2 font-semibold">
+                                <CheckCircle2
+                                    class="h-4 w-4"
+                                    :class="
+                                        props.canCollect
+                                            ? 'text-[#9fe58d]'
+                                            : 'text-[#8d9487]'
+                                    "
+                                />
+                                Collection
+                            </div>
+                            <p class="mt-1 text-[#b8c2b0]">
+                                {{
+                                    props.canCollect
+                                        ? 'Daily collection is ready.'
+                                        : 'Daily collection is not ready yet.'
+                                }}
+                            </p>
+                            <button
+                                type="button"
+                                class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+                                :class="
+                                    props.canCollect
+                                        ? 'border-[#9fe58d]/45 bg-[#15351c]/70 text-[#e8ffe3] hover:bg-[#1d4625]/85'
+                                        : 'border-white/15 bg-white/[0.03] text-[#b8c2b0]'
+                                "
+                                :disabled="!props.canCollect || isCollecting"
+                                @click="collectResources"
+                            >
+                                <Sparkles class="h-4 w-4" />
+                                {{
+                                    isCollecting
+                                        ? 'Collecting...'
+                                        : props.canCollect
+                                          ? 'Collect resources'
+                                          : 'Collected today'
+                                }}
+                            </button>
+                        </div>
+
+                        <div
+                            class="rounded-md border border-white/10 bg-white/[0.04] p-3"
+                        >
+                            <div class="flex items-center gap-2 font-semibold">
+                                <Hammer
+                                    class="h-4 w-4"
+                                    :class="
+                                        hasUpgradeReady
+                                            ? 'text-[#e0b461]'
+                                            : 'text-[#8d9487]'
+                                    "
+                                />
+                                Building upgrades
+                            </div>
+                            <p class="mt-1 text-[#b8c2b0]">
+                                {{
+                                    hasUpgradeReady
+                                        ? `${upgradeReadyBuildings.length} upgrade${upgradeReadyBuildings.length === 1 ? '' : 's'} available.`
+                                        : 'No building upgrades are currently affordable.'
+                                }}
+                            </p>
+                            <div
+                                v-if="hasUpgradeReady"
+                                class="mt-2 flex flex-wrap gap-1.5"
+                            >
+                                <span
+                                    v-for="building in upgradeReadyBuildings"
+                                    :key="building.id"
+                                    class="rounded border border-[#e0b461]/25 bg-[#e0b461]/10 px-2 py-1 text-xs font-semibold text-[#fff0c8]"
+                                >
+                                    {{ building.name }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <Link
+                            :href="dashboard()"
+                            class="inline-flex items-center justify-center rounded-md border border-white/15 px-3 py-2 font-semibold text-[#f3efe4] transition hover:bg-white/10"
+                        >
+                            Open dashboard
+                        </Link>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    class="inline-flex h-14 w-14 items-center justify-center rounded-full border transition hover:scale-105"
+                    :class="actionButtonClass"
+                    :aria-label="actionButtonLabel"
+                    :title="actionButtonLabel"
+                    @click="isActionMenuOpen = !isActionMenuOpen"
+                >
+                    <Bell class="h-6 w-6" />
+                </button>
             </div>
         </section>
     </main>
