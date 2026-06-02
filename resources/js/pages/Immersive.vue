@@ -1,33 +1,55 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     Bell,
     CheckCircle2,
     Coins,
+    Gamepad2,
     Hammer,
     LayoutGrid,
+    Mountain,
     Pause,
     Play,
     RotateCcw,
     Sparkles,
+    TreePine,
+    Wheat,
     X,
 } from 'lucide-vue-next';
-import type { Building, DashboardGameData } from '@/lib/game';
-import { getUserSystemTime, type UserSystemTime } from '@/lib/userSystemTime';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
+import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
+import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
+import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
+import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
+import { useImmersiveTestingPanel } from '@/composables/useImmersiveTestingPanel';
+import type {
+    Building,
+    DashboardGameData,
+    Minigame,
+    ResourceKey,
+} from '@/lib/game';
+import { getUserSystemTime } from '@/lib/userSystemTime';
+import type { UserSystemTime } from '@/lib/userSystemTime';
 import { weatherConditionLabel, weatherIconFor } from '@/lib/weather';
 import { dashboard, immersive } from '@/routes';
 
-const backgroundAssets = import.meta.glob<string>('./assets/backgrounds/*.png', {
-    eager: true,
-    import: 'default',
-    query: '?url',
-});
-const cloudAssets = import.meta.glob<string>('./assets/backgrounds/clouds/*.png', {
-    eager: true,
-    import: 'default',
-    query: '?url',
-});
+const backgroundAssets = import.meta.glob<string>(
+    './assets/backgrounds/*.png',
+    {
+        eager: true,
+        import: 'default',
+        query: '?url',
+    },
+);
+const cloudAssets = import.meta.glob<string>(
+    './assets/backgrounds/clouds/*.png',
+    {
+        eager: true,
+        import: 'default',
+        query: '?url',
+    },
+);
 const fallbackAssets = import.meta.glob<string>('./assets/*.png', {
     eager: true,
     import: 'default',
@@ -67,6 +89,31 @@ const resourcesButtonPosition = {
 const upgradesButtonPosition = {
     left: 14,
     top: 80,
+};
+
+const minigameButtonPositions: Record<
+    ResourceKey,
+    {
+        left: number;
+        top: number;
+    }
+> = {
+    wood: {
+        left: 86,
+        top: 78,
+    },
+    food: {
+        left: 56,
+        top: 80,
+    },
+    stone: {
+        left: 84,
+        top: 50,
+    },
+    gold: {
+        left: 88,
+        top: 50,
+    },
 };
 
 const MAX_ROAD_BUILD_AMOUNT = 10_000_000;
@@ -237,10 +284,14 @@ const isUpgradesMenuOpen = ref(false);
 const isCollecting = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
+const activeMinigameResource = ref<ResourceKey | null>(null);
+const selectedMinigameResource = ref<ResourceKey | null>(null);
+const hasWonMinigame = ref(false);
 const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
 let userTimeInterval: number | undefined;
 let timeLoopInterval: number | undefined;
+const { isImmersiveTestingPanelOpen } = useImmersiveTestingPanel();
 
 const weatherLabel = computed(() =>
     weatherConditionLabel(props.weather.conditions),
@@ -295,6 +346,45 @@ const upgradeReadyBuildings = computed(() =>
 );
 
 const hasUpgradeReady = computed(() => upgradeReadyBuildings.value.length > 0);
+
+const minigames = computed<Minigame[]>(() => props.minigames);
+
+const resourceIcons = {
+    gold: Coins,
+    wood: TreePine,
+    stone: Mountain,
+    food: Wheat,
+};
+
+const minigameComponents = {
+    gold: GoldMinigame,
+    wood: WoodMinigame,
+    stone: StoneMinigame,
+    food: FoodMinigame,
+};
+
+const selectedMinigame = computed<Minigame | null>(() =>
+    selectedMinigameResource.value
+        ? (minigames.value.find(
+              (minigame) =>
+                  minigame.resource === selectedMinigameResource.value,
+          ) ?? null)
+        : null,
+);
+
+const selectedMinigameResourceAmount = computed(() =>
+    selectedMinigame.value
+        ? props.resources[selectedMinigame.value.resource]
+        : 0,
+);
+
+const selectedMinigameComponent = computed(() =>
+    selectedMinigame.value
+        ? minigameComponents[selectedMinigame.value.resource]
+        : null,
+);
+
+const isMinigameOpen = computed(() => selectedMinigame.value !== null);
 
 const actionButtonClass = computed(() => {
     if (props.canCollect && hasUpgradeReady.value) {
@@ -408,6 +498,17 @@ const roadLabel = computed(() => {
     return 'No roads built';
 });
 
+const minigameButtons = computed(() =>
+    minigames.value.map((minigame) => ({
+        ...minigame,
+        icon: resourceIcons[minigame.resource],
+        style: {
+            left: `${minigameButtonPositions[minigame.resource].left}%`,
+            top: `${minigameButtonPositions[minigame.resource].top}%`,
+        },
+    })),
+);
+
 const skyState = computed(() => {
     const hour = displayedTime.value.hourDecimal;
 
@@ -439,7 +540,9 @@ const activeBackgroundAsset = computed(() =>
     ),
 );
 
-const activeClouds = computed(() => (isSunVisible.value ? dayClouds : nightClouds));
+const activeClouds = computed(() =>
+    isSunVisible.value ? dayClouds : nightClouds,
+);
 
 const activeCelestialAsset = computed(() =>
     backgroundAsset(isSunVisible.value ? 'sun.png' : 'moon.png'),
@@ -527,6 +630,26 @@ function formatNumber(value: number): string {
     return new Intl.NumberFormat('en').format(value);
 }
 
+function minigameButtonClass(resource: ResourceKey): string {
+    if (selectedMinigameResource.value === resource) {
+        return 'border-[#8fd8ff]/70 bg-[#12313d]/90 text-[#d9f5ff] shadow-[0_0_28px_rgb(83_186_219/0.32)]';
+    }
+
+    if (resource === 'wood') {
+        return 'border-[#9fe58d]/55 bg-[#15351c]/82 text-[#e8ffe3] shadow-[0_0_22px_rgb(126_214_111/0.22)]';
+    }
+
+    if (resource === 'food') {
+        return 'border-[#d8d16e]/55 bg-[#393a12]/82 text-[#fff9bf] shadow-[0_0_22px_rgb(216_209_110/0.2)]';
+    }
+
+    if (resource === 'stone') {
+        return 'border-[#b8c6cf]/55 bg-[#202b31]/82 text-[#eef8ff] shadow-[0_0_22px_rgb(184_198_207/0.18)]';
+    }
+
+    return 'border-[#e0b461]/55 bg-[#3a2a10]/82 text-[#fff0c8] shadow-[0_0_22px_rgb(224_180_97/0.22)]';
+}
+
 function settlementStageForLevel(level: number): number {
     if (level >= 25) {
         return 6;
@@ -573,9 +696,7 @@ function stagedBackgroundAsset(period: 'day' | 'night', stage: number): string {
 }
 
 function cloudAsset(filename: string): string {
-    return (
-        cloudAssets[`./assets/backgrounds/clouds/${filename}`] ?? emptyAsset
-    );
+    return cloudAssets[`./assets/backgrounds/clouds/${filename}`] ?? emptyAsset;
 }
 
 function cloudStyle(cloud: CloudPlacement): Record<string, string> {
@@ -653,6 +774,63 @@ function upgradeBuilding(building: Building): void {
     );
 }
 
+function completeMinigame(minigame: Minigame): void {
+    router.post(
+        `/dashboard/minigames/${minigame.resource}/complete`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                activeMinigameResource.value = minigame.resource;
+            },
+            onSuccess: () => {
+                hasWonMinigame.value = true;
+            },
+            onError: (errors) => {
+                if (errors.minigame) {
+                    toast.error(errors.minigame);
+                }
+            },
+            onFinish: () => {
+                activeMinigameResource.value = null;
+            },
+        },
+    );
+}
+
+function openMinigame(minigame: Minigame): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isActionMenuOpen.value = false;
+    isResourcesMenuOpen.value = false;
+    isUpgradesMenuOpen.value = false;
+    selectedMinigameResource.value = minigame.resource;
+    hasWonMinigame.value = false;
+}
+
+function closeMinigame(): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+}
+
+function continueMinigame(): void {
+    hasWonMinigame.value = false;
+}
+
+function completeSelectedMinigame(): void {
+    if (!selectedMinigame.value) {
+        return;
+    }
+
+    completeMinigame(selectedMinigame.value);
+}
+
 function incrementTestTime(minutes: number): void {
     const baseDate = timeOverride.value
         ? timeFromInputValue(timeOverride.value)
@@ -666,6 +844,7 @@ function incrementTestTime(minutes: number): void {
 function toggleTimeLoop(): void {
     if (isTimeLooping.value) {
         stopTimeLoop();
+
         return;
     }
 
@@ -827,9 +1006,7 @@ function timeFromInputValue(value: string): Date {
                             </div>
                             <p class="self-center text-base font-bold">
                                 {{
-                                    formatNumber(
-                                        props.resources[resource.key],
-                                    )
+                                    formatNumber(props.resources[resource.key])
                                 }}
                             </p>
                         </div>
@@ -936,7 +1113,7 @@ function timeFromInputValue(value: string): Date {
                                     min="1"
                                     :max="MAX_ROAD_BUILD_AMOUNT"
                                     step="1"
-                                    class="h-9 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-sm text-[#1f241c] outline-none transition focus:border-[#9a7a46] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
+                                    class="h-9 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-sm text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
                                     placeholder="1"
                                 />
                             </label>
@@ -944,6 +1121,21 @@ function timeFromInputValue(value: string): Date {
                     </div>
                 </div>
             </div>
+
+            <button
+                v-for="minigame in minigameButtons"
+                :key="minigame.resource"
+                type="button"
+                class="absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+                :class="minigameButtonClass(minigame.resource)"
+                :style="minigame.style"
+                :disabled="activeMinigameResource !== null"
+                :aria-label="`Play ${minigame.label}`"
+                :title="`Play ${minigame.label}`"
+                @click="openMinigame(minigame)"
+            >
+                <component :is="minigame.icon" class="h-5 w-5" />
+            </button>
 
             <div
                 class="absolute top-4 right-4 left-4 z-20 flex flex-col gap-3 sm:left-auto sm:w-[22rem]"
@@ -1000,95 +1192,109 @@ function timeFromInputValue(value: string): Date {
                             <p class="mt-1 font-semibold">{{ roadLabel }}</p>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div
-                        class="mt-4 grid gap-2 border-t border-white/10 pt-4"
-                    >
-                        <label class="min-w-0 flex-1">
-                            <span class="text-sm text-[#b8c2b0]"
-                                >Test time</span
+            <div
+                v-if="isImmersiveTestingPanelOpen"
+                class="absolute top-4 left-4 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
+            >
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Testing
+                        </p>
+                        <h2 class="mt-1 text-lg font-bold">Scene controls</h2>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid gap-2">
+                    <label class="min-w-0 flex-1">
+                        <span class="text-sm text-[#696250] dark:text-[#b8c2b0]"
+                            >Test time</span
+                        >
+                        <input
+                            v-model="timeOverride"
+                            type="time"
+                            class="mt-1 w-full rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 py-2 text-sm font-semibold text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-white/15 dark:bg-[#0a0f0b]/80 dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
+                        />
+                    </label>
+                    <div class="grid grid-cols-[1fr_1fr_2.5rem] gap-2">
+                        <button
+                            type="button"
+                            class="rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            @click="incrementTestTime(1)"
+                        >
+                            +1m
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            @click="incrementTestTime(60)"
+                        >
+                            +1h
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#b7aa91] text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            :disabled="!timeOverride"
+                            aria-label="Use real local time"
+                            @click="timeOverride = ''"
+                        >
+                            <RotateCcw class="h-4 w-4" />
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-[1fr_6rem] gap-2">
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-md border border-[#b7aa91] px-3 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            @click="toggleTimeLoop"
+                        >
+                            <Pause v-if="isTimeLooping" class="h-4 w-4" />
+                            <Play v-else class="h-4 w-4" />
+                            {{ isTimeLooping ? 'Stop loop' : 'Start loop' }}
+                        </button>
+                        <label>
+                            <span class="sr-only"
+                                >Loop speed in milliseconds</span
                             >
                             <input
-                                v-model="timeOverride"
-                                type="time"
-                                class="mt-1 w-full rounded-md border border-white/15 bg-[#0a0f0b]/80 px-3 py-2 text-sm font-semibold text-[#f3efe4] outline-none transition focus:border-[#caa66c]"
+                                v-model.number="timeLoopSpeedMs"
+                                type="number"
+                                min="50"
+                                max="60000"
+                                step="50"
+                                class="w-full rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 py-2 text-sm font-semibold text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-white/15 dark:bg-[#0a0f0b]/80 dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
+                                aria-label="Loop speed in milliseconds"
                             />
                         </label>
-                        <div class="grid grid-cols-[1fr_1fr_2.5rem] gap-2">
-                            <button
-                                type="button"
-                                class="rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-[#f3efe4] transition hover:bg-white/10"
-                                @click="incrementTestTime(1)"
+                    </div>
+                    <div class="grid grid-cols-[1fr_2.5rem] gap-2">
+                        <label>
+                            <span
+                                class="text-sm text-[#696250] dark:text-[#b8c2b0]"
+                                >Test settlement stage</span
                             >
-                                +1m
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-[#f3efe4] transition hover:bg-white/10"
-                                @click="incrementTestTime(60)"
-                            >
-                                +1h
-                            </button>
-                            <button
-                                type="button"
-                                class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 text-[#f3efe4] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
-                                :disabled="!timeOverride"
-                                aria-label="Use real local time"
-                                @click="timeOverride = ''"
-                            >
-                                <RotateCcw class="h-4 w-4" />
-                            </button>
-                        </div>
-                        <div class="grid grid-cols-[1fr_6rem] gap-2">
-                            <button
-                                type="button"
-                                class="inline-flex items-center justify-center gap-2 rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-[#f3efe4] transition hover:bg-white/10"
-                                @click="toggleTimeLoop"
-                            >
-                                <Pause
-                                    v-if="isTimeLooping"
-                                    class="h-4 w-4"
-                                />
-                                <Play v-else class="h-4 w-4" />
-                                {{ isTimeLooping ? 'Stop loop' : 'Start loop' }}
-                            </button>
-                            <label>
-                                <span class="sr-only">Loop speed in milliseconds</span>
-                                <input
-                                    v-model.number="timeLoopSpeedMs"
-                                    type="number"
-                                    min="50"
-                                    max="60000"
-                                    step="50"
-                                    class="w-full rounded-md border border-white/15 bg-[#0a0f0b]/80 px-3 py-2 text-sm font-semibold text-[#f3efe4] outline-none transition focus:border-[#caa66c]"
-                                    aria-label="Loop speed in milliseconds"
-                                />
-                            </label>
-                        </div>
-                        <div class="grid grid-cols-[1fr_2.5rem] gap-2">
-                            <label>
-                                <span class="text-sm text-[#b8c2b0]"
-                                    >Test settlement stage</span
-                                >
-                                <input
-                                    v-model="settlementStageOverride"
-                                    type="number"
-                                    min="0"
-                                    max="6"
-                                    step="1"
-                                    class="mt-1 w-full rounded-md border border-white/15 bg-[#0a0f0b]/80 px-3 py-2 text-sm font-semibold text-[#f3efe4] outline-none transition focus:border-[#caa66c]"
-                                />
-                            </label>
-                            <button
-                                type="button"
-                                class="mt-6 inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 text-[#f3efe4] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
-                                :disabled="!settlementStageOverride"
-                                aria-label="Use calculated settlement stage"
-                                @click="settlementStageOverride = ''"
-                            >
-                                <RotateCcw class="h-4 w-4" />
-                            </button>
-                        </div>
+                            <input
+                                v-model="settlementStageOverride"
+                                type="number"
+                                min="0"
+                                max="6"
+                                step="1"
+                                class="mt-1 w-full rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 py-2 text-sm font-semibold text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-white/15 dark:bg-[#0a0f0b]/80 dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            class="mt-6 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#b7aa91] text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            :disabled="!settlementStageOverride"
+                            aria-label="Use calculated settlement stage"
+                            @click="settlementStageOverride = ''"
+                        >
+                            <RotateCcw class="h-4 w-4" />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1220,6 +1426,131 @@ function timeFromInputValue(value: string): Date {
             </div>
         </section>
     </main>
+
+    <Teleport to="body">
+        <div
+            v-if="isMinigameOpen && selectedMinigame"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+            @click.self="closeMinigame"
+        >
+            <section
+                class="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Minigame
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">
+                            {{ selectedMinigame.label }}
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close minigame"
+                        :disabled="activeMinigameResource !== null"
+                        @click="closeMinigame"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div class="relative">
+                    <component
+                        :is="selectedMinigameComponent"
+                        :key="selectedMinigame.resource"
+                        :is-saving="
+                            activeMinigameResource === selectedMinigame.resource
+                        "
+                        :is-completed="hasWonMinigame"
+                        @complete="completeSelectedMinigame"
+                    />
+                    <button
+                        v-if="hasWonMinigame && activeMinigameResource === null"
+                        type="button"
+                        class="absolute inset-0 z-50 cursor-pointer rounded-md bg-transparent"
+                        aria-label="Continue playing"
+                        @click="continueMinigame"
+                    ></button>
+                </div>
+
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Reward
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{ selectedMinigame.rewardLabel }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Current resources
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{ formatNumber(selectedMinigameResourceAmount) }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Completions
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{ formatNumber(selectedMinigame.completions) }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Total gained
+                        </p>
+                        <p class="mt-2 text-xl font-bold">
+                            {{ formatNumber(selectedMinigame.resourcesGained) }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    v-if="hasWonMinigame"
+                    class="mt-5 flex flex-col gap-3 border-t border-[#e4dac7] pt-4 sm:flex-row sm:justify-end dark:border-[#35332c]"
+                >
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="continueMinigame"
+                    >
+                        <Gamepad2 class="h-4 w-4" />
+                        Continue playing
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                        @click="closeMinigame"
+                    >
+                        Stop playing
+                    </button>
+                </div>
+            </section>
+        </div>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -1292,5 +1623,4 @@ function timeFromInputValue(value: string): Date {
         transform: translate(var(--cloud-drift), -50%);
     }
 }
-
 </style>

@@ -409,6 +409,21 @@ test('minigame completion awards resources from current production and tracks co
             ->where('minigames.0.resourcesGained', 6));
 });
 
+test('minigame completion returns to immersive mode when submitted from immersive mode', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $this->from(route('immersive'))
+        ->post(route('dashboard.minigames.complete', ['resource' => 'wood']))
+        ->assertRedirect(route('immersive'));
+
+    $this->assertDatabaseHas('minigames', [
+        'user_id' => $user->id,
+        'resource' => 'wood',
+        'completions' => 1,
+    ]);
+});
+
 test('minigame completions are rate limited per user and resource', function () {
     $user = User::factory()->create();
     $this->actingAs($user);

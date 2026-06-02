@@ -258,7 +258,7 @@ class DashboardController extends Controller
 
         $this->syncAchievementsFor($user, $resources, $buildings);
 
-        return redirect()->route('dashboard');
+        return redirect()->to(url()->previous(route('dashboard')));
     }
 
     public function prestige(Request $request): RedirectResponse
