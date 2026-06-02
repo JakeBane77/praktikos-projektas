@@ -352,7 +352,7 @@ class DashboardController extends Controller
             ],
         );
 
-        return redirect()->route('dashboard');
+        return redirect()->to(url()->previous(route('dashboard')));
     }
 
     public function resetWeatherLocation(Request $request): RedirectResponse
@@ -361,7 +361,7 @@ class DashboardController extends Controller
             ->where('user_id', $request->user()->id)
             ->delete();
 
-        return redirect()->route('dashboard');
+        return redirect()->to(url()->previous(route('dashboard')));
     }
 
     private function resourcesFor(User $user): UserResource

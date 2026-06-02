@@ -123,12 +123,12 @@ test('users can save browser supplied coordinates and weather', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    $this->post(route('dashboard.weather-location'), [
+    $this->from(route('immersive'))->post(route('dashboard.weather-location'), [
         'latitude' => 55.1234,
         'longitude' => 24.9876,
         'weather_code' => 45,
         'api_time' => '2026-05-29T06:18Z',
-    ])->assertRedirect(route('dashboard'));
+    ])->assertRedirect(route('immersive'));
 
     $this->assertDatabaseHas('weather_snapshots', [
         'user_id' => $user->id,
@@ -172,8 +172,8 @@ test('users can switch weather back to default location', function () {
         'api_time' => now(),
     ]);
 
-    $this->post(route('dashboard.weather-location.default'))
-        ->assertRedirect(route('dashboard'));
+    $this->from(route('immersive'))->post(route('dashboard.weather-location.default'))
+        ->assertRedirect(route('immersive'));
 
     $this->assertDatabaseMissing('weather_snapshots', [
         'user_id' => $user->id,
