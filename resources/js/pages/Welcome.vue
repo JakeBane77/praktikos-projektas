@@ -3,6 +3,8 @@ import { Head, Link } from '@inertiajs/vue3';
 import {
     Award,
     BarChart3,
+    Castle,
+    CloudSun,
     Coins,
     Gamepad2,
     Hammer,
@@ -50,13 +52,18 @@ const resourceCards = [
 const featureCards = [
     {
         title: 'Build and upgrade',
-        text: 'Mines, farms, lumbercamps, quarries, and roads all grow from database-backed building types.',
+        text: 'Mines, farms, lumbercamps, quarries, and roads expand your settlement with every upgrade.',
         icon: Hammer,
     },
     {
         title: 'Timed minigames',
-        text: 'Resource minigames reward active play, starting with the wood timing game.',
+        text: 'Wood, food, stone, and gold minigames reward active play with resource-specific gains.',
         icon: Gamepad2,
+    },
+    {
+        title: 'Immersive kingdom',
+        text: 'A visual map changes with local time, weather, settlement stage, and long-term progress.',
+        icon: CloudSun,
     },
     {
         title: 'Achievement bonuses',
@@ -82,8 +89,13 @@ const featureCards = [
         >
             <Link
                 :href="$page.props.auth.user ? dashboard() : '/'"
-                class="text-lg font-bold"
+                class="inline-flex items-center gap-3 text-lg font-bold"
             >
+                <span
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#243627] text-white"
+                >
+                    <Castle class="h-5 w-5" />
+                </span>
                 Kingdom Idle
             </Link>
 
@@ -124,7 +136,9 @@ const featureCards = [
             </nav>
         </header>
 
-        <div class="mx-auto flex w-full max-w-7xl justify-end px-5 pb-2 sm:hidden">
+        <div
+            class="mx-auto flex w-full max-w-7xl justify-end px-5 pb-2 sm:hidden"
+        >
             <AppearanceTabs />
         </div>
 
@@ -157,11 +171,11 @@ const featureCards = [
                 </h1>
 
                 <p
-                    class="mt-5 max-w-xl text-base leading-7 text-[#4f574b] sm:text-lg dark:text-[#c6c0b3]"
+                    class="mt-5 max-w-xl text-justify text-base leading-7 text-[#4f574b] sm:text-lg dark:text-[#c6c0b3]"
                 >
                     Gather resources, upgrade production, complete minigames,
-                    unlock bonuses, and prestige when your road network reaches
-                    the edge of the world.
+                    unlock bonuses, and watch your kingdom shift between
+                    dashboard control and immersive world view.
                 </p>
 
                 <div class="mt-8 flex flex-wrap gap-3">
@@ -188,14 +202,13 @@ const featureCards = [
                     </Link>
                 </div>
 
-                <div class="mt-10 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+                <div
+                    class="mt-10 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4"
+                >
                     <div
                         v-for="resource in resourceCards"
                         :key="resource.label"
-                        :class="[
-                            'rounded-md p-4 shadow-sm',
-                            resource.class,
-                        ]"
+                        :class="['rounded-md p-4 shadow-sm', resource.class]"
                     >
                         <div class="flex items-center justify-between gap-3">
                             <p class="text-sm font-semibold">
@@ -255,7 +268,9 @@ const featureCards = [
         </section>
 
         <section class="mx-auto w-full max-w-7xl px-5 py-10 sm:px-6">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div
+                class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"
+            >
                 <div>
                     <p
                         class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
@@ -267,15 +282,14 @@ const featureCards = [
                     </h2>
                 </div>
                 <p
-                    class="max-w-xl text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                    class="max-w-xl text-justify text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
                 >
-                    Passive production keeps working between visits, while
-                    daily collection and minigames give active players more to
-                    do.
+                    Passive production keeps working between visits, while daily
+                    collection and minigames give active players more to do.
                 </p>
             </div>
 
-            <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <article
                     v-for="feature in featureCards"
                     :key="feature.title"
@@ -286,7 +300,7 @@ const featureCards = [
                     </div>
                     <h3 class="mt-4 text-lg font-bold">{{ feature.title }}</h3>
                     <p
-                        class="mt-2 text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                        class="mt-2 text-justify text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
                     >
                         {{ feature.text }}
                     </p>

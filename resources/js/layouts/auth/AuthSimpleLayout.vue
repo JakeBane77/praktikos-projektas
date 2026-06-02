@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { Award, Gamepad2, Route, TreePine } from 'lucide-vue-next';
+import { Award, Gamepad2, Route } from 'lucide-vue-next';
 import AppearanceTabs from '@/components/AppearanceTabs.vue';
+import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import oakTree from '@/components/minigames/assets/trees/oak.svg';
 import { home } from '@/routes';
 
@@ -15,7 +16,9 @@ defineProps<{
     <div
         class="min-h-svh bg-[#f6f3ec] text-[#1f241c] dark:bg-[#12140f] dark:text-[#f3efe4]"
     >
-        <div class="mx-auto grid min-h-svh w-full max-w-7xl lg:grid-cols-[1fr_0.78fr]">
+        <div
+            class="mx-auto grid min-h-svh w-full max-w-7xl lg:grid-cols-[1fr_0.78fr]"
+        >
             <section
                 class="relative hidden overflow-hidden border-r border-[#ded2bd] px-8 py-8 lg:flex lg:flex-col lg:justify-between dark:border-[#38362f]"
             >
@@ -28,7 +31,7 @@ defineProps<{
                             <div
                                 class="flex h-10 w-10 items-center justify-center rounded-md bg-[#243627] text-white"
                             >
-                                <TreePine class="h-5 w-5" />
+                                <AppLogoIcon class="h-5 w-5" />
                             </div>
                             Kingdom Idle
                         </Link>
@@ -42,14 +45,14 @@ defineProps<{
                             Settlement access
                         </p>
                         <h1 class="mt-4 text-5xl leading-tight font-bold">
-                            Return to your growing kingdom.
+                            Your kingdom keeps growing between visits.
                         </h1>
                         <p
-                            class="mt-5 text-base leading-7 text-[#5d6356] dark:text-[#c6c0b3]"
+                            class="mt-5 text-justify text-base leading-7 text-[#5d6356] dark:text-[#c6c0b3]"
                         >
                             Collect daily resources, upgrade production, clear
-                            minigames, and keep pushing toward the next
-                            prestige.
+                            resource minigames, unlock achievement bonuses, and
+                            push your road network toward prestige.
                         </p>
                     </div>
                 </div>
@@ -67,9 +70,7 @@ defineProps<{
                             <Gamepad2
                                 class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
                             />
-                            <p class="mt-3 text-sm font-semibold">
-                                Minigames
-                            </p>
+                            <p class="mt-3 text-sm font-semibold">Minigames</p>
                         </div>
                         <div
                             class="rounded-md border border-[#ded2bd] bg-[#fffaf0]/90 p-4 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]/90"
@@ -77,9 +78,7 @@ defineProps<{
                             <Award
                                 class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
                             />
-                            <p class="mt-3 text-sm font-semibold">
-                                Bonuses
-                            </p>
+                            <p class="mt-3 text-sm font-semibold">Bonuses</p>
                         </div>
                         <div
                             class="rounded-md border border-[#ded2bd] bg-[#fffaf0]/90 p-4 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]/90"
@@ -87,9 +86,7 @@ defineProps<{
                             <Route
                                 class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
                             />
-                            <p class="mt-3 text-sm font-semibold">
-                                Prestige
-                            </p>
+                            <p class="mt-3 text-sm font-semibold">Prestige</p>
                         </div>
                     </div>
                 </div>
@@ -99,7 +96,9 @@ defineProps<{
                 class="flex min-h-svh items-center justify-center px-5 py-8 sm:px-6 lg:px-10"
             >
                 <div class="w-full max-w-md">
-                    <div class="mb-8 flex flex-col items-center gap-4 lg:hidden">
+                    <div
+                        class="mb-8 flex flex-col items-center gap-4 lg:hidden"
+                    >
                         <div
                             class="flex w-full items-center justify-between gap-4"
                         >
@@ -110,7 +109,7 @@ defineProps<{
                                 <div
                                     class="flex h-10 w-10 items-center justify-center rounded-md bg-[#243627] text-white"
                                 >
-                                    <TreePine class="h-5 w-5" />
+                                    <AppLogoIcon class="h-5 w-5" />
                                 </div>
                                 Kingdom Idle
                             </Link>
@@ -129,9 +128,9 @@ defineProps<{
                             </p>
                             <h1 class="text-2xl font-bold">{{ title }}</h1>
                             <p
-                                class="text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                                class="text-justify text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
                             >
-                            {{ description }}
+                                {{ description }}
                             </p>
                         </div>
 

@@ -16,8 +16,9 @@ defineProps<{
 
 defineOptions({
     layout: {
-        title: 'Create an account',
-        description: 'Create your settlement and start gathering resources.',
+        title: 'Found your kingdom',
+        description:
+            'Create a settlement, gather resources, unlock achievements, and start building toward prestige.',
     },
 });
 </script>
@@ -33,7 +34,9 @@ defineOptions({
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="name" class="text-[#3b3f36] dark:text-[#f3efe4]">Name</Label>
+                <Label for="name" class="text-[#3b3f36] dark:text-[#f3efe4]"
+                    >Ruler name</Label
+                >
                 <Input
                     id="name"
                     type="text"
@@ -42,13 +45,15 @@ defineOptions({
                     :tabindex="1"
                     autocomplete="name"
                     name="name"
-                    placeholder="Full name"
+                    placeholder="Settlement ruler"
                 />
                 <InputError :message="errors.name" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="email" class="text-[#3b3f36] dark:text-[#f3efe4]">Email address</Label>
+                <Label for="email" class="text-[#3b3f36] dark:text-[#f3efe4]"
+                    >Email address</Label
+                >
                 <Input
                     id="email"
                     type="email"
@@ -62,7 +67,9 @@ defineOptions({
             </div>
 
             <div class="grid gap-2">
-                <Label for="password" class="text-[#3b3f36] dark:text-[#f3efe4]">Password</Label>
+                <Label for="password" class="text-[#3b3f36] dark:text-[#f3efe4]"
+                    >Password</Label
+                >
                 <PasswordInput
                     id="password"
                     required
@@ -102,7 +109,7 @@ defineOptions({
                 data-test="register-user-button"
             >
                 <Spinner v-if="processing" />
-                Create account
+                Found kingdom
             </Button>
         </div>
 

@@ -15,8 +15,9 @@ import { request } from '@/routes/password';
 
 defineOptions({
     layout: {
-        title: 'Log in to your account',
-        description: 'Enter your settlement credentials to continue playing.',
+        title: 'Return to your kingdom',
+        description:
+            'Log in to collect resources, manage upgrades, and continue your prestige run.',
     },
 });
 
@@ -46,7 +47,9 @@ defineProps<{
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                    <Label for="email" class="text-[#3b3f36] dark:text-[#f3efe4]">Email address</Label>
+                <Label for="email" class="text-[#3b3f36] dark:text-[#f3efe4]"
+                    >Email address</Label
+                >
                 <Input
                     id="email"
                     type="email"
@@ -62,7 +65,11 @@ defineProps<{
 
             <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                    <Label for="password" class="text-[#3b3f36] dark:text-[#f3efe4]">Password</Label>
+                    <Label
+                        for="password"
+                        class="text-[#3b3f36] dark:text-[#f3efe4]"
+                        >Password</Label
+                    >
                     <TextLink
                         v-if="canResetPassword"
                         :href="request()"
@@ -84,7 +91,10 @@ defineProps<{
             </div>
 
             <div class="flex items-center justify-between">
-                <Label for="remember" class="flex items-center space-x-3 text-[#3b3f36] dark:text-[#f3efe4]">
+                <Label
+                    for="remember"
+                    class="flex items-center space-x-3 text-[#3b3f36] dark:text-[#f3efe4]"
+                >
                     <Checkbox id="remember" name="remember" :tabindex="3" />
                     <span>Remember me</span>
                 </Label>
@@ -98,7 +108,7 @@ defineProps<{
                 data-test="login-button"
             >
                 <Spinner v-if="processing" />
-                Log in
+                Enter kingdom
             </Button>
         </div>
 
@@ -109,7 +119,7 @@ defineProps<{
                 class="text-[#7b633d] underline-offset-4 hover:text-[#243627] dark:text-[#caa66c] dark:hover:text-[#f3efe4]"
                 :tabindex="5"
             >
-                Sign up
+                Create kingdom
             </TextLink>
         </div>
     </Form>
