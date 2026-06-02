@@ -13,7 +13,7 @@ import {
     Sparkles,
     X,
 } from 'lucide-vue-next';
-import type { DashboardGameData } from '@/lib/game';
+import type { Building, DashboardGameData } from '@/lib/game';
 import { getUserSystemTime, type UserSystemTime } from '@/lib/userSystemTime';
 import { weatherConditionLabel, weatherIconFor } from '@/lib/weather';
 import { dashboard, immersive } from '@/routes';
@@ -63,6 +63,13 @@ const resourcesButtonPosition = {
     left: 41,
     top: 74,
 };
+
+const upgradesButtonPosition = {
+    left: 14,
+    top: 80,
+};
+
+const MAX_ROAD_BUILD_AMOUNT = 10_000_000;
 
 const resourceRows = [
     { key: 'wood', label: 'Wood' },
@@ -226,7 +233,10 @@ const timeOverride = ref('');
 const settlementStageOverride = ref('');
 const isActionMenuOpen = ref(false);
 const isResourcesMenuOpen = ref(false);
+const isUpgradesMenuOpen = ref(false);
 const isCollecting = ref(false);
+const upgradingBuildingId = ref<number | null>(null);
+const roadBuildAmounts = ref<Record<number, number>>({});
 const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
 let userTimeInterval: number | undefined;
@@ -335,6 +345,25 @@ const resourcesButtonStyle = computed(() => ({
     left: `${resourcesButtonPosition.left}%`,
     top: `${resourcesButtonPosition.top}%`,
 }));
+
+const upgradesButtonStyle = computed(() => ({
+    left: `${upgradesButtonPosition.left}%`,
+    top: `${upgradesButtonPosition.top}%`,
+}));
+
+const upgradesButtonClass = computed(() => {
+    if (hasUpgradeReady.value) {
+        return 'border-[#e0b461]/60 bg-[#3a2a10]/88 text-[#fff0c8] shadow-[0_0_28px_rgb(224_180_97/0.28)] hover:bg-[#4b3613]/90';
+    }
+
+    return 'border-white/15 bg-[#10140f]/72 text-[#b8c2b0] opacity-70';
+});
+
+const upgradesButtonLabel = computed(() =>
+    hasUpgradeReady.value
+        ? `${upgradeReadyBuildings.value.length} building upgrade${upgradeReadyBuildings.value.length === 1 ? '' : 's'} ready`
+        : 'No building upgrades ready',
+);
 
 const collectButtonLabel = computed(() => {
     if (isCollecting.value) {
@@ -592,6 +621,38 @@ function collectResources(): void {
     );
 }
 
+function roadBuildAmount(building: Building): number {
+    const amount = Number(roadBuildAmounts.value[building.id] ?? 1);
+
+    if (!Number.isFinite(amount)) {
+        return 1;
+    }
+
+    return Math.min(MAX_ROAD_BUILD_AMOUNT, Math.max(1, Math.floor(amount)));
+}
+
+function upgradeBuilding(building: Building): void {
+    if (!building.canUpgrade || upgradingBuildingId.value !== null) {
+        return;
+    }
+
+    router.post(
+        `/dashboard/buildings/${building.id}/upgrade`,
+        {
+            amount: building.isRoad ? roadBuildAmount(building) : 1,
+        },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                upgradingBuildingId.value = building.id;
+            },
+            onFinish: () => {
+                upgradingBuildingId.value = null;
+            },
+        },
+    );
+}
+
 function incrementTestTime(minutes: number): void {
     const baseDate = timeOverride.value
         ? timeFromInputValue(timeOverride.value)
@@ -721,12 +782,12 @@ function timeFromInputValue(value: string): Date {
 
                 <div
                     v-if="isResourcesMenuOpen"
-                    class="absolute bottom-14 left-1/2 w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-white/15 bg-[#10140f]/92 p-4 text-sm shadow-2xl backdrop-blur"
+                    class="absolute bottom-14 left-1/2 w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p
-                                class="text-xs font-semibold tracking-wider text-[#caa66c] uppercase"
+                                class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
                             >
                                 Resources
                             </p>
@@ -736,7 +797,7 @@ function timeFromInputValue(value: string): Date {
                         </div>
                         <button
                             type="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 text-[#f3efe4] transition hover:bg-white/10"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
                             aria-label="Close resources menu"
                             @click="isResourcesMenuOpen = false"
                         >
@@ -748,13 +809,15 @@ function timeFromInputValue(value: string): Date {
                         <div
                             v-for="resource in resourceRows"
                             :key="resource.key"
-                            class="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-white/10 bg-white/[0.04] p-3"
+                            class="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
                         >
                             <div>
                                 <p class="font-semibold">
                                     {{ resource.label }}
                                 </p>
-                                <p class="mt-1 text-xs text-[#b8c2b0]">
+                                <p
+                                    class="mt-1 text-xs text-[#696250] dark:text-[#b8c2b0]"
+                                >
                                     +{{
                                         formatNumber(
                                             props.resourceRates[resource.key],
@@ -769,6 +832,114 @@ function timeFromInputValue(value: string): Date {
                                     )
                                 }}
                             </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+                :style="upgradesButtonStyle"
+            >
+                <button
+                    type="button"
+                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                    :class="upgradesButtonClass"
+                    :aria-label="upgradesButtonLabel"
+                    :title="upgradesButtonLabel"
+                    @click="isUpgradesMenuOpen = !isUpgradesMenuOpen"
+                >
+                    <Hammer class="h-5 w-5" />
+                </button>
+
+                <div
+                    v-if="isUpgradesMenuOpen"
+                    class="absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Buildings
+                            </p>
+                            <h2 class="mt-1 text-lg font-bold">
+                                Upgrade status
+                            </h2>
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            aria-label="Close upgrades menu"
+                            @click="isUpgradesMenuOpen = false"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div class="mt-4 grid gap-2">
+                        <div
+                            v-if="!hasUpgradeReady"
+                            class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 text-[#696250] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#b8c2b0]"
+                        >
+                            No building upgrades are currently affordable.
+                        </div>
+
+                        <div
+                            v-for="building in upgradeReadyBuildings"
+                            v-else
+                            :key="building.id"
+                            class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold">
+                                        {{ building.name }}
+                                    </p>
+                                    <p
+                                        class="mt-1 text-xs text-[#696250] dark:text-[#b8c2b0]"
+                                    >
+                                        {{ building.levelLabel }}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center justify-center rounded border border-[#b99145]/35 bg-[#ead9b6] px-3 py-1.5 text-xs font-semibold text-[#5a4320] transition hover:bg-[#dfc996] disabled:cursor-not-allowed disabled:opacity-55 dark:border-[#e0b461]/25 dark:bg-[#e0b461]/10 dark:text-[#fff0c8] dark:hover:bg-[#e0b461]/20"
+                                    :disabled="
+                                        upgradingBuildingId !== null ||
+                                        !building.canUpgrade
+                                    "
+                                    @click="upgradeBuilding(building)"
+                                >
+                                    {{
+                                        upgradingBuildingId === building.id
+                                            ? 'Upgrading...'
+                                            : 'Upgrade'
+                                    }}
+                                </button>
+                            </div>
+                            <p
+                                class="mt-2 text-xs text-[#696250] dark:text-[#b8c2b0]"
+                            >
+                                {{ building.upgradeCost }}
+                            </p>
+                            <label
+                                v-if="building.isRoad"
+                                class="mt-3 flex items-center gap-2 text-xs font-semibold text-[#696250] dark:text-[#b8c2b0]"
+                            >
+                                Build km
+                                <input
+                                    v-model.number="
+                                        roadBuildAmounts[building.id]
+                                    "
+                                    type="number"
+                                    min="1"
+                                    :max="MAX_ROAD_BUILD_AMOUNT"
+                                    step="1"
+                                    class="h-9 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-sm text-[#1f241c] outline-none transition focus:border-[#9a7a46] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
+                                    placeholder="1"
+                                />
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -925,12 +1096,12 @@ function timeFromInputValue(value: string): Date {
             <div class="absolute right-4 bottom-4 z-30">
                 <div
                     v-if="isActionMenuOpen"
-                    class="mb-3 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-white/15 bg-[#10140f]/90 p-4 text-sm shadow-2xl backdrop-blur"
+                    class="mb-3 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/90 dark:text-[#f3efe4]"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p
-                                class="text-xs font-semibold tracking-wider text-[#caa66c] uppercase"
+                                class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
                             >
                                 Actions
                             </p>
@@ -940,7 +1111,7 @@ function timeFromInputValue(value: string): Date {
                         </div>
                         <button
                             type="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 text-[#f3efe4] transition hover:bg-white/10"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
                             aria-label="Close actions menu"
                             @click="isActionMenuOpen = false"
                         >
@@ -950,7 +1121,7 @@ function timeFromInputValue(value: string): Date {
 
                     <div class="mt-4 grid gap-3">
                         <div
-                            class="rounded-md border border-white/10 bg-white/[0.04] p-3"
+                            class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
                         >
                             <div class="flex items-center gap-2 font-semibold">
                                 <CheckCircle2
@@ -963,7 +1134,7 @@ function timeFromInputValue(value: string): Date {
                                 />
                                 Collection
                             </div>
-                            <p class="mt-1 text-[#b8c2b0]">
+                            <p class="mt-1 text-[#696250] dark:text-[#b8c2b0]">
                                 {{
                                     props.canCollect
                                         ? 'Daily collection is ready.'
@@ -975,8 +1146,8 @@ function timeFromInputValue(value: string): Date {
                                 class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
                                 :class="
                                     props.canCollect
-                                        ? 'border-[#9fe58d]/45 bg-[#15351c]/70 text-[#e8ffe3] hover:bg-[#1d4625]/85'
-                                        : 'border-white/15 bg-white/[0.03] text-[#b8c2b0]'
+                                        ? 'border-[#86ad6c] bg-[#edf6e8] text-[#2d5b28] hover:bg-[#e2f0da] dark:border-[#9fe58d]/45 dark:bg-[#15351c]/70 dark:text-[#e8ffe3] dark:hover:bg-[#1d4625]/85'
+                                        : 'border-[#d6cab6] bg-[#f8efe1] text-[#696250] dark:border-white/15 dark:bg-white/[0.03] dark:text-[#b8c2b0]'
                                 "
                                 :disabled="!props.canCollect || isCollecting"
                                 @click="collectResources"
@@ -993,7 +1164,7 @@ function timeFromInputValue(value: string): Date {
                         </div>
 
                         <div
-                            class="rounded-md border border-white/10 bg-white/[0.04] p-3"
+                            class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
                         >
                             <div class="flex items-center gap-2 font-semibold">
                                 <Hammer
@@ -1006,7 +1177,7 @@ function timeFromInputValue(value: string): Date {
                                 />
                                 Building upgrades
                             </div>
-                            <p class="mt-1 text-[#b8c2b0]">
+                            <p class="mt-1 text-[#696250] dark:text-[#b8c2b0]">
                                 {{
                                     hasUpgradeReady
                                         ? `${upgradeReadyBuildings.length} upgrade${upgradeReadyBuildings.length === 1 ? '' : 's'} available.`
@@ -1020,7 +1191,7 @@ function timeFromInputValue(value: string): Date {
                                 <span
                                     v-for="building in upgradeReadyBuildings"
                                     :key="building.id"
-                                    class="rounded border border-[#e0b461]/25 bg-[#e0b461]/10 px-2 py-1 text-xs font-semibold text-[#fff0c8]"
+                                    class="rounded border border-[#b99145]/35 bg-[#ead9b6] px-2 py-1 text-xs font-semibold text-[#5a4320] dark:border-[#e0b461]/25 dark:bg-[#e0b461]/10 dark:text-[#fff0c8]"
                                 >
                                     {{ building.name }}
                                 </span>
@@ -1029,7 +1200,7 @@ function timeFromInputValue(value: string): Date {
 
                         <Link
                             :href="dashboard()"
-                            class="inline-flex items-center justify-center rounded-md border border-white/15 px-3 py-2 font-semibold text-[#f3efe4] transition hover:bg-white/10"
+                            class="inline-flex items-center justify-center rounded-md border border-[#b7aa91] px-3 py-2 font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
                         >
                             Open dashboard
                         </Link>

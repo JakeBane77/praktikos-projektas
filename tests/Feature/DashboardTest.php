@@ -637,6 +637,45 @@ test('users can upgrade a built building by paying scaled cost', function () {
     ]);
 });
 
+test('building upgrade returns to immersive mode when submitted from immersive mode', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $mine = BuildingType::create([
+        'name' => 'Mine',
+        'slug' => 'mine',
+        'produces_resource' => 'gold',
+        'base_production_per_hour' => 5,
+        'production_multiplier' => 1,
+        'base_costs' => ['wood' => 100],
+    ]);
+
+    $building = UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $mine->id,
+        'level' => 0,
+        'built_at' => null,
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 120,
+        'stone' => 0,
+        'food' => 0,
+        'last_produced_at' => now(),
+    ]);
+
+    $this->from(route('immersive'))
+        ->post(route('dashboard.buildings.upgrade', $building))
+        ->assertRedirect(route('immersive'));
+
+    $this->assertDatabaseHas('user_buildings', [
+        'id' => $building->id,
+        'level' => 1,
+    ]);
+});
+
 test('users cannot upgrade without enough resources', function () {
     $user = User::factory()->create();
     $this->actingAs($user);

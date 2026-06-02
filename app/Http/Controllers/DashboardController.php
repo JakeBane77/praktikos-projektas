@@ -183,7 +183,7 @@ class DashboardController extends Controller
 
         if ($building->buildingType->max_level !== null && ($building->level + $amount) > $building->buildingType->max_level) {
             return redirect()
-                ->route('dashboard')
+                ->to(url()->previous(route('dashboard')))
                 ->withErrors([
                     'upgrade' => $building->buildingType->name.' is already at max level.',
                 ]);
@@ -193,7 +193,7 @@ class DashboardController extends Controller
 
         if (! $this->canAfford($resources, $costs)) {
             return redirect()
-                ->route('dashboard')
+                ->to(url()->previous(route('dashboard')))
                 ->withErrors([
                     'upgrade' => 'Not enough resources to upgrade '.$building->buildingType->name.'.',
                 ]);
@@ -216,7 +216,7 @@ class DashboardController extends Controller
 
         $this->syncAchievementsFor($request->user(), $resources, $this->buildingsFor($request->user()));
 
-        return redirect()->route('dashboard');
+        return redirect()->to(url()->previous(route('dashboard')));
     }
 
     public function completeMinigame(Request $request, string $resource): RedirectResponse
