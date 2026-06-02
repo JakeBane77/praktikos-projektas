@@ -35,7 +35,11 @@ import type {
 } from '@/lib/game';
 import { getUserSystemTime } from '@/lib/userSystemTime';
 import type { UserSystemTime } from '@/lib/userSystemTime';
-import { weatherConditionLabel, weatherIconFor } from '@/lib/weather';
+import {
+    weatherConditionLabel,
+    weatherConditionsForCode,
+    weatherIconFor,
+} from '@/lib/weather';
 import { immersive } from '@/routes';
 
 const backgroundAssets = import.meta.glob<string>(
@@ -158,6 +162,15 @@ type CloudPlacement = {
     drift: number;
     duration: number;
     delay: number;
+};
+
+type WeatherParticle = {
+    id: number;
+    left: number;
+    delay: number;
+    duration: number;
+    opacity: number;
+    size: number;
 };
 
 const dayClouds: CloudPlacement[] = [
@@ -286,6 +299,27 @@ const nightClouds: CloudPlacement[] = [
     },
 ];
 
+const rainDrops: WeatherParticle[] = Array.from({ length: 90 }, (_, index) => ({
+    id: index,
+    left: (index * 37) % 100,
+    delay: -((index * 0.17) % 1.8),
+    duration: 0.55 + ((index * 13) % 22) / 100,
+    opacity: 0.35 + ((index * 7) % 45) / 100,
+    size: 0.75 + ((index * 5) % 30) / 100,
+}));
+
+const snowFlakes: WeatherParticle[] = Array.from(
+    { length: 70 },
+    (_, index) => ({
+        id: index,
+        left: (index * 41) % 100,
+        delay: -((index * 0.31) % 8),
+        duration: 7 + ((index * 11) % 50) / 10,
+        opacity: 0.35 + ((index * 9) % 45) / 100,
+        size: 0.45 + ((index * 7) % 55) / 100,
+    }),
+);
+
 defineOptions({
     layout: {
         breadcrumbs: [
@@ -302,6 +336,7 @@ const props = defineProps<DashboardGameData>();
 const userTime = ref<UserSystemTime>(getUserSystemTime());
 const timeOverride = ref('');
 const settlementStageOverride = ref('');
+const weatherCodeOverride = ref('');
 const isActionMenuOpen = ref(false);
 const isResourcesMenuOpen = ref(false);
 const isUpgradesMenuOpen = ref(false);
@@ -327,11 +362,28 @@ let userTimeInterval: number | undefined;
 let timeLoopInterval: number | undefined;
 const { isImmersiveTestingPanelOpen } = useImmersiveTestingPanel();
 
+const displayedWeatherCode = computed(() => {
+    if (weatherCodeOverride.value === '') {
+        return props.weather.weatherCode;
+    }
+
+    const weatherCode = Number(weatherCodeOverride.value);
+
+    return Number.isInteger(weatherCode) ? weatherCode : null;
+});
+const displayedWeatherConditions = computed(() =>
+    weatherCodeOverride.value === ''
+        ? props.weather.conditions
+        : weatherConditionsForCode(displayedWeatherCode.value),
+);
 const weatherLabel = computed(() =>
-    weatherConditionLabel(props.weather.conditions),
+    weatherConditionLabel(displayedWeatherConditions.value),
 );
 const WeatherIcon = computed(() =>
-    weatherIconFor(props.weather.weatherCode, props.weather.conditions),
+    weatherIconFor(
+        displayedWeatherCode.value,
+        displayedWeatherConditions.value,
+    ),
 );
 
 const displayedTime = computed(() =>
@@ -749,8 +801,20 @@ const activeBackgroundAsset = computed(() =>
     ),
 );
 
+const isClearWeather = computed(() => displayedWeatherConditions.value.clear);
+const isRainVisible = computed(
+    () =>
+        displayedWeatherConditions.value.raining ||
+        displayedWeatherConditions.value.thunderstorm,
+);
+const isThunderstormVisible = computed(
+    () => displayedWeatherConditions.value.thunderstorm,
+);
+const isSnowVisible = computed(() => displayedWeatherConditions.value.snowing);
+const isFogVisible = computed(() => displayedWeatherConditions.value.foggy);
+
 const activeClouds = computed(() =>
-    isSunVisible.value ? dayClouds : nightClouds,
+    isClearWeather.value ? [] : isSunVisible.value ? dayClouds : nightClouds,
 );
 
 const activeCelestialAsset = computed(() =>
@@ -802,6 +866,13 @@ const sceneClass = computed(() => ({
     'immersive-scene-dawn': skyState.value === 'dawn',
     'immersive-scene-dusk': skyState.value === 'dusk',
     'immersive-scene-night': skyState.value === 'night',
+    'immersive-weather-clear': displayedWeatherConditions.value.clear,
+    'immersive-weather-cloudy': displayedWeatherConditions.value.cloudy,
+    'immersive-weather-raining': displayedWeatherConditions.value.raining,
+    'immersive-weather-foggy': displayedWeatherConditions.value.foggy,
+    'immersive-weather-thunderstorm':
+        displayedWeatherConditions.value.thunderstorm,
+    'immersive-weather-snowing': displayedWeatherConditions.value.snowing,
 }));
 
 watch(
@@ -916,6 +987,28 @@ function cloudStyle(cloud: CloudPlacement): Record<string, string> {
         '--cloud-drift': `${cloud.drift}%`,
         '--cloud-duration': `${cloud.duration}s`,
         '--cloud-delay': `${cloud.delay}s`,
+    };
+}
+
+function rainDropStyle(drop: WeatherParticle): Record<string, string> {
+    return {
+        left: `${drop.left}%`,
+        opacity: String(drop.opacity),
+        '--rain-scale': String(drop.size),
+        '--rain-delay': `${drop.delay}s`,
+        '--rain-duration': `${drop.duration}s`,
+    };
+}
+
+function snowFlakeStyle(flake: WeatherParticle): Record<string, string> {
+    return {
+        left: `${flake.left}%`,
+        opacity: String(flake.opacity),
+        width: `${flake.size}rem`,
+        height: `${flake.size}rem`,
+        '--snow-delay': `${flake.delay}s`,
+        '--snow-duration': `${flake.duration}s`,
+        '--snow-drift': `${((flake.id * 17) % 28) - 14}vw`,
     };
 }
 
@@ -1262,6 +1355,46 @@ function timeFromInputValue(value: string): Date {
                     draggable="false"
                     @error="useEmptyAsset"
                 />
+            </div>
+
+            <div
+                v-if="isFogVisible"
+                class="immersive-weather-layer immersive-fog-layer"
+            >
+                <div class="immersive-fog immersive-fog-a"></div>
+                <div class="immersive-fog immersive-fog-b"></div>
+            </div>
+
+            <div
+                v-if="isRainVisible"
+                class="immersive-weather-layer immersive-rain-layer"
+            >
+                <span
+                    v-for="drop in rainDrops"
+                    :key="drop.id"
+                    class="immersive-rain-drop"
+                    :style="rainDropStyle(drop)"
+                ></span>
+            </div>
+
+            <div
+                v-if="isThunderstormVisible"
+                class="immersive-weather-layer immersive-lightning-layer"
+            >
+                <div class="immersive-lightning immersive-lightning-a"></div>
+                <div class="immersive-lightning immersive-lightning-b"></div>
+            </div>
+
+            <div
+                v-if="isSnowVisible"
+                class="immersive-weather-layer immersive-snow-layer"
+            >
+                <span
+                    v-for="flake in snowFlakes"
+                    :key="flake.id"
+                    class="immersive-snow-flake"
+                    :style="snowFlakeStyle(flake)"
+                ></span>
             </div>
 
             <button
@@ -1665,6 +1798,11 @@ function timeFromInputValue(value: string): Date {
                             <component :is="WeatherIcon" class="h-4 w-4" />
                             {{ weatherLabel }}
                         </p>
+                        <p
+                            class="mt-1 text-xs text-[#696250] dark:text-[#b8c2b0]"
+                        >
+                            Code {{ displayedWeatherCode ?? '-' }}
+                        </p>
                     </div>
                     <div
                         class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
@@ -1756,6 +1894,31 @@ function timeFromInputValue(value: string): Date {
                                 aria-label="Loop speed in milliseconds"
                             />
                         </label>
+                    </div>
+                    <div class="grid grid-cols-[1fr_2.5rem] gap-2">
+                        <label>
+                            <span
+                                class="text-sm text-[#696250] dark:text-[#b8c2b0]"
+                                >Test weather code</span
+                            >
+                            <input
+                                v-model="weatherCodeOverride"
+                                type="number"
+                                min="0"
+                                max="99"
+                                step="1"
+                                class="mt-1 w-full rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 py-2 text-sm font-semibold text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-white/15 dark:bg-[#0a0f0b]/80 dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            class="mt-6 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#b7aa91] text-[#243627] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            :disabled="!weatherCodeOverride"
+                            aria-label="Use live weather code"
+                            @click="weatherCodeOverride = ''"
+                        >
+                            <RotateCcw class="h-4 w-4" />
+                        </button>
                     </div>
                     <div class="grid grid-cols-[1fr_2.5rem] gap-2">
                         <label>
@@ -2485,12 +2648,154 @@ function timeFromInputValue(value: string): Date {
     display: none;
 }
 
+.immersive-weather-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.immersive-rain-layer {
+    background: linear-gradient(
+        180deg,
+        rgb(12 21 26 / 0.22),
+        rgb(12 21 26 / 0.08)
+    );
+}
+
+.immersive-rain-drop {
+    position: absolute;
+    top: -18vh;
+    width: 0.12rem;
+    height: 18vh;
+    border-radius: 999px;
+    background: linear-gradient(
+        180deg,
+        rgb(217 245 255 / 0),
+        rgb(217 245 255 / 0.78)
+    );
+    animation: rain-fall var(--rain-duration) linear infinite;
+    animation-delay: var(--rain-delay);
+}
+
+.immersive-snow-layer {
+    background: linear-gradient(
+        180deg,
+        rgb(235 248 255 / 0.16),
+        rgb(235 248 255 / 0.02)
+    );
+}
+
+.immersive-snow-flake {
+    position: absolute;
+    top: -8vh;
+    border-radius: 999px;
+    background: rgb(245 251 255 / 0.92);
+    box-shadow: 0 0 0.5rem rgb(245 251 255 / 0.45);
+    animation: snow-fall var(--snow-duration) linear infinite;
+    animation-delay: var(--snow-delay);
+}
+
+.immersive-fog-layer {
+    z-index: 4;
+    background:
+        linear-gradient(180deg, rgb(226 232 222 / 0.24), transparent 38%),
+        linear-gradient(0deg, rgb(226 232 222 / 0.2), transparent 42%);
+}
+
+.immersive-fog {
+    position: absolute;
+    left: -20%;
+    width: 140%;
+    height: 36%;
+    border-radius: 999px;
+    background: radial-gradient(
+        ellipse at center,
+        rgb(238 242 232 / 0.34),
+        rgb(238 242 232 / 0)
+    );
+    filter: blur(1.5rem);
+    animation: fog-drift 38s ease-in-out infinite alternate;
+}
+
+.immersive-fog-a {
+    top: 24%;
+}
+
+.immersive-fog-b {
+    top: 56%;
+    animation-duration: 52s;
+    animation-delay: -18s;
+}
+
+.immersive-lightning-layer {
+    z-index: 5;
+    background: rgb(217 245 255 / 0);
+    animation: lightning-flash 7s step-end infinite;
+}
+
+.immersive-lightning {
+    position: absolute;
+    top: -4%;
+    width: 0.25rem;
+    height: 42%;
+    opacity: 0;
+    background: linear-gradient(
+        180deg,
+        rgb(237 250 255 / 0.95),
+        rgb(141 216 255 / 0)
+    );
+    filter: drop-shadow(0 0 0.75rem rgb(141 216 255 / 0.9));
+    clip-path: polygon(
+        44% 0,
+        70% 0,
+        55% 36%,
+        76% 36%,
+        36% 100%,
+        48% 48%,
+        30% 48%
+    );
+    animation: lightning-bolt 7s step-end infinite;
+}
+
+.immersive-lightning-a {
+    left: 22%;
+    animation-delay: -1.8s;
+}
+
+.immersive-lightning-b {
+    right: 28%;
+    animation-delay: -4.9s;
+}
+
 .immersive-scene-dawn .immersive-background {
     filter: brightness(0.95) saturate(0.96);
 }
 
 .immersive-scene-dusk .immersive-background {
     filter: brightness(0.82) saturate(0.88);
+}
+
+.immersive-weather-clear .immersive-background {
+    filter: brightness(1.04) saturate(1.05);
+}
+
+.immersive-weather-cloudy .immersive-background {
+    filter: brightness(0.94) saturate(0.92);
+}
+
+.immersive-weather-raining .immersive-background,
+.immersive-weather-thunderstorm .immersive-background {
+    filter: brightness(0.72) saturate(0.75) contrast(1.04);
+}
+
+.immersive-weather-foggy .immersive-background {
+    filter: brightness(0.9) saturate(0.68) contrast(0.86);
+}
+
+.immersive-weather-snowing .immersive-background {
+    filter: brightness(0.96) saturate(0.72) contrast(0.92);
 }
 
 @keyframes cloud-drift {
@@ -2500,6 +2805,66 @@ function timeFromInputValue(value: string): Date {
 
     to {
         transform: translate(var(--cloud-drift), -50%);
+    }
+}
+
+@keyframes rain-fall {
+    from {
+        transform: translate3d(-8vw, -20vh, 0) rotate(12deg)
+            scale(var(--rain-scale));
+    }
+
+    to {
+        transform: translate3d(8vw, 120vh, 0) rotate(12deg)
+            scale(var(--rain-scale));
+    }
+}
+
+@keyframes snow-fall {
+    from {
+        transform: translate3d(0, -10vh, 0);
+    }
+
+    to {
+        transform: translate3d(var(--snow-drift), 112vh, 0);
+    }
+}
+
+@keyframes fog-drift {
+    from {
+        transform: translateX(-4%);
+    }
+
+    to {
+        transform: translateX(4%);
+    }
+}
+
+@keyframes lightning-flash {
+    0%,
+    87%,
+    91%,
+    100% {
+        background: rgb(217 245 255 / 0);
+    }
+
+    88%,
+    90% {
+        background: rgb(217 245 255 / 0.28);
+    }
+}
+
+@keyframes lightning-bolt {
+    0%,
+    87%,
+    91%,
+    100% {
+        opacity: 0;
+    }
+
+    88%,
+    90% {
+        opacity: 1;
     }
 }
 </style>

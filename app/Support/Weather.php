@@ -3,7 +3,9 @@
 namespace App\Support;
 
 final class Weather
-{
+{   
+    //locations are malaysia (active), los angeles, alytus
+    //default location
     public const LATITUDE = 2.495;//34.0522;//54.6892;//54.3957;
     
     public const LONGITUDE = 112.4819;//-118.2437;//25.2798;//24.0389;
