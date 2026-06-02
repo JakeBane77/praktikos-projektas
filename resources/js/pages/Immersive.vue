@@ -535,23 +535,42 @@ const leaderboardButtonLabel = computed(() =>
         : 'Leaderboard',
 );
 
+const iconButtonReadyClass =
+    'border-[#e0b461]/70 bg-[#3a2a10]/90 text-[#fff0c8] shadow-[0_0_30px_rgb(224_180_97/0.34)] hover:bg-[#4b3613]/90';
+const iconButtonIdleClass =
+    'border-white/15 bg-black/45 text-[#d8dccf] shadow-[0_0_18px_rgb(0_0_0/0.24)] hover:bg-black/60';
+const iconButtonMenuClass =
+    'border-[#8fd8ff]/55 bg-[#12313d]/85 text-[#d9f5ff] shadow-[0_0_24px_rgb(83_186_219/0.24)] hover:bg-[#173f4e]/90';
+const iconButtonMinigameClass =
+    'border-[#ff9a9a]/55 bg-[#4a1717]/82 text-[#ffe1e1] shadow-[0_0_24px_rgb(255_112_112/0.24)] hover:bg-[#5b2020]/90';
+
 const actionButtonClass = computed(() => {
+    if (props.prestigeStats.canPrestige) {
+        return iconButtonReadyClass;
+    }
+
     if (props.canCollect && hasActionUpgradeReady.value) {
-        return 'border-[#8fd8ff]/60 bg-[#12313d]/88 text-[#d9f5ff] shadow-[0_0_28px_rgb(83_186_219/0.32)]';
+        return iconButtonReadyClass;
     }
 
     if (props.canCollect) {
-        return 'border-[#9fe58d]/60 bg-[#15351c]/88 text-[#e8ffe3] shadow-[0_0_28px_rgb(126_214_111/0.3)]';
+        return iconButtonReadyClass;
     }
 
     if (hasActionUpgradeReady.value) {
-        return 'border-[#e0b461]/60 bg-[#3a2a10]/88 text-[#fff0c8] shadow-[0_0_28px_rgb(224_180_97/0.28)]';
+        return iconButtonReadyClass;
     }
 
-    return 'border-white/15 bg-[#10140f]/82 text-[#f3efe4]';
+    return iconButtonIdleClass;
 });
 
 const actionButtonLabel = computed(() => {
+    if (props.prestigeStats.canPrestige) {
+        return props.canCollect || hasActionUpgradeReady.value
+            ? 'Prestige and actions ready'
+            : 'Prestige ready';
+    }
+
     if (props.canCollect && hasActionUpgradeReady.value) {
         return 'Collection and upgrades ready';
     }
@@ -569,10 +588,10 @@ const actionButtonLabel = computed(() => {
 
 const collectButtonClass = computed(() => {
     if (props.canCollect) {
-        return 'border-[#9fe58d]/60 bg-[#15351c]/88 text-[#e8ffe3] shadow-[0_0_28px_rgb(126_214_111/0.3)] hover:bg-[#1d4625]/90';
+        return iconButtonReadyClass;
     }
 
-    return 'border-white/15 bg-[#10140f]/72 text-[#b8c2b0] opacity-70';
+    return iconButtonIdleClass;
 });
 
 const collectButtonStyle = computed(() => ({
@@ -617,25 +636,22 @@ const actionMenuStyle = computed(() => ({
 
 const upgradesButtonClass = computed(() => {
     if (hasUpgradeReady.value) {
-        return 'border-[#e0b461]/60 bg-[#3a2a10]/88 text-[#fff0c8] shadow-[0_0_28px_rgb(224_180_97/0.28)] hover:bg-[#4b3613]/90';
+        return iconButtonReadyClass;
     }
 
-    return 'border-white/15 bg-[#10140f]/72 text-[#b8c2b0] opacity-70';
+    return iconButtonIdleClass;
 });
 
 const prestigeButtonClass = computed(() => {
     if (props.prestigeStats.canPrestige) {
-        return 'border-[#8fd8ff]/60 bg-[#12313d]/88 text-[#d9f5ff] shadow-[0_0_28px_rgb(83_186_219/0.32)] hover:bg-[#173f4e]/90';
+        return iconButtonReadyClass;
     }
 
-    return 'border-[#e0b461]/45 bg-[#3a2a10]/78 text-[#fff0c8] shadow-[0_0_22px_rgb(224_180_97/0.2)] hover:bg-[#4b3613]/85';
+    return iconButtonIdleClass;
 });
 
-const leaderboardButtonClass =
-    'border-[#d8d16e]/55 bg-[#393a12]/82 text-[#fff9bf] shadow-[0_0_22px_rgb(216_209_110/0.2)] hover:bg-[#474817]/90';
-
-const achievementsButtonClass =
-    'border-[#9fe58d]/55 bg-[#15351c]/82 text-[#e8ffe3] shadow-[0_0_22px_rgb(126_214_111/0.22)] hover:bg-[#1d4625]/90';
+const leaderboardButtonClass = iconButtonMenuClass;
+const achievementsButtonClass = iconButtonMenuClass;
 
 const achievementsButtonLabel = computed(
     () =>
@@ -839,24 +855,8 @@ function formatNumber(value: number): string {
     return new Intl.NumberFormat('en').format(value);
 }
 
-function minigameButtonClass(resource: ResourceKey): string {
-    if (selectedMinigameResource.value === resource) {
-        return 'border-[#8fd8ff]/70 bg-[#12313d]/90 text-[#d9f5ff] shadow-[0_0_28px_rgb(83_186_219/0.32)]';
-    }
-
-    if (resource === 'wood') {
-        return 'border-[#9fe58d]/55 bg-[#15351c]/82 text-[#e8ffe3] shadow-[0_0_22px_rgb(126_214_111/0.22)]';
-    }
-
-    if (resource === 'food') {
-        return 'border-[#d8d16e]/55 bg-[#393a12]/82 text-[#fff9bf] shadow-[0_0_22px_rgb(216_209_110/0.2)]';
-    }
-
-    if (resource === 'stone') {
-        return 'border-[#b8c6cf]/55 bg-[#202b31]/82 text-[#eef8ff] shadow-[0_0_22px_rgb(184_198_207/0.18)]';
-    }
-
-    return 'border-[#e0b461]/55 bg-[#3a2a10]/82 text-[#fff0c8] shadow-[0_0_22px_rgb(224_180_97/0.22)]';
+function minigameButtonClass(): string {
+    return iconButtonMinigameClass;
 }
 
 function settlementStageForLevel(level: number): number {
@@ -1283,7 +1283,8 @@ function timeFromInputValue(value: string): Date {
             >
                 <button
                     type="button"
-                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#8fd8ff]/50 bg-[#12313d]/88 text-[#d9f5ff] shadow-[0_0_24px_rgb(83_186_219/0.24)] transition hover:scale-105 hover:bg-[#173f4e]/90"
+                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                    :class="iconButtonMenuClass"
                     aria-label="Show resources and production"
                     title="Resources and production"
                     @click="isResourcesMenuOpen = !isResourcesMenuOpen"
@@ -1476,7 +1477,7 @@ function timeFromInputValue(value: string): Date {
                 :key="minigame.resource"
                 type="button"
                 class="absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
-                :class="minigameButtonClass(minigame.resource)"
+                :class="minigameButtonClass()"
                 :style="minigame.style"
                 :disabled="activeMinigameResource !== null"
                 :aria-label="`Play ${minigame.label}`"
@@ -1849,6 +1850,28 @@ function timeFromInputValue(value: string): Date {
                                       ? 'Collect resources'
                                       : 'Collected today'
                             }}
+                        </button>
+                    </div>
+
+                    <div
+                        v-if="props.prestigeStats.canPrestige"
+                        class="rounded-md border border-[#c5dff1] bg-[#eef8ff]/80 p-3 dark:border-[#8fd8ff]/25 dark:bg-[#12313d]/55"
+                    >
+                        <div class="flex items-center gap-2 font-semibold">
+                            <RotateCcw class="h-4 w-4 text-[#2d7898]" />
+                            Prestige
+                        </div>
+                        <p class="mt-1 text-[#696250] dark:text-[#b8c2b0]">
+                            Your road network is ready for prestige.
+                        </p>
+                        <button
+                            type="button"
+                            class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#76b7d7] bg-[#dff2ff] px-3 py-2 font-semibold text-[#12313d] transition hover:bg-[#cfebfb] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#8fd8ff]/35 dark:bg-[#8fd8ff]/12 dark:text-[#d9f5ff] dark:hover:bg-[#8fd8ff]/18"
+                            :disabled="isPrestiging"
+                            @click="confirmPrestige"
+                        >
+                            <RotateCcw class="h-4 w-4" />
+                            {{ isPrestiging ? 'Prestiging...' : 'Prestige' }}
                         </button>
                     </div>
 
