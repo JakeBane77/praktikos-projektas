@@ -285,6 +285,7 @@ const settlementStageOverride = ref('');
 const isActionMenuOpen = ref(false);
 const isResourcesMenuOpen = ref(false);
 const isUpgradesMenuOpen = ref(false);
+const showOnlyAvailableUpgrades = ref(true);
 const isCollecting = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
@@ -350,6 +351,16 @@ const upgradeReadyBuildings = computed(() =>
 );
 
 const hasUpgradeReady = computed(() => upgradeReadyBuildings.value.length > 0);
+
+const visibleUpgradeBuildings = computed(() =>
+    showOnlyAvailableUpgrades.value
+        ? upgradeReadyBuildings.value
+        : props.buildings.filter((building) => !building.isMaxLevel),
+);
+
+const hasVisibleUpgradeBuildings = computed(
+    () => visibleUpgradeBuildings.value.length > 0,
+);
 
 const minigames = computed<Minigame[]>(() => props.minigames);
 
@@ -1068,16 +1079,31 @@ function timeFromInputValue(value: string): Date {
                         </button>
                     </div>
 
+                    <label
+                        class="mt-4 flex items-center justify-between gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 text-sm font-semibold dark:border-white/10 dark:bg-white/[0.04]"
+                    >
+                        <span>Show only available</span>
+                        <input
+                            v-model="showOnlyAvailableUpgrades"
+                            type="checkbox"
+                            class="h-4 w-4 accent-[#243627]"
+                        />
+                    </label>
+
                     <div class="mt-4 grid gap-2">
                         <div
-                            v-if="!hasUpgradeReady"
+                            v-if="!hasVisibleUpgradeBuildings"
                             class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 text-[#696250] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#b8c2b0]"
                         >
-                            No building upgrades are currently affordable.
+                            {{
+                                showOnlyAvailableUpgrades
+                                    ? 'No building upgrades are currently affordable.'
+                                    : 'No further building upgrades are available.'
+                            }}
                         </div>
 
                         <div
-                            v-for="building in upgradeReadyBuildings"
+                            v-for="building in visibleUpgradeBuildings"
                             v-else
                             :key="building.id"
                             class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
@@ -1105,7 +1131,9 @@ function timeFromInputValue(value: string): Date {
                                     {{
                                         upgradingBuildingId === building.id
                                             ? 'Upgrading...'
-                                            : 'Upgrade'
+                                            : building.canUpgrade
+                                              ? 'Upgrade'
+                                              : 'Unavailable'
                                     }}
                                 </button>
                             </div>
