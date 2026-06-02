@@ -1003,6 +1003,36 @@ test('users can mark achievement unlock popups as seen', function () {
     expect($userAchievement->fresh()->notification_seen_at)->not->toBeNull();
 });
 
+test('achievement unlock popups return to immersive mode when marked seen from immersive mode', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $achievement = Achievement::create([
+        'name' => 'Immersive Collector',
+        'slug' => 'immersive-collector',
+        'description' => 'Keep collecting in immersive mode.',
+        'type' => 'manual_collects',
+        'target_value' => 10,
+        'production_bonus_percent' => 5,
+    ]);
+
+    $userAchievement = UserAchievement::create([
+        'user_id' => $user->id,
+        'achievement_id' => $achievement->id,
+        'progress' => 10,
+        'unlocked_at' => now(),
+        'notification_seen_at' => null,
+    ]);
+
+    $this->from(route('immersive'))
+        ->post(route('dashboard.achievements.unlocks.seen'), [
+            'ids' => [$userAchievement->id],
+        ])
+        ->assertRedirect(route('immersive'));
+
+    expect($userAchievement->fresh()->notification_seen_at)->not->toBeNull();
+});
+
 test('users can build multiple kilometers of road at once', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -1332,6 +1362,44 @@ test('users can prestige after building roads to the road max level', function (
             ->component('Dashboard')
             ->where('achievements.1.rewardLabel', '+5% all buildings base production, daily collect base becomes 100 of each resource')
         );
+});
+
+test('prestige returns to immersive mode when submitted from immersive mode', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $road = BuildingType::create([
+        'name' => 'Road',
+        'slug' => 'road',
+        'produces_resource' => null,
+        'base_production_per_hour' => 0,
+        'production_multiplier' => null,
+        'effect_type' => 'road_length',
+        'base_costs' => ['wood' => 10],
+        'max_level' => 8,
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $road->id,
+        'level' => 8,
+        'built_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'wood' => 200,
+        'last_produced_at' => now(),
+    ]);
+
+    $this->from(route('immersive'))
+        ->post(route('dashboard.prestige'))
+        ->assertRedirect(route('immersive'));
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'prestiges' => 1,
+    ]);
 });
 
 test('users cannot prestige before reaching sixty million kilometers of road', function () {

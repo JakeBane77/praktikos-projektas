@@ -271,7 +271,7 @@ class DashboardController extends Controller
 
         if ($prestigeRoadRequirement <= 0) {
             return redirect()
-                ->route('dashboard')
+                ->to(url()->previous(route('dashboard')))
                 ->withErrors([
                     'prestige' => 'Road max level is not configured.',
                 ]);
@@ -279,7 +279,7 @@ class DashboardController extends Controller
 
         if ($this->roadLengthFor($buildings) < $prestigeRoadRequirement) {
             return redirect()
-                ->route('dashboard')
+                ->to(url()->previous(route('dashboard')))
                 ->withErrors([
                     'prestige' => 'You need '.number_format($prestigeRoadRequirement).' km of roads before you can prestige.',
                 ]);
@@ -305,7 +305,7 @@ class DashboardController extends Controller
 
         $this->syncAchievementsFor($user, $resources->fresh(), $this->buildingsFor($user));
 
-        return redirect()->route('dashboard');
+        return redirect()->to(url()->previous(route('dashboard')));
     }
 
     public function markAchievementUnlocksSeen(Request $request): RedirectResponse
@@ -324,7 +324,7 @@ class DashboardController extends Controller
                 'notification_seen_at' => now(),
             ]);
 
-        return redirect()->route('dashboard');
+        return redirect()->to(url()->previous(route('dashboard')));
     }
 
     public function updateWeatherLocation(Request $request): RedirectResponse

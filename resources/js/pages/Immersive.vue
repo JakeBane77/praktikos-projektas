@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import {
+    Award,
     Bell,
     CheckCircle2,
     Coins,
     Gamepad2,
     Hammer,
+    Lock,
     Mountain,
     Pause,
     Play,
     RotateCcw,
     Sparkles,
     TreePine,
+    Trophy,
     Wheat,
     X,
 } from 'lucide-vue-next';
@@ -23,8 +26,10 @@ import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import { useImmersiveTestingPanel } from '@/composables/useImmersiveTestingPanel';
 import type {
+    AchievementUnlock,
     Building,
     DashboardGameData,
+    Leaderboard,
     Minigame,
     ResourceKey,
 } from '@/lib/game';
@@ -90,6 +95,21 @@ const upgradesButtonPosition = {
     top: 80,
 };
 
+const prestigeButtonPosition = {
+    left: 42.5,
+    top: 68,
+};
+
+const leaderboardButtonPosition = {
+    right: 1,
+    bottom: 5,
+};
+
+const achievementsButtonPosition = {
+    right: 1,
+    bottom: 9,
+};
+
 const actionButtonPosition = {
     right: 1,
     bottom: 1,
@@ -104,7 +124,7 @@ const minigameButtonPositions: Record<
 > = {
     wood: {
         left: 86,
-        top: 78,
+        top: 76,
     },
     food: {
         left: 56,
@@ -285,13 +305,22 @@ const settlementStageOverride = ref('');
 const isActionMenuOpen = ref(false);
 const isResourcesMenuOpen = ref(false);
 const isUpgradesMenuOpen = ref(false);
+const isPrestigeMenuOpen = ref(false);
+const activeGameModal = ref<'achievements' | 'leaderboard' | 'minigame' | null>(
+    null,
+);
 const showOnlyAvailableUpgrades = ref(true);
+const hideCompletedAchievements = ref(true);
+const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
+const activeAchievementUnlockIndex = ref(0);
 const isCollecting = ref(false);
+const isPrestiging = ref(false);
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const activeMinigameResource = ref<ResourceKey | null>(null);
 const selectedMinigameResource = ref<ResourceKey | null>(null);
 const hasWonMinigame = ref(false);
+const selectedLeaderboardKey = ref(props.leaderboards.defaultKey);
 const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
 let userTimeInterval: number | undefined;
@@ -363,6 +392,56 @@ const hasVisibleUpgradeBuildings = computed(
 );
 
 const minigames = computed<Minigame[]>(() => props.minigames);
+const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
+const achievements = computed(() => props.achievements);
+const achievementBonuses = computed(() => props.achievementBonuses);
+const currentAchievementUnlock = computed(
+    () => achievementUnlockQueue.value[activeAchievementUnlockIndex.value],
+);
+const achievementUnlockCount = computed(
+    () => achievementUnlockQueue.value.length,
+);
+const achievementUnlockPosition = computed(() =>
+    Math.min(
+        activeAchievementUnlockIndex.value + 1,
+        achievementUnlockCount.value,
+    ),
+);
+const achievementUnlockButtonLabel = computed(() =>
+    activeAchievementUnlockIndex.value + 1 < achievementUnlockCount.value
+        ? 'Next'
+        : 'Done',
+);
+
+const visibleAchievements = computed(() =>
+    hideCompletedAchievements.value
+        ? achievements.value.filter((achievement) => !achievement.isUnlocked)
+        : achievements.value,
+);
+
+const unlockedAchievementCount = computed(
+    () =>
+        achievements.value.filter((achievement) => achievement.isUnlocked)
+            .length,
+);
+
+const defaultLeaderboard = computed<Leaderboard | null>(
+    () =>
+        leaderboards.value.find(
+            (leaderboard) => leaderboard.key === props.leaderboards.defaultKey,
+        ) ??
+        leaderboards.value[0] ??
+        null,
+);
+
+const selectedLeaderboard = computed<Leaderboard | null>(
+    () =>
+        leaderboards.value.find(
+            (leaderboard) => leaderboard.key === selectedLeaderboardKey.value,
+        ) ??
+        defaultLeaderboard.value ??
+        null,
+);
 
 const resourceIcons = {
     gold: Coins,
@@ -399,7 +478,48 @@ const selectedMinigameComponent = computed(() =>
         : null,
 );
 
-const isMinigameOpen = computed(() => selectedMinigame.value !== null);
+const isMinigameOpen = computed(
+    () =>
+        activeGameModal.value === 'minigame' && selectedMinigame.value !== null,
+);
+
+const isLeaderboardModalOpen = computed(
+    () =>
+        activeGameModal.value === 'leaderboard' &&
+        selectedLeaderboard.value !== null,
+);
+
+const isAchievementsModalOpen = computed(
+    () => activeGameModal.value === 'achievements',
+);
+
+const prestigeRequirementLabel = computed(() =>
+    props.prestigeStats.requirement.toLocaleString(),
+);
+
+const prestigeProgressPercent = computed(() =>
+    props.prestigeStats.requirement > 0
+        ? Math.min(
+              100,
+              Math.floor(
+                  (props.roadStats.length / props.prestigeStats.requirement) *
+                      100,
+              ),
+          )
+        : 0,
+);
+
+const prestigeButtonLabel = computed(() =>
+    props.prestigeStats.canPrestige
+        ? 'Prestige ready'
+        : `${prestigeProgressPercent.value}% toward prestige`,
+);
+
+const leaderboardButtonLabel = computed(() =>
+    defaultLeaderboard.value
+        ? `Leaderboard rank #${defaultLeaderboard.value.currentRank.toLocaleString()}`
+        : 'Leaderboard',
+);
 
 const actionButtonClass = computed(() => {
     if (props.canCollect && hasUpgradeReady.value) {
@@ -456,6 +576,21 @@ const upgradesButtonStyle = computed(() => ({
     top: `${upgradesButtonPosition.top}%`,
 }));
 
+const prestigeButtonStyle = computed(() => ({
+    left: `${prestigeButtonPosition.left}%`,
+    top: `${prestigeButtonPosition.top}%`,
+}));
+
+const leaderboardButtonStyle = computed(() => ({
+    right: `${leaderboardButtonPosition.right}rem`,
+    bottom: `${leaderboardButtonPosition.bottom}rem`,
+}));
+
+const achievementsButtonStyle = computed(() => ({
+    right: `${achievementsButtonPosition.right}rem`,
+    bottom: `${achievementsButtonPosition.bottom}rem`,
+}));
+
 const actionButtonStyle = computed(() => ({
     right: `${actionButtonPosition.right}rem`,
     bottom: `${actionButtonPosition.bottom}rem`,
@@ -473,6 +608,25 @@ const upgradesButtonClass = computed(() => {
 
     return 'border-white/15 bg-[#10140f]/72 text-[#b8c2b0] opacity-70';
 });
+
+const prestigeButtonClass = computed(() => {
+    if (props.prestigeStats.canPrestige) {
+        return 'border-[#8fd8ff]/60 bg-[#12313d]/88 text-[#d9f5ff] shadow-[0_0_28px_rgb(83_186_219/0.32)] hover:bg-[#173f4e]/90';
+    }
+
+    return 'border-[#e0b461]/45 bg-[#3a2a10]/78 text-[#fff0c8] shadow-[0_0_22px_rgb(224_180_97/0.2)] hover:bg-[#4b3613]/85';
+});
+
+const leaderboardButtonClass =
+    'border-[#d8d16e]/55 bg-[#393a12]/82 text-[#fff9bf] shadow-[0_0_22px_rgb(216_209_110/0.2)] hover:bg-[#474817]/90';
+
+const achievementsButtonClass =
+    'border-[#9fe58d]/55 bg-[#15351c]/82 text-[#e8ffe3] shadow-[0_0_22px_rgb(126_214_111/0.22)] hover:bg-[#1d4625]/90';
+
+const achievementsButtonLabel = computed(
+    () =>
+        `${unlockedAchievementCount.value.toLocaleString()} of ${achievements.value.length.toLocaleString()} achievements unlocked`,
+);
 
 const upgradesButtonLabel = computed(() =>
     hasUpgradeReady.value
@@ -619,6 +773,22 @@ const sceneClass = computed(() => ({
     'immersive-scene-dusk': skyState.value === 'dusk',
     'immersive-scene-night': skyState.value === 'night',
 }));
+
+watch(
+    () => props.achievementUnlocks,
+    (achievementUnlocks) => {
+        if (
+            achievementUnlocks.length === 0 ||
+            achievementUnlockQueue.value.length > 0
+        ) {
+            return;
+        }
+
+        achievementUnlockQueue.value = [...achievementUnlocks];
+        activeAchievementUnlockIndex.value = 0;
+    },
+    { immediate: true },
+);
 
 onMounted(() => {
     userTimeInterval = window.setInterval(() => {
@@ -799,6 +969,95 @@ function upgradeBuilding(building: Building): void {
     );
 }
 
+function togglePrestigeMenu(): void {
+    isPrestigeMenuOpen.value = !isPrestigeMenuOpen.value;
+    activeGameModal.value = null;
+    isActionMenuOpen.value = false;
+    isResourcesMenuOpen.value = false;
+    isUpgradesMenuOpen.value = false;
+}
+
+function openLeaderboard(): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    if (defaultLeaderboard.value) {
+        selectedLeaderboardKey.value = defaultLeaderboard.value.key;
+    }
+
+    isPrestigeMenuOpen.value = false;
+    isActionMenuOpen.value = false;
+    isResourcesMenuOpen.value = false;
+    isUpgradesMenuOpen.value = false;
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'leaderboard';
+}
+
+function openAchievements(): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isPrestigeMenuOpen.value = false;
+    isActionMenuOpen.value = false;
+    isResourcesMenuOpen.value = false;
+    isUpgradesMenuOpen.value = false;
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'achievements';
+}
+
+function closeLeaderboard(): void {
+    if (activeGameModal.value === 'leaderboard') {
+        activeGameModal.value = null;
+    }
+}
+
+function closeAchievements(): void {
+    if (activeGameModal.value === 'achievements') {
+        activeGameModal.value = null;
+    }
+}
+
+function closeActiveGameModal(): void {
+    if (activeGameModal.value === 'achievements') {
+        closeAchievements();
+
+        return;
+    }
+
+    if (activeGameModal.value === 'leaderboard') {
+        closeLeaderboard();
+
+        return;
+    }
+
+    closeMinigame();
+}
+
+function confirmPrestige(): void {
+    if (!props.prestigeStats.canPrestige || isPrestiging.value) {
+        return;
+    }
+
+    router.post(
+        '/dashboard/prestige',
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isPrestiging.value = true;
+            },
+            onFinish: () => {
+                isPrestiging.value = false;
+                isPrestigeMenuOpen.value = false;
+            },
+        },
+    );
+}
+
 function completeMinigame(minigame: Minigame): void {
     router.post(
         `/dashboard/minigames/${minigame.resource}/complete`,
@@ -831,8 +1090,10 @@ function openMinigame(minigame: Minigame): void {
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
     isUpgradesMenuOpen.value = false;
+    isPrestigeMenuOpen.value = false;
     selectedMinigameResource.value = minigame.resource;
     hasWonMinigame.value = false;
+    activeGameModal.value = 'minigame';
 }
 
 function closeMinigame(): void {
@@ -842,6 +1103,9 @@ function closeMinigame(): void {
 
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
+    if (activeGameModal.value === 'minigame') {
+        activeGameModal.value = null;
+    }
 }
 
 function continueMinigame(): void {
@@ -854,6 +1118,35 @@ function completeSelectedMinigame(): void {
     }
 
     completeMinigame(selectedMinigame.value);
+}
+
+function advanceAchievementUnlockPopup(): void {
+    if (activeAchievementUnlockIndex.value + 1 < achievementUnlockCount.value) {
+        activeAchievementUnlockIndex.value += 1;
+
+        return;
+    }
+
+    const seenAchievementUnlockIds = achievementUnlockQueue.value.map(
+        (achievementUnlock) => achievementUnlock.id,
+    );
+
+    achievementUnlockQueue.value = [];
+    activeAchievementUnlockIndex.value = 0;
+
+    if (seenAchievementUnlockIds.length === 0) {
+        return;
+    }
+
+    router.post(
+        '/dashboard/achievements/unlocks/seen',
+        {
+            ids: seenAchievementUnlockIds,
+        },
+        {
+            preserveScroll: true,
+        },
+    );
 }
 
 function incrementTestTime(minutes: number): void {
@@ -1180,6 +1473,158 @@ function timeFromInputValue(value: string): Date {
             </button>
 
             <div
+                class="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+                :style="prestigeButtonStyle"
+            >
+                <button
+                    type="button"
+                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                    :class="prestigeButtonClass"
+                    :aria-label="prestigeButtonLabel"
+                    :title="prestigeButtonLabel"
+                    @click="togglePrestigeMenu"
+                >
+                    <RotateCcw class="h-5 w-5" />
+                </button>
+
+                <div
+                    v-if="isPrestigeMenuOpen"
+                    class="absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Prestige
+                            </p>
+                            <h2 class="mt-1 text-lg font-bold">
+                                Reset progress
+                            </h2>
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                            aria-label="Close prestige menu"
+                            @click="isPrestigeMenuOpen = false"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div class="mt-4 grid gap-3">
+                        <div
+                            class="grid grid-cols-2 gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+                        >
+                            <div>
+                                <p
+                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                                >
+                                    Current roads
+                                </p>
+                                <p class="mt-1 font-bold">
+                                    {{ formatNumber(props.roadStats.length) }}
+                                    km
+                                </p>
+                            </div>
+                            <div>
+                                <p
+                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                                >
+                                    Required
+                                </p>
+                                <p class="mt-1 font-bold">
+                                    {{ prestigeRequirementLabel }} km
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded-full border border-[#d7cbb8] bg-[#efe8d9] dark:border-white/15 dark:bg-white/10"
+                        >
+                            <div
+                                class="h-2 rounded-full bg-[#243627] transition-[width] dark:bg-[#caa66c]"
+                                :style="{
+                                    width: `${prestigeProgressPercent}%`,
+                                }"
+                            ></div>
+                        </div>
+
+                        <div
+                            class="grid grid-cols-2 gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+                        >
+                            <div>
+                                <p
+                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                                >
+                                    Prestiges
+                                </p>
+                                <p class="mt-1 font-bold">
+                                    {{
+                                        props.prestigeStats.count.toLocaleString()
+                                    }}
+                                </p>
+                            </div>
+                            <div>
+                                <p
+                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                                >
+                                    Rank
+                                </p>
+                                <p class="mt-1 font-bold">
+                                    #{{
+                                        props.prestigeStats.rank.toLocaleString()
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-3 py-2 font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="
+                                !props.prestigeStats.canPrestige || isPrestiging
+                            "
+                            @click="confirmPrestige"
+                        >
+                            <RotateCcw class="h-4 w-4" />
+                            {{
+                                isPrestiging
+                                    ? 'Prestiging...'
+                                    : props.prestigeStats.canPrestige
+                                      ? 'Prestige'
+                                      : 'Requirement not met'
+                            }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                :class="achievementsButtonClass"
+                :style="achievementsButtonStyle"
+                :aria-label="achievementsButtonLabel"
+                :title="achievementsButtonLabel"
+                @click="openAchievements"
+            >
+                <Award class="h-5 w-5" />
+            </button>
+
+            <button
+                type="button"
+                class="absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                :class="leaderboardButtonClass"
+                :style="leaderboardButtonStyle"
+                :aria-label="leaderboardButtonLabel"
+                :title="leaderboardButtonLabel"
+                @click="openLeaderboard"
+            >
+                <Trophy class="h-5 w-5" />
+            </button>
+
+            <div
                 v-if="isImmersiveTestingPanelOpen"
                 class="absolute top-4 left-4 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
             >
@@ -1447,12 +1892,328 @@ function timeFromInputValue(value: string): Date {
 
     <Teleport to="body">
         <div
-            v-if="isMinigameOpen && selectedMinigame"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
-            @click.self="closeMinigame"
+            v-if="
+                isAchievementsModalOpen ||
+                isLeaderboardModalOpen ||
+                isMinigameOpen
+            "
+            data-game-modal-layer
+            class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
+            @click.self="closeActiveGameModal"
         >
             <section
-                class="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+                v-if="isAchievementsModalOpen"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="rounded-md bg-[#243627] p-2 text-white">
+                            <Award class="h-5 w-5" />
+                        </div>
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Achievements
+                            </p>
+                            <h2 class="mt-1 text-2xl font-bold">Milestones</h2>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close achievements"
+                        @click="closeAchievements"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div
+                    class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <p class="text-sm text-[#696250] dark:text-[#b6ae9d]">
+                        Production bonuses unlocked by milestones
+                    </p>
+                    <div class="flex flex-wrap items-center gap-4">
+                        <label
+                            class="inline-flex items-center gap-2 text-sm font-semibold text-[#5d6356] dark:text-[#c6c0b3]"
+                        >
+                            <input
+                                v-model="hideCompletedAchievements"
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-[#b7aa91] text-[#243627] focus:ring-[#47663b] dark:border-[#554f42]"
+                            />
+                            Hide completed
+                        </label>
+                        <p
+                            class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            {{ unlockedAchievementCount }} /
+                            {{ achievements.length }} unlocked
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <h3 class="text-sm font-semibold">Current bonuses</h3>
+                    <div
+                        v-if="achievementBonuses.length > 0"
+                        class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                    >
+                        <div
+                            v-for="bonus in achievementBonuses"
+                            :key="bonus.id"
+                            class="rounded-md border border-[#e4dac7] px-3 py-2 dark:border-[#35332c]"
+                        >
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <p class="text-sm font-semibold">
+                                    {{ bonus.label }}
+                                </p>
+                                <p
+                                    class="text-sm font-bold text-[#47663b] dark:text-[#9dcc84]"
+                                >
+                                    {{ bonus.bonusLabel }}
+                                </p>
+                            </div>
+                            <p
+                                class="mt-1 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
+                            >
+                                base production
+                            </p>
+                        </div>
+                    </div>
+                    <p
+                        v-else
+                        class="mt-3 text-sm text-[#5d6356] dark:text-[#c6c0b3]"
+                    >
+                        No active bonuses yet.
+                    </p>
+                </div>
+
+                <div
+                    v-if="visibleAchievements.length > 0"
+                    class="mt-5 grid gap-3 lg:grid-cols-2"
+                >
+                    <article
+                        v-for="achievement in visibleAchievements"
+                        :key="achievement.id"
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-semibold">
+                                        {{ achievement.name }}
+                                    </h3>
+                                    <span
+                                        :class="[
+                                            'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-semibold',
+                                            achievement.isUnlocked
+                                                ? 'bg-[#dce9d1] text-[#263f20] dark:bg-[#273820] dark:text-[#bde4a5]'
+                                                : 'bg-[#e9e1d3] text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]',
+                                        ]"
+                                    >
+                                        <CheckCircle2
+                                            v-if="achievement.isUnlocked"
+                                            class="h-3.5 w-3.5"
+                                        />
+                                        <Lock v-else class="h-3.5 w-3.5" />
+                                        {{
+                                            achievement.isUnlocked
+                                                ? 'Unlocked'
+                                                : 'Locked'
+                                        }}
+                                    </span>
+                                </div>
+                                <p
+                                    v-if="achievement.description"
+                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    {{ achievement.description }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <div
+                                class="flex items-center justify-between gap-4 text-xs font-semibold text-[#7a705d] dark:text-[#aaa18f]"
+                            >
+                                <span>Progress</span>
+                                <span>{{ achievement.progressLabel }}</span>
+                            </div>
+                            <div
+                                class="mt-2 h-2 overflow-hidden rounded-full bg-[#e9e1d3] dark:bg-[#24281d]"
+                            >
+                                <div
+                                    class="h-full rounded-full bg-[#47663b] dark:bg-[#9dcc84]"
+                                    :style="{
+                                        width: `${achievement.progressPercent}%`,
+                                    }"
+                                />
+                            </div>
+                        </div>
+
+                        <p
+                            class="mt-3 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            {{ achievement.rewardLabel }}
+                        </p>
+                    </article>
+                </div>
+
+                <p
+                    v-else
+                    class="mt-5 rounded-md border border-[#e4dac7] p-4 text-sm text-[#5d6356] dark:border-[#35332c] dark:text-[#c6c0b3]"
+                >
+                    {{
+                        achievements.length > 0
+                            ? 'Completed achievements hidden.'
+                            : 'No achievements configured yet.'
+                    }}
+                </p>
+            </section>
+
+            <section
+                v-else-if="isLeaderboardModalOpen && selectedLeaderboard"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Leaderboard
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">Top 50 players</h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close leaderboard"
+                        @click="closeLeaderboard"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <button
+                        v-for="leaderboard in leaderboards"
+                        :key="leaderboard.key"
+                        type="button"
+                        class="rounded-md border px-3 py-2 text-sm font-semibold transition"
+                        :class="
+                            selectedLeaderboard.key === leaderboard.key
+                                ? 'border-[#243627] bg-[#243627] text-white'
+                                : 'border-[#d7cbb8] text-[#4f574b] hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]'
+                        "
+                        @click="selectedLeaderboardKey = leaderboard.key"
+                    >
+                        {{ leaderboard.label }}
+                    </button>
+                </div>
+
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Your rank
+                        </p>
+                        <p class="mt-2 text-2xl font-bold">
+                            #{{
+                                selectedLeaderboard.currentRank.toLocaleString()
+                            }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Your score
+                        </p>
+                        <p class="mt-2 text-2xl font-bold">
+                            {{ selectedLeaderboard.currentValueLabel }}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <p
+                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Metric
+                        </p>
+                        <p class="mt-2 text-2xl font-bold">
+                            {{ selectedLeaderboard.metricLabel }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c]"
+                >
+                    <div
+                        class="grid grid-cols-[4rem_1fr_7rem] gap-3 border-b border-[#e4dac7] bg-[#f6f0e5] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:bg-[#151910] dark:text-[#b6ae9d]"
+                    >
+                        <span>Rank</span>
+                        <span>Player</span>
+                        <span class="text-right">Score</span>
+                    </div>
+
+                    <div
+                        v-if="selectedLeaderboard.entries.length === 0"
+                        class="px-4 py-8 text-center text-sm font-medium text-[#696250] dark:text-[#b6ae9d]"
+                    >
+                        No players on this leaderboard yet.
+                    </div>
+
+                    <div
+                        v-else
+                        class="divide-y divide-[#e4dac7] dark:divide-[#35332c]"
+                    >
+                        <div
+                            v-for="entry in selectedLeaderboard.entries"
+                            :key="`${selectedLeaderboard.key}-${entry.userId}`"
+                            class="grid grid-cols-[4rem_1fr_7rem] items-center gap-3 px-4 py-3 text-sm"
+                            :class="
+                                entry.isCurrentUser
+                                    ? 'bg-[#edf6e8] text-[#243627] dark:bg-[#1d2a17] dark:text-[#d7edc5]'
+                                    : ''
+                            "
+                        >
+                            <span class="font-bold">
+                                #{{ entry.rank.toLocaleString() }}
+                            </span>
+                            <span class="min-w-0 truncate font-semibold">
+                                {{ entry.userName }}
+                                <span
+                                    v-if="entry.isCurrentUser"
+                                    class="ml-2 rounded-sm bg-[#243627] px-2 py-0.5 text-xs text-white"
+                                >
+                                    You
+                                </span>
+                            </span>
+                            <span class="text-right font-bold">
+                                {{ entry.valueLabel }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                v-else-if="isMinigameOpen && selectedMinigame"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <header class="flex items-start justify-between gap-4">
                     <div>
@@ -1564,6 +2325,73 @@ function timeFromInputValue(value: string): Date {
                         @click="closeMinigame"
                     >
                         Stop playing
+                    </button>
+                </div>
+            </section>
+        </div>
+    </Teleport>
+
+    <Teleport to="body">
+        <div
+            v-if="currentAchievementUnlock"
+            class="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[calc(100%-2rem)] max-w-md items-end justify-end sm:right-6 sm:bottom-6"
+        >
+            <section
+                class="pointer-events-auto max-h-[calc(100vh-3rem)] w-full overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <div class="flex items-start gap-4">
+                    <div class="rounded-md bg-[#243627] p-3 text-white">
+                        <Award class="h-6 w-6" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p
+                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Achievement unlocked
+                        </p>
+                        <h2 class="mt-1 text-2xl font-bold">
+                            {{ currentAchievementUnlock.name }}
+                        </h2>
+                        <p
+                            v-if="currentAchievementUnlock.description"
+                            class="mt-3 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
+                        >
+                            {{ currentAchievementUnlock.description }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                >
+                    <div class="flex items-center gap-2">
+                        <CheckCircle2
+                            class="h-5 w-5 text-[#47663b] dark:text-[#9dcc84]"
+                        />
+                        <p class="text-sm font-semibold">Bonus activated</p>
+                    </div>
+                    <p
+                        class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                    >
+                        {{ currentAchievementUnlock.rewardLabel }}
+                    </p>
+                </div>
+
+                <div
+                    class="mt-5 flex items-center justify-between gap-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <p
+                        class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                    >
+                        {{ achievementUnlockPosition }} /
+                        {{ achievementUnlockCount }}
+                    </p>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
+                        @click="advanceAchievementUnlockPopup"
+                    >
+                        {{ achievementUnlockButtonLabel }}
                     </button>
                 </div>
             </section>
