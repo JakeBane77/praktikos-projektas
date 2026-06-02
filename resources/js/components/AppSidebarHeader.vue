@@ -37,11 +37,11 @@ const { isImmersiveTestingPanelOpen, toggleImmersiveTestingPanel } =
             <button
                 v-if="isImmersivePage"
                 type="button"
-                class="inline-flex items-center gap-1.5 rounded-md border border-[#ded2bd] bg-[#fffaf0] px-3 py-2 text-sm font-semibold text-[#5d6356] shadow-sm transition hover:bg-[#ebe4d7] hover:text-[#243627] dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#c6c0b3] dark:hover:bg-[#24281d] dark:hover:text-[#f3efe4]"
+                class="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold shadow-sm transition"
                 :class="
                     isImmersiveTestingPanelOpen
-                        ? 'bg-[#243627] text-white hover:bg-[#243627] hover:text-white dark:bg-[#243627] dark:text-white'
-                        : ''
+                        ? 'border-[#243627] bg-[#243627] text-white hover:bg-[#1a291d] dark:border-[#caa66c]/40 dark:bg-[#243627] dark:text-white dark:hover:bg-[#2f4632]'
+                        : 'border-[#ded2bd] bg-[#fffaf0] text-[#5d6356] hover:bg-[#ebe4d7] hover:text-[#243627] dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#c6c0b3] dark:hover:bg-[#24281d] dark:hover:text-[#f3efe4]'
                 "
                 :aria-pressed="isImmersiveTestingPanelOpen"
                 aria-label="Toggle testing panel"
