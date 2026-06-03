@@ -35,7 +35,7 @@ defineOptions({
         <div class="grid gap-6">
             <div class="grid gap-2">
                 <Label for="name" class="text-[#3b3f36] dark:text-[#f3efe4]"
-                    >Ruler name</Label
+                    >User name</Label
                 >
                 <Input
                     id="name"
@@ -45,7 +45,7 @@ defineOptions({
                     :tabindex="1"
                     autocomplete="name"
                     name="name"
-                    placeholder="Settlement ruler"
+                    placeholder="User name"
                 />
                 <InputError :message="errors.name" />
             </div>
@@ -109,7 +109,7 @@ defineOptions({
                 data-test="register-user-button"
             >
                 <Spinner v-if="processing" />
-                Found kingdom
+                Register
             </Button>
         </div>
 

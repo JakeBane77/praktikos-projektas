@@ -108,7 +108,7 @@ defineProps<{
                 data-test="login-button"
             >
                 <Spinner v-if="processing" />
-                Enter kingdom
+                Log in
             </Button>
         </div>
 
@@ -119,7 +119,7 @@ defineProps<{
                 class="text-[#7b633d] underline-offset-4 hover:text-[#243627] dark:text-[#caa66c] dark:hover:text-[#f3efe4]"
                 :tabindex="5"
             >
-                Create kingdom
+                Create an account
             </TextLink>
         </div>
     </Form>

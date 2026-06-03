@@ -184,7 +184,7 @@ const featureCards = [
                         :href="register()"
                         class="rounded-md bg-[#243627] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
                     >
-                        Start playing
+                        Register
                     </Link>
                     <Link
                         v-if="!$page.props.auth.user"
