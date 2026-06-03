@@ -85,12 +85,12 @@ const cloudsBox = {
 };
 
 const collectButtonPosition = {
-    left: 44,
+    left: 46,
     top: 74,
 };
 
 const resourcesButtonPosition = {
-    left: 41,
+    left: 40,
     top: 74,
 };
 
@@ -100,8 +100,8 @@ const upgradesButtonPosition = {
 };
 
 const prestigeButtonPosition = {
-    left: 42.5,
-    top: 68,
+    left: 43,
+    top: 62,
 };
 
 const leaderboardButtonPosition = {
@@ -135,12 +135,12 @@ const minigameButtonPositions: Record<
         top: 80,
     },
     stone: {
-        left: 84,
-        top: 50,
+        left: 82,
+        top: 54,
     },
     gold: {
         left: 88,
-        top: 50,
+        top: 54,
     },
 };
 
@@ -1210,6 +1210,7 @@ function closeMinigame(): void {
 
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
+
     if (activeGameModal.value === 'minigame') {
         activeGameModal.value = null;
     }
@@ -1316,9 +1317,9 @@ function timeFromInputValue(value: string): Date {
 <template>
     <Head title="Immersive mode" />
 
-    <main class="min-h-full bg-[#071015] text-[#f3efe4]">
+    <main class="immersive-scroll-shell min-h-full bg-[#071015] text-[#f3efe4]">
         <section
-            class="relative min-h-[calc(100vh-4rem)] overflow-hidden"
+            class="immersive-scene relative min-h-[calc(100svh-3.5rem)] overflow-hidden sm:min-h-[calc(100svh-4rem)] sm:min-h-[calc(100vh-4rem)]"
             :class="sceneClass"
         >
             <img
@@ -1399,7 +1400,7 @@ function timeFromInputValue(value: string): Date {
 
             <button
                 type="button"
-                class="absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:hover:scale-100"
+                class="immersive-icon-button absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:hover:scale-100"
                 :class="collectButtonClass"
                 :style="collectButtonStyle"
                 :disabled="!props.canCollect || isCollecting"
@@ -1411,12 +1412,12 @@ function timeFromInputValue(value: string): Date {
             </button>
 
             <div
-                class="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+                class="immersive-menu-anchor absolute z-30 -translate-x-1/2 -translate-y-1/2"
                 :style="resourcesButtonStyle"
             >
                 <button
                     type="button"
-                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                    class="immersive-icon-button inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
                     :class="iconButtonMenuClass"
                     aria-label="Show resources and production"
                     title="Resources and production"
@@ -1427,7 +1428,7 @@ function timeFromInputValue(value: string): Date {
 
                 <div
                     v-if="isResourcesMenuOpen"
-                    class="absolute bottom-14 left-1/2 w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
+                    class="immersive-popover absolute bottom-14 left-1/2 w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -1481,12 +1482,12 @@ function timeFromInputValue(value: string): Date {
             </div>
 
             <div
-                class="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+                class="immersive-menu-anchor absolute z-30 -translate-x-1/2 -translate-y-1/2"
                 :style="upgradesButtonStyle"
             >
                 <button
                     type="button"
-                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                    class="immersive-icon-button inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
                     :class="upgradesButtonClass"
                     :aria-label="upgradesButtonLabel"
                     :title="upgradesButtonLabel"
@@ -1497,7 +1498,7 @@ function timeFromInputValue(value: string): Date {
 
                 <div
                     v-if="isUpgradesMenuOpen"
-                    class="absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
+                    class="immersive-popover absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -1609,7 +1610,7 @@ function timeFromInputValue(value: string): Date {
                 v-for="minigame in minigameButtons"
                 :key="minigame.resource"
                 type="button"
-                class="absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+                class="immersive-icon-button absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
                 :class="minigameButtonClass()"
                 :style="minigame.style"
                 :disabled="activeMinigameResource !== null"
@@ -1621,12 +1622,12 @@ function timeFromInputValue(value: string): Date {
             </button>
 
             <div
-                class="absolute z-30 -translate-x-1/2 -translate-y-1/2"
+                class="immersive-menu-anchor absolute z-30 -translate-x-1/2 -translate-y-1/2"
                 :style="prestigeButtonStyle"
             >
                 <button
                     type="button"
-                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                    class="immersive-icon-button inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
                     :class="prestigeButtonClass"
                     :aria-label="prestigeButtonLabel"
                     :title="prestigeButtonLabel"
@@ -1637,7 +1638,7 @@ function timeFromInputValue(value: string): Date {
 
                 <div
                     v-if="isPrestigeMenuOpen"
-                    class="absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
+                    class="immersive-popover absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -1750,7 +1751,7 @@ function timeFromInputValue(value: string): Date {
 
             <button
                 type="button"
-                class="absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                class="immersive-icon-button absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
                 :class="achievementsButtonClass"
                 :style="achievementsButtonStyle"
                 :aria-label="achievementsButtonLabel"
@@ -1762,7 +1763,7 @@ function timeFromInputValue(value: string): Date {
 
             <button
                 type="button"
-                class="absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                class="immersive-icon-button absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
                 :class="leaderboardButtonClass"
                 :style="leaderboardButtonStyle"
                 :aria-label="leaderboardButtonLabel"
@@ -1774,7 +1775,7 @@ function timeFromInputValue(value: string): Date {
 
             <div
                 v-if="isImmersiveTestingPanelOpen"
-                class="absolute top-4 left-4 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
+                class="immersive-testing-panel absolute top-4 left-4 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
             >
                 <div class="flex items-start justify-between gap-4">
                     <div>
@@ -1950,7 +1951,7 @@ function timeFromInputValue(value: string): Date {
 
             <div
                 v-if="isActionMenuOpen"
-                class="absolute z-30 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/90 dark:text-[#f3efe4]"
+                class="immersive-action-popover immersive-popover absolute z-30 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/90 dark:text-[#f3efe4]"
                 :style="actionMenuStyle"
             >
                 <div class="flex items-start justify-between gap-4">
@@ -2075,10 +2076,13 @@ function timeFromInputValue(value: string): Date {
                 </div>
             </div>
 
-            <div class="absolute z-30 h-12 w-12" :style="actionButtonStyle">
+            <div
+                class="immersive-icon-button-frame absolute z-30 h-12 w-12"
+                :style="actionButtonStyle"
+            >
                 <button
                     type="button"
-                    class="inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                    class="immersive-icon-button inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
                     :class="actionButtonClass"
                     :aria-label="actionButtonLabel"
                     :title="actionButtonLabel"
@@ -2596,6 +2600,15 @@ function timeFromInputValue(value: string): Date {
 </template>
 
 <style scoped>
+.immersive-scroll-shell {
+    width: 100%;
+}
+
+.immersive-scene {
+    width: 100%;
+    touch-action: manipulation;
+}
+
 .immersive-background {
     position: absolute;
     inset: 0;
@@ -2620,6 +2633,11 @@ function timeFromInputValue(value: string): Date {
     transition:
         top 1000ms ease,
         left 1000ms ease;
+}
+
+.immersive-popover,
+.immersive-testing-panel {
+    overscroll-behavior: contain;
 }
 
 .celestial-path-guide {
@@ -2796,6 +2814,138 @@ function timeFromInputValue(value: string): Date {
 
 .immersive-weather-snowing .immersive-background {
     filter: brightness(0.96) saturate(0.72) contrast(0.92);
+}
+
+@media (max-width: 640px) {
+    .immersive-scroll-shell {
+        height: calc(100svh - 3.5rem);
+        overflow: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .immersive-scene {
+        width: max(100%, calc(177.7svh - 6.22rem));
+        height: calc(100svh - 3.5rem);
+        min-height: calc(100svh - 3.5rem);
+    }
+
+    .immersive-celestial {
+        width: clamp(5rem, 24vw, 7rem);
+    }
+
+    .immersive-icon-button,
+    .immersive-icon-button-frame {
+        width: 2.75rem !important;
+        height: 2.75rem !important;
+    }
+
+    .immersive-icon-button :deep(svg) {
+        width: 1.125rem;
+        height: 1.125rem;
+    }
+
+    .immersive-menu-anchor {
+        translate: none !important;
+        transform: none !important;
+    }
+
+    .immersive-menu-anchor > .immersive-icon-button {
+        translate: -50% -50%;
+        transform: none;
+    }
+
+    .immersive-menu-anchor:has(.immersive-popover) {
+        z-index: 70 !important;
+    }
+
+    .immersive-popover {
+        position: fixed !important;
+        top: auto !important;
+        right: max(0.75rem, env(safe-area-inset-right)) !important;
+        bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+        left: max(0.75rem, env(safe-area-inset-left)) !important;
+        z-index: 55;
+        width: auto !important;
+        max-height: min(64svh, 30rem);
+        overflow-y: auto;
+        translate: none !important;
+        transform: none !important;
+    }
+
+    .immersive-action-popover {
+        bottom: calc(
+            max(0.75rem, env(safe-area-inset-bottom)) + 3.25rem
+        ) !important;
+    }
+
+    .immersive-testing-panel {
+        position: fixed !important;
+        top: calc(3.5rem + max(0.75rem, env(safe-area-inset-top))) !important;
+        right: max(0.75rem, env(safe-area-inset-right)) !important;
+        left: max(0.75rem, env(safe-area-inset-left)) !important;
+        width: auto !important;
+        max-height: calc(100svh - 5rem);
+        overflow-y: auto;
+    }
+}
+
+@media (max-height: 480px) and (max-width: 900px) {
+    .immersive-celestial {
+        width: clamp(4rem, 10vw, 5rem);
+    }
+
+    .immersive-icon-button,
+    .immersive-icon-button-frame {
+        width: 2.25rem !important;
+        height: 2.25rem !important;
+    }
+
+    .immersive-icon-button :deep(svg) {
+        width: 0.95rem;
+        height: 0.95rem;
+    }
+
+    .immersive-menu-anchor {
+        translate: none !important;
+        transform: none !important;
+    }
+
+    .immersive-menu-anchor > .immersive-icon-button {
+        translate: -50% -50%;
+        transform: none;
+    }
+
+    .immersive-menu-anchor:has(.immersive-popover) {
+        z-index: 70 !important;
+    }
+
+    .immersive-popover {
+        position: fixed !important;
+        top: auto !important;
+        right: max(0.5rem, env(safe-area-inset-right)) !important;
+        bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+        left: max(0.5rem, env(safe-area-inset-left)) !important;
+        z-index: 55;
+        width: auto !important;
+        max-height: calc(100svh - 1rem);
+        padding: 0.9rem;
+        overflow-y: auto;
+        translate: none !important;
+        transform: none !important;
+    }
+
+    .immersive-action-popover {
+        bottom: calc(
+            max(0.5rem, env(safe-area-inset-bottom)) + 2.75rem
+        ) !important;
+    }
+
+    .immersive-testing-panel {
+        top: max(0.5rem, env(safe-area-inset-top)) !important;
+        max-height: calc(100svh - 1rem);
+        padding: 0.9rem;
+    }
 }
 
 @keyframes cloud-drift {

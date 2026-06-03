@@ -2,13 +2,13 @@
 import { router, usePage } from '@inertiajs/vue3';
 import { MapPin, RotateCcw, SlidersHorizontal } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
 import AppearanceTabs from '@/components/AppearanceTabs.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useImmersiveTestingPanel } from '@/composables/useImmersiveTestingPanel';
 import type { WeatherSnapshot } from '@/lib/weather';
 import type { BreadcrumbItem } from '@/types';
-import { toast } from 'vue-sonner';
 
 withDefaults(
     defineProps<{
@@ -151,18 +151,24 @@ function useDefaultWeatherLocation(): void {
 
 <template>
     <header
-        class="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/70 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4"
+        class="immersive-app-header flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border/70 px-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 sm:h-16 md:px-4"
     >
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 items-center gap-2">
             <SidebarTrigger class="-ml-1" />
             <template v-if="breadcrumbs && breadcrumbs.length > 0">
-                <Breadcrumbs :breadcrumbs="breadcrumbs" />
+                <div
+                    class="immersive-header-breadcrumbs hidden min-w-0 sm:block"
+                >
+                    <Breadcrumbs :breadcrumbs="breadcrumbs" />
+                </div>
             </template>
         </div>
-        <div class="ml-auto flex items-center gap-2">
+        <div
+            class="immersive-header-actions ml-auto flex min-w-0 items-center gap-1 sm:gap-2"
+        >
             <section
                 v-if="isImmersivePage"
-                class="flex items-center gap-1 rounded-md border border-[#ded2bd] bg-[#fffaf0] p-1 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
+                class="immersive-location-controls flex items-center gap-1 rounded-md border border-[#ded2bd] bg-[#fffaf0] p-1 shadow-sm dark:border-[#38362f] dark:bg-[#1a1d15]"
                 aria-label="Weather location controls"
             >
                 <button
@@ -173,7 +179,9 @@ function useDefaultWeatherLocation(): void {
                     @click="updateWeatherLocation"
                 >
                     <MapPin class="h-3.5 w-3.5" />
-                    <span class="hidden sm:inline">Use my location</span>
+                    <span class="immersive-header-label hidden sm:inline"
+                        >Use my location</span
+                    >
                 </button>
                 <button
                     type="button"
@@ -188,13 +196,15 @@ function useDefaultWeatherLocation(): void {
                     @click="useDefaultWeatherLocation"
                 >
                     <RotateCcw class="h-3.5 w-3.5" />
-                    <span class="hidden sm:inline">Default location</span>
+                    <span class="immersive-header-label hidden sm:inline"
+                        >Default location</span
+                    >
                 </button>
             </section>
             <button
                 v-if="isImmersivePage"
                 type="button"
-                class="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold shadow-sm transition"
+                class="immersive-testing-toggle inline-flex items-center gap-1.5 rounded-md border px-2 py-2 text-sm font-semibold shadow-sm transition sm:px-3"
                 :class="
                     isImmersiveTestingPanelOpen
                         ? 'border-[#243627] bg-[#243627] text-white hover:bg-[#1a291d] dark:border-[#caa66c]/40 dark:bg-[#243627] dark:text-white dark:hover:bg-[#2f4632]'
@@ -206,9 +216,34 @@ function useDefaultWeatherLocation(): void {
                 @click="toggleImmersiveTestingPanel"
             >
                 <SlidersHorizontal class="h-4 w-4" />
-                <span class="hidden sm:inline">Testing</span>
+                <span class="immersive-header-label hidden sm:inline"
+                    >Testing</span
+                >
             </button>
             <AppearanceTabs />
         </div>
     </header>
 </template>
+
+<style scoped>
+@media (max-height: 480px) and (max-width: 900px) {
+    .immersive-app-header {
+        height: 3.25rem;
+        padding-inline: 0.5rem;
+    }
+
+    .immersive-header-breadcrumbs,
+    .immersive-header-label {
+        display: none !important;
+    }
+
+    .immersive-header-actions {
+        gap: 0.25rem;
+    }
+
+    .immersive-location-controls button,
+    .immersive-testing-toggle {
+        padding: 0.5rem;
+    }
+}
+</style>
