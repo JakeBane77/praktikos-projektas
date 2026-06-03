@@ -1,0 +1,108 @@
+x-app-environment: &app-environment
+  APP_NAME: "Kingdom Idle"
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_URL: "${DOCKER_APP_URL:-http://localhost:8080}"
+  APP_KEY: "${DOCKER_APP_KEY:-}"
+  LOG_CHANNEL: stack
+  LOG_STACK: single
+  DB_CONNECTION: mysql
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_DATABASE: "${DOCKER_DB_DATABASE:-kingdom_idle}"
+  DB_USERNAME: "${DOCKER_DB_USERNAME:-kingdom}"
+  DB_PASSWORD: "${DOCKER_DB_PASSWORD:-kingdom_secret}"
+  SESSION_DRIVER: database
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  BROADCAST_CONNECTION: log
+  MAIL_MAILER: log
+  RUN_OPTIMIZE: "${DOCKER_RUN_OPTIMIZE:-true}"
+
+services:
+  web:
+    build:
+      context: .
+      target: web
+    ports:
+      - "${DOCKER_APP_PORT:-8080}:80"
+    depends_on:
+      - app
+    volumes:
+      - app-storage:/var/www/html/storage:ro
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      target: runtime
+    environment:
+      <<: *app-environment
+      RUN_MIGRATIONS: "${DOCKER_RUN_MIGRATIONS:-true}"
+      RUN_SEEDERS: "${DOCKER_RUN_SEEDERS:-false}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - app-storage:/var/www/html/storage
+      - app-bootstrap-cache:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+  queue:
+    build:
+      context: .
+      target: runtime
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=90"]
+    environment:
+      <<: *app-environment
+      RUN_MIGRATIONS: "false"
+      RUN_SEEDERS: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      app:
+        condition: service_started
+    volumes:
+      - app-storage:/var/www/html/storage
+      - app-bootstrap-cache:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      target: runtime
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      <<: *app-environment
+      RUN_MIGRATIONS: "false"
+      RUN_SEEDERS: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      app:
+        condition: service_started
+    volumes:
+      - app-storage:/var/www/html/storage
+      - app-bootstrap-cache:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: "${DOCKER_DB_DATABASE:-kingdom_idle}"
+      MYSQL_USER: "${DOCKER_DB_USERNAME:-kingdom}"
+      MYSQL_PASSWORD: "${DOCKER_DB_PASSWORD:-kingdom_secret}"
+      MYSQL_ROOT_PASSWORD: "${DOCKER_DB_ROOT_PASSWORD:-root_secret}"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  app-storage:
+  app-bootstrap-cache:
+  mysql-data:
