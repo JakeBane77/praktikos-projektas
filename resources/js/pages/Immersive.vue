@@ -2640,6 +2640,10 @@ function timeFromInputValue(value: string): Date {
     overscroll-behavior: contain;
 }
 
+.immersive-menu-anchor:has(.immersive-popover) {
+    z-index: 70 !important;
+}
+
 .celestial-path-guide {
     display: none;
 }
@@ -2855,10 +2859,6 @@ function timeFromInputValue(value: string): Date {
         transform: none;
     }
 
-    .immersive-menu-anchor:has(.immersive-popover) {
-        z-index: 70 !important;
-    }
-
     .immersive-popover {
         position: fixed !important;
         top: auto !important;
@@ -2914,10 +2914,6 @@ function timeFromInputValue(value: string): Date {
     .immersive-menu-anchor > .immersive-icon-button {
         translate: -50% -50%;
         transform: none;
-    }
-
-    .immersive-menu-anchor:has(.immersive-popover) {
-        z-index: 70 !important;
     }
 
     .immersive-popover {
