@@ -2,11 +2,22 @@
 
 namespace App\Providers;
 
+use App\Models\Minigame;
+use App\Models\UserAchievement;
+use App\Models\UserBuilding;
+use App\Models\UserResource;
+use App\Models\WeatherSnapshot;
+use App\Policies\MinigamePolicy;
+use App\Policies\UserAchievementPolicy;
+use App\Policies\UserBuildingPolicy;
+use App\Policies\UserResourcePolicy;
+use App\Policies\WeatherSnapshotPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -26,8 +37,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configureAuthorization();
         $this->configureDefaults();
         $this->configureRateLimiting();
+    }
+
+    /**
+     * Configure model ownership policies.
+     */
+    protected function configureAuthorization(): void
+    {
+        Gate::policy(UserBuilding::class, UserBuildingPolicy::class);
+        Gate::policy(UserAchievement::class, UserAchievementPolicy::class);
+        Gate::policy(UserResource::class, UserResourcePolicy::class);
+        Gate::policy(Minigame::class, MinigamePolicy::class);
+        Gate::policy(WeatherSnapshot::class, WeatherSnapshotPolicy::class);
     }
 
     /**

@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -125,6 +126,8 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $resources = $this->resourcesFor($user);
+        Gate::authorize('collect', $resources);
+
         $buildings = $this->buildingsFor($user);
         $productionBonuses = $this->productionBonusesFor($user);
         $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
@@ -171,9 +174,7 @@ class DashboardController extends Controller
             'amount' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_ROAD_BUILD_AMOUNT],
         ]);
 
-        if ($building->user_id !== $request->user()->id) {
-            abort(404);
-        }
+        Gate::authorize('upgrade', $building);
 
         $resources = $this->resourcesFor($request->user());
         $buildings = $this->buildingsFor($request->user());
@@ -231,6 +232,7 @@ class DashboardController extends Controller
         $productionBonuses = $this->productionBonusesFor($user);
         $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
         $minigame = $this->minigameFor($user, $resource);
+        Gate::authorize('complete', $minigame);
 
         $productionRates = $this->productionRatesFor($buildings, $productionBonuses);
         $reward = $this->minigameRewardFor((int) $productionRates[$resource]);
@@ -265,6 +267,8 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $resources = $this->resourcesFor($user);
+        Gate::authorize('prestige', $resources);
+
         $buildings = $this->buildingsFor($user);
         $this->applyPassiveProduction($resources, $buildings, $this->productionBonusesFor($user));
         $prestigeRoadRequirement = $this->prestigeRoadRequirementFor($buildings);
@@ -315,9 +319,14 @@ class DashboardController extends Controller
             'ids.*' => ['integer'],
         ]);
 
-        UserAchievement::query()
-            ->where('user_id', $request->user()->id)
+        $achievements = UserAchievement::query()
             ->whereIn('id', $validated['ids'])
+            ->get();
+
+        $achievements->each(fn (UserAchievement $achievement) => Gate::authorize('markUnlockSeen', $achievement));
+
+        UserAchievement::query()
+            ->whereKey($achievements->modelKeys())
             ->whereNotNull('unlocked_at')
             ->whereNull('notification_seen_at')
             ->update([
@@ -338,28 +347,34 @@ class DashboardController extends Controller
 
         $latitude = Weather::normalizeCoordinate($validated['latitude']);
         $longitude = Weather::normalizeCoordinate($validated['longitude']);
-
-        WeatherSnapshot::updateOrCreate(
-            [
+        $snapshot = WeatherSnapshot::query()
+            ->firstOrNew([
                 'user_id' => $request->user()->id,
-            ],
-            [
-                'latitude' => $latitude,
-                'longitude' => $longitude,
-                'weather_code' => (int) $validated['weather_code'],
-                'api_time' => CarbonImmutable::parse($validated['api_time'], 'UTC')
-                    ->setTimezone(config('app.timezone')),
-            ],
-        );
+            ]);
+
+        Gate::authorize($snapshot->exists ? 'update' : 'create', $snapshot->exists ? $snapshot : WeatherSnapshot::class);
+
+        $snapshot->fill([
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'weather_code' => (int) $validated['weather_code'],
+            'api_time' => CarbonImmutable::parse($validated['api_time'], 'UTC')
+                ->setTimezone(config('app.timezone')),
+        ])->save();
 
         return redirect()->to(url()->previous(route('dashboard')));
     }
 
     public function resetWeatherLocation(Request $request): RedirectResponse
     {
-        WeatherSnapshot::query()
+        $snapshot = WeatherSnapshot::query()
             ->where('user_id', $request->user()->id)
-            ->delete();
+            ->first();
+
+        if ($snapshot !== null) {
+            Gate::authorize('delete', $snapshot);
+            $snapshot->delete();
+        }
 
         return redirect()->to(url()->previous(route('dashboard')));
     }
