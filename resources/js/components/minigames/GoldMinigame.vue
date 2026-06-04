@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import {
-    goldRunThemes,
-    type GoldObstacleDefinition,
-    type GoldRunTheme,
-} from './goldRuns';
+import { goldRunThemes } from './goldRuns';
+import type { GoldObstacleDefinition, GoldRunTheme } from './goldRuns';
 
 const props = defineProps<{
     isSaving: boolean;

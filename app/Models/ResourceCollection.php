@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $stone
  * @property int $food
  * @property string $source
- * @property \Carbon\CarbonInterface|null $collected_at
+ * @property CarbonInterface|null $collected_at
  * @property-read User|null $user
  */
 class ResourceCollection extends Model

@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Sprout } from 'lucide-vue-next';
-import {
-    foodCrops,
-    wiltedCropImage,
-    type FoodCropDefinition,
-} from './foodCrops';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { foodCrops, wiltedCropImage } from './foodCrops';
+import type { FoodCropDefinition } from './foodCrops';
 
 const props = defineProps<{
     isSaving: boolean;
@@ -246,7 +243,7 @@ function isPlotRipe(plot: CropPlot): boolean {
         class="mt-5 flex min-h-[420px] w-full flex-col overflow-hidden rounded-md border border-[#d6cab6] bg-[#eef0df] text-left sm:min-h-[520px] dark:border-[#35332c] dark:bg-[#10140e]"
     >
         <div
-            class="relative flex min-h-[340px] flex-1 flex-col overflow-hidden bg-[#dfe7cc] px-4 py-5 dark:bg-[#11180f] sm:min-h-[440px]"
+            class="relative flex min-h-[340px] flex-1 flex-col overflow-hidden bg-[#dfe7cc] px-4 py-5 sm:min-h-[440px] dark:bg-[#11180f]"
         >
             <div
                 class="absolute inset-x-0 bottom-0 h-20 bg-[#7d8b5b] dark:bg-[#25311f]"
@@ -255,7 +252,9 @@ function isPlotRipe(plot: CropPlot): boolean {
                 class="absolute inset-x-0 bottom-16 h-24 bg-gradient-to-t from-[#c7d5a8] to-transparent dark:from-[#1d2918]"
             ></div>
 
-            <div class="relative z-10 grid flex-1 grid-cols-2 gap-3 lg:grid-cols-3">
+            <div
+                class="relative z-10 grid flex-1 grid-cols-2 gap-3 lg:grid-cols-3"
+            >
                 <button
                     v-for="plot in plots"
                     :key="plot.id"
@@ -266,7 +265,9 @@ function isPlotRipe(plot: CropPlot): boolean {
                             ? 'border-[#8ea85d] shadow-[0_0_0_2px_rgba(142,168,93,0.2)] dark:border-[#9dcc84]'
                             : 'border-[#d6cab6] dark:border-[#35332c]'
                     "
-                    :disabled="isSaving || isCompleted || hasSubmittedCompletion"
+                    :disabled="
+                        isSaving || isCompleted || hasSubmittedCompletion
+                    "
                     :aria-label="`Harvest ${plot.crop.name} plot`"
                     @click="harvest(plot.id)"
                 >
@@ -281,10 +282,10 @@ function isPlotRipe(plot: CropPlot): boolean {
                             draggable="false"
                         />
                     </div>
-                    <span class="text-sm font-bold">
-                        Plot {{ plot.id }}
-                    </span>
-                    <span class="mt-1 text-xs font-semibold text-[#696250] dark:text-[#b6ae9d]">
+                    <span class="text-sm font-bold"> Plot {{ plot.id }} </span>
+                    <span
+                        class="mt-1 text-xs font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                    >
                         {{ plot.crop.name }} | {{ plotStageLabel(plot) }}
                     </span>
                 </button>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -18,8 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $lifetime_food
  * @property int $manual_collects
  * @property int $prestiges
- * @property \Carbon\CarbonInterface|null $last_produced_at
- * @property \Carbon\CarbonInterface|null $last_collected_at
+ * @property CarbonInterface|null $last_produced_at
+ * @property CarbonInterface|null $last_collected_at
  * @property-read User|null $user
  */
 class UserResource extends Model

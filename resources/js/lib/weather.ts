@@ -1,4 +1,3 @@
-import type { Component } from 'vue';
 import {
     Cloud,
     CloudFog,
@@ -8,6 +7,7 @@ import {
     CloudSun,
     Sun,
 } from 'lucide-vue-next';
+import type { Component } from 'vue';
 
 export type WeatherConditions = {
     clear: boolean;

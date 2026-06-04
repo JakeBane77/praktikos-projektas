@@ -6,6 +6,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -20,9 +21,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $name
  * @property string $email
  * @property-read UserResource|null $resources
- * @property-read \Illuminate\Database\Eloquent\Collection<int, UserBuilding> $buildings
- * @property-read \Illuminate\Database\Eloquent\Collection<int, UserAchievement> $achievements
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Minigame> $minigames
+ * @property-read Collection<int, UserBuilding> $buildings
+ * @property-read Collection<int, UserAchievement> $achievements
+ * @property-read Collection<int, Minigame> $minigames
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]

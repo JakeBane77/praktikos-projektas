@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Pickaxe } from 'lucide-vue-next';
-import { stoneRocks, type StoneRockDefinition } from './stoneRocks';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { stoneRocks } from './stoneRocks';
+import type { StoneRockDefinition } from './stoneRocks';
 
 const props = defineProps<{
     isSaving: boolean;
@@ -199,7 +200,7 @@ function mineMarkedSpot() {
         class="mt-5 flex min-h-[420px] w-full flex-col overflow-hidden rounded-md border border-[#d6cab6] bg-[#eef0df] text-left sm:min-h-[520px] dark:border-[#35332c] dark:bg-[#10140e]"
     >
         <div
-            class="relative flex min-h-[340px] flex-1 items-center justify-center overflow-hidden bg-[#dfe2d7] px-5 py-8 dark:bg-[#111513] sm:min-h-[440px]"
+            class="relative flex min-h-[340px] flex-1 items-center justify-center overflow-hidden bg-[#dfe2d7] px-5 py-8 sm:min-h-[440px] dark:bg-[#111513]"
         >
             <div
                 class="absolute inset-x-0 bottom-0 h-20 bg-[#8b8f82] dark:bg-[#222820]"
@@ -213,7 +214,9 @@ function mineMarkedSpot() {
                 <button
                     type="button"
                     class="absolute inset-0 cursor-crosshair rounded-[42%] transition disabled:cursor-not-allowed"
-                    :disabled="isSaving || isCompleted || hasSubmittedCompletion"
+                    :disabled="
+                        isSaving || isCompleted || hasSubmittedCompletion
+                    "
                     aria-label="Mine rock"
                     @click="mineRock"
                 >
@@ -228,7 +231,9 @@ function mineMarkedSpot() {
                 <button
                     type="button"
                     class="absolute z-20 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-[#f7f0c8] bg-[#b9543d] text-[#fff7d8] shadow-[0_0_18px_rgba(185,84,61,0.45)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="isSaving || isCompleted || hasSubmittedCompletion"
+                    :disabled="
+                        isSaving || isCompleted || hasSubmittedCompletion
+                    "
                     :style="{
                         left: `${markedSpot.x}%`,
                         top: `${markedSpot.y}%`,

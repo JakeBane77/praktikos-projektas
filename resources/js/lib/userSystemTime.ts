@@ -21,8 +21,6 @@ export function getUserSystemTime(date = new Date()): UserSystemTime {
         minute: date.getMinutes(),
         second: date.getSeconds(),
         hourDecimal:
-            date.getHours() +
-            date.getMinutes() / 60 +
-            date.getSeconds() / 3600,
+            date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600,
     };
 }

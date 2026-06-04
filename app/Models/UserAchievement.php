@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property int $achievement_id
  * @property int $progress
- * @property \Carbon\CarbonInterface|null $unlocked_at
- * @property \Carbon\CarbonInterface|null $notification_seen_at
+ * @property CarbonInterface|null $unlocked_at
+ * @property CarbonInterface|null $notification_seen_at
  * @property-read Achievement|null $achievement
  * @property-read User|null $user
  */

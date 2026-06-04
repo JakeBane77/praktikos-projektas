@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { woodTrees, type WoodTreeDefinition } from './woodTrees';
+import { woodTrees } from './woodTrees';
+import type { WoodTreeDefinition } from './woodTrees';
 
 const props = defineProps<{
     isSaving: boolean;
@@ -222,7 +223,7 @@ function hit() {
         @click="hit"
     >
         <div
-            class="relative flex min-h-[340px] flex-1 items-end justify-center overflow-hidden bg-[#dfe7cc] px-5 pb-7 dark:bg-[#11180f] sm:min-h-[440px]"
+            class="relative flex min-h-[340px] flex-1 items-end justify-center overflow-hidden bg-[#dfe7cc] px-5 pb-7 sm:min-h-[440px] dark:bg-[#11180f]"
         >
             <div
                 class="absolute inset-x-0 bottom-0 h-16 bg-[#7c8d5d] dark:bg-[#25311f]"

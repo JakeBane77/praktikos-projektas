@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { toast } from 'vue-sonner';
 import {
     ArrowUp,
     Award,
@@ -19,25 +17,26 @@ import {
     Wheat,
     X,
 } from 'lucide-vue-next';
-import {
-    formatRate,
-    getTotalResources,
-    type AchievementUnlock,
-    type Building,
-    type DashboardGameData,
-    type Leaderboard,
-    type Minigame,
-    type ResourceKey,
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
+import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
+import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
+import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
+import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
+import { formatRate, getTotalResources } from '@/lib/game';
+import type {
+    AchievementUnlock,
+    Building,
+    DashboardGameData,
+    Leaderboard,
+    Minigame,
+    ResourceKey,
 } from '@/lib/game';
 import {
     weatherConditionLabel as getWeatherConditionLabel,
     weatherIconFor,
 } from '@/lib/weather';
 import { dashboard } from '@/routes';
-import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
-import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
-import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
-import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 
 defineOptions({
     layout: {
@@ -698,6 +697,7 @@ function closeMinigame() {
 
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
+
     if (activeGameModal.value === 'minigame') {
         activeGameModal.value = null;
     }
@@ -769,6 +769,7 @@ function openLeaderboard(leaderboardKey = defaultLeaderboard.value?.key) {
 
     isBuildingsOpen.value = false;
     isPrestigeConfirmOpen.value = false;
+
     if (leaderboardKey) {
         selectedLeaderboardKey.value = leaderboardKey;
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -10,8 +11,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property numeric-string $latitude
  * @property numeric-string $longitude
  * @property int $weather_code
- * @property \Carbon\CarbonInterface|null $api_time
- * @property \Carbon\CarbonInterface|null $updated_at
+ * @property CarbonInterface|null $api_time
+ * @property CarbonInterface|null $updated_at
  */
 class WeatherSnapshot extends Model
 {

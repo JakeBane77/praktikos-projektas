@@ -15,8 +15,8 @@ import {
     Wheat,
 } from 'lucide-vue-next';
 import AppearanceTabs from '@/components/AppearanceTabs.vue';
-import { dashboard, immersive, login, register } from '@/routes';
 import oakTree from '@/components/minigames/assets/trees/oak.svg';
+import { dashboard, immersive, login, register } from '@/routes';
 
 const resourceCards = [
     {
