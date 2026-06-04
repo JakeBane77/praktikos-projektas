@@ -72,5 +72,4 @@ class WeatherSnapshotService
             'api_time' => $apiTime,
         ];
     }
-
 }
