@@ -6,6 +6,9 @@ parameters:
 
     paths:
         - app/
+        - routes/
+        - database/seeders/
+        - database/factories/
 
     # Level 10 is the highest level
     level: 5
