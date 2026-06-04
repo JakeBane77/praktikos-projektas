@@ -38,6 +38,11 @@ class DashboardController extends Controller
 
     private const DAILY_PRODUCTION_HOURS = 6;
 
+    private const DEFAULT_PRODUCTION_BONUSES = [
+        'all' => 0,
+        'buildingTypes' => [],
+    ];
+
     public function index(Request $request): Response
     {
         return Inertia::render('Dashboard', $this->gameDataFor($request->user()));
@@ -464,7 +469,7 @@ class DashboardController extends Controller
      * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      * @return array{gold: int, wood: int, stone: int, food: int}
      */
-    private function productionRatesFor(iterable $buildings, array $productionBonuses = []): array
+    private function productionRatesFor(iterable $buildings, array $productionBonuses = self::DEFAULT_PRODUCTION_BONUSES): array
     {
         $rates = [
             'gold' => 0,
@@ -661,16 +666,16 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param  Collection<int, UserResource|Minigame>  $rows
+     * @param  iterable<UserResource|Minigame>  $rows
      * @return array<int, array{rank: int, userId: int, userName: string, value: int, valueLabel: string, isCurrentUser: bool}>
      */
-    private function leaderboardEntriesFor(Collection $rows, string $valueColumn, User $currentUser): array
+    private function leaderboardEntriesFor(iterable $rows, string $valueColumn, User $currentUser): array
     {
         $rank = 0;
         $position = 0;
         $previousValue = null;
 
-        return $rows
+        return collect($rows)
             ->map(function (UserResource|Minigame $row) use ($currentUser, &$position, &$previousValue, &$rank, $valueColumn): array {
                 $position += 1;
                 $value = (int) $row->{$valueColumn};
@@ -698,10 +703,7 @@ class DashboardController extends Controller
      */
     private function productionBonusesFor(User $user): array
     {
-        $bonuses = [
-            'all' => 0,
-            'buildingTypes' => [],
-        ];
+        $bonuses = self::DEFAULT_PRODUCTION_BONUSES;
 
         UserAchievement::query()
             ->with('achievement')
@@ -976,7 +978,7 @@ class DashboardController extends Controller
      * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      * @return array{gold: int, wood: int, stone: int, food: int}
      */
-    private function collectAmountsFor(UserResource $resources, iterable $buildings, array $productionBonuses = []): array
+    private function collectAmountsFor(UserResource $resources, iterable $buildings, array $productionBonuses = self::DEFAULT_PRODUCTION_BONUSES): array
     {
         $rates = $this->productionRatesFor($buildings, $productionBonuses);
         $baseRewards = $this->dailyBaseRewardsFor($resources);
@@ -1010,7 +1012,7 @@ class DashboardController extends Controller
      * @param  iterable<UserBuilding>  $buildings
      * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      */
-    private function applyPassiveProduction(UserResource $resources, iterable $buildings, array $productionBonuses = []): void
+    private function applyPassiveProduction(UserResource $resources, iterable $buildings, array $productionBonuses = self::DEFAULT_PRODUCTION_BONUSES): void
     {
         if ($resources->last_produced_at === null) {
             $resources->last_produced_at = now();
@@ -1060,7 +1062,7 @@ class DashboardController extends Controller
     /**
      * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      */
-    private function productionFor(UserBuilding $building, array $productionBonuses = []): int
+    private function productionFor(UserBuilding $building, array $productionBonuses = self::DEFAULT_PRODUCTION_BONUSES): int
     {
         if ($building->level === 0) {
             return 0;
@@ -1077,7 +1079,7 @@ class DashboardController extends Controller
     /**
      * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      */
-    private function buildingProductionLabel(UserBuilding $building, array $productionBonuses = []): string
+    private function buildingProductionLabel(UserBuilding $building, array $productionBonuses = self::DEFAULT_PRODUCTION_BONUSES): string
     {
         if ($this->isRoad($building)) {
             return number_format($building->level).' km built';
