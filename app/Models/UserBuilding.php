@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property int $building_type_id
  * @property int $level
- * @property \Illuminate\Support\Carbon|null $built_at
+ * @property \Carbon\CarbonInterface|null $built_at
  * @property-read BuildingType|null $buildingType
  * @property-read User|null $user
  */

@@ -18,8 +18,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $lifetime_food
  * @property int $manual_collects
  * @property int $prestiges
- * @property \Illuminate\Support\Carbon|null $last_produced_at
- * @property \Illuminate\Support\Carbon|null $last_collected_at
+ * @property \Carbon\CarbonInterface|null $last_produced_at
+ * @property \Carbon\CarbonInterface|null $last_collected_at
  * @property-read User|null $user
  */
 class UserResource extends Model

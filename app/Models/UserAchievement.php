@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property int $achievement_id
  * @property int $progress
- * @property \Illuminate\Support\Carbon|null $unlocked_at
- * @property \Illuminate\Support\Carbon|null $notification_seen_at
+ * @property \Carbon\CarbonInterface|null $unlocked_at
+ * @property \Carbon\CarbonInterface|null $notification_seen_at
  * @property-read Achievement|null $achievement
  * @property-read User|null $user
  */
