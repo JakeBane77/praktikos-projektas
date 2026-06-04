@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\ResourceCollectionFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,6 +21,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ResourceCollection extends Model
 {
+    /** @use HasFactory<ResourceCollectionFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'gold',

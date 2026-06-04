@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Database\Factories\BuildingTypeFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -20,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class BuildingType extends Model
 {
+    /** @use HasFactory<BuildingTypeFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'slug',

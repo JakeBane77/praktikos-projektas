@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\UserAchievementFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -18,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class UserAchievement extends Model
 {
+    /** @use HasFactory<UserAchievementFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'achievement_id',

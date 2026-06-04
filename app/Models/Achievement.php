@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Database\Factories\AchievementFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -26,6 +28,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Achievement extends Model
 {
+    /** @use HasFactory<AchievementFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'building_type_id',
         'bonus_building_type_id',
