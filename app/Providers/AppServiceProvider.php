@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Minigame;
+use App\Models\User;
 use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
@@ -82,9 +83,11 @@ class AppServiceProvider extends ServiceProvider
     protected function configureRateLimiting(): void
     {
         RateLimiter::for('minigames', function (Request $request): array {
+            $user = $request->user();
+
             $key = implode(':', [
                 'minigame',
-                $request->user()?->id ?? $request->ip(),
+                $user instanceof User ? (string) $user->id : $request->ip(),
                 $request->route('resource') ?? 'unknown',
             ]);
 

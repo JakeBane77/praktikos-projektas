@@ -581,7 +581,8 @@ class DashboardController extends Controller
         ];
 
         foreach (self::RESOURCE_DISPLAY_ORDER as $resource) {
-            $currentValue = (int) ($minigames->firstWhere('resource', $resource)?->completions ?? 0);
+            $minigame = $minigames->firstWhere('resource', $resource);
+            $currentValue = $minigame instanceof Minigame ? (int) $minigame->completions : 0;
             $boards[] = $this->minigameLeaderboardFor($user, $resource, $currentValue);
         }
 
@@ -682,7 +683,7 @@ class DashboardController extends Controller
                 return [
                     'rank' => $rank,
                     'userId' => (int) $row->user_id,
-                    'userName' => $row->user?->name ?? 'Unknown player',
+                    'userName' => $row->user instanceof User ? $row->user->name : 'Unknown player',
                     'value' => $value,
                     'valueLabel' => number_format($value),
                     'isCurrentUser' => (int) $row->user_id === (int) $currentUser->id,
@@ -819,7 +820,9 @@ class DashboardController extends Controller
             return $buildings->sum('level');
         }
 
-        return (int) ($buildings->firstWhere('building_type_id', $achievement->building_type_id)?->level ?? 0);
+        $building = $buildings->firstWhere('building_type_id', $achievement->building_type_id);
+
+        return $building instanceof UserBuilding ? (int) $building->level : 0;
     }
 
     /**
@@ -883,7 +886,8 @@ class DashboardController extends Controller
             return 'No production bonus';
         }
 
-        $target = $achievement->bonusBuildingType?->name ?? 'all buildings';
+        $bonusBuildingType = $achievement->bonusBuildingType;
+        $target = $bonusBuildingType instanceof BuildingType ? $bonusBuildingType->name : 'all buildings';
         $rewardLabel = '+'.$bonusPercent.'% '.$target.' base production';
 
         if ($achievement->slug === 'prestiges-1') {
@@ -900,7 +904,7 @@ class DashboardController extends Controller
     private function achievementBonusCardsFor(array $productionBonuses): array
     {
         $cards = [];
-        $allBonus = (int) ($productionBonuses['all'] ?? 0);
+        $allBonus = (int) $productionBonuses['all'];
 
         if ($allBonus > 0) {
             $cards[] = [
@@ -911,7 +915,7 @@ class DashboardController extends Controller
             ];
         }
 
-        $buildingTypeBonuses = $productionBonuses['buildingTypes'] ?? [];
+        $buildingTypeBonuses = $productionBonuses['buildingTypes'];
         $buildingTypeNames = BuildingType::query()
             ->whereIn('id', array_keys($buildingTypeBonuses))
             ->pluck('name', 'id');
@@ -955,8 +959,8 @@ class DashboardController extends Controller
                     'currentProduction' => $currentProduction,
                     'reward' => $reward,
                     'rewardLabel' => '+'.number_format($reward).' '.$resource,
-                    'completions' => (int) ($minigame?->completions ?? 0),
-                    'resourcesGained' => (int) ($minigame?->resources_gained ?? 0),
+                    'completions' => $minigame instanceof Minigame ? (int) $minigame->completions : 0,
+                    'resourcesGained' => $minigame instanceof Minigame ? (int) $minigame->resources_gained : 0,
                 ];
             })
             ->values()
