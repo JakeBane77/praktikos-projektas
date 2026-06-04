@@ -23,6 +23,7 @@ return new class extends Migration
             $table->unsignedBigInteger('lifetime_stone')->default(0);
             $table->unsignedBigInteger('lifetime_food')->default(0);
             $table->unsignedInteger('manual_collects')->default(0);
+            $table->unsignedInteger('prestiges')->default(0);
             $table->timestamp('last_produced_at')->nullable();
             $table->timestamp('last_collected_at')->nullable();
             $table->timestamps();

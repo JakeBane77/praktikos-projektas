@@ -11,17 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('user_achievements', function (Blueprint $table) {
+        Schema::create('minigames', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('achievement_id')->constrained()->cascadeOnDelete();
-            $table->unsignedBigInteger('progress')->default(0);
-            $table->timestamp('unlocked_at')->nullable();
-            $table->timestamp('notification_seen_at')->nullable();
+            $table->string('resource');
+            $table->unsignedBigInteger('completions')->default(0);
+            $table->unsignedBigInteger('resources_gained')->default(0);
             $table->timestamps();
 
-            $table->unique(['user_id', 'achievement_id']);
-            $table->index('unlocked_at');
+            $table->unique(['user_id', 'resource']);
+            $table->index('resource');
         });
     }
 
@@ -30,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('user_achievements');
+        Schema::dropIfExists('minigames');
     }
 };

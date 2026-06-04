@@ -24,6 +24,8 @@ return new class extends Migration
             $table->unsignedInteger('reward_wood')->default(0);
             $table->unsignedInteger('reward_stone')->default(0);
             $table->unsignedInteger('reward_food')->default(0);
+            $table->unsignedInteger('production_bonus_percent')->default(5);
+            $table->foreignId('bonus_building_type_id')->nullable()->constrained('building_types')->nullOnDelete();
             $table->timestamps();
 
             $table->unique('name');

@@ -1200,11 +1200,7 @@ class DashboardController extends Controller
 
     private function baseProductionFor(BuildingType $buildingType): int
     {
-        return (int) (
-            $buildingType->getAttribute('base_production_per_hour')
-            ?? $buildingType->getAttribute('base_production_per_minute')
-            ?? 0
-        );
+        return (int) $buildingType->getAttribute('base_production_per_hour');
     }
 
     private function isRoad(UserBuilding $building): bool

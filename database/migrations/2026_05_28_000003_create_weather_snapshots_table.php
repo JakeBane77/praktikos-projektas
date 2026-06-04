@@ -10,13 +10,15 @@ return new class extends Migration
     {
         Schema::create('weather_snapshots', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
             $table->decimal('latitude', 8, 4);
             $table->decimal('longitude', 8, 4);
             $table->unsignedSmallInteger('weather_code')->nullable();
             $table->dateTime('api_time')->nullable();
             $table->timestamps();
 
-            $table->unique(['latitude', 'longitude']);
+            $table->unique('user_id');
+            $table->index(['latitude', 'longitude']);
         });
     }
 
