@@ -5,6 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int $achievement_id
+ * @property int $progress
+ * @property \Illuminate\Support\Carbon|null $unlocked_at
+ * @property \Illuminate\Support\Carbon|null $notification_seen_at
+ * @property-read Achievement|null $achievement
+ * @property-read User|null $user
+ */
 class UserAchievement extends Model
 {
     protected $fillable = [
@@ -23,11 +33,17 @@ class UserAchievement extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Achievement, $this>
+     */
     public function achievement(): BelongsTo
     {
         return $this->belongsTo(Achievement::class);
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

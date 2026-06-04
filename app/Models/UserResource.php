@@ -5,6 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int $gold
+ * @property int $wood
+ * @property int $stone
+ * @property int $food
+ * @property int $lifetime_gold
+ * @property int $lifetime_wood
+ * @property int $lifetime_stone
+ * @property int $lifetime_food
+ * @property int $manual_collects
+ * @property int $prestiges
+ * @property \Illuminate\Support\Carbon|null $last_produced_at
+ * @property \Illuminate\Support\Carbon|null $last_collected_at
+ * @property-read User|null $user
+ */
 class UserResource extends Model
 {
     protected $fillable = [
@@ -31,6 +48,9 @@ class UserResource extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

@@ -15,6 +15,15 @@ use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $email
+ * @property-read UserResource|null $resources
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, UserBuilding> $buildings
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, UserAchievement> $achievements
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Minigame> $minigames
+ */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
@@ -36,21 +45,33 @@ class User extends Authenticatable implements PasskeyUser
         ];
     }
 
+    /**
+     * @return HasOne<UserResource, $this>
+     */
     public function resources(): HasOne
     {
         return $this->hasOne(UserResource::class);
     }
 
+    /**
+     * @return HasMany<UserBuilding, $this>
+     */
     public function buildings(): HasMany
     {
         return $this->hasMany(UserBuilding::class);
     }
 
+    /**
+     * @return HasMany<UserAchievement, $this>
+     */
     public function achievements(): HasMany
     {
         return $this->hasMany(UserAchievement::class);
     }
 
+    /**
+     * @return HasMany<Minigame, $this>
+     */
     public function minigames(): HasMany
     {
         return $this->hasMany(Minigame::class);

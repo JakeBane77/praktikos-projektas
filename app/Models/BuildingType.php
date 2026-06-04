@@ -5,6 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $slug
+ * @property string|null $produces_resource
+ * @property numeric-string|float|int $base_production_per_hour
+ * @property numeric-string|float|int $production_multiplier
+ * @property string|null $effect_type
+ * @property array<string, mixed>|null $effects
+ * @property array<string, int>|null $base_costs
+ * @property numeric-string|float|int $upgrade_cost_multiplier
+ * @property int|null $max_level
+ */
 class BuildingType extends Model
 {
     protected $fillable = [
@@ -30,6 +43,9 @@ class BuildingType extends Model
         ];
     }
 
+    /**
+     * @return HasMany<UserBuilding, $this>
+     */
     public function userBuildings(): HasMany
     {
         return $this->hasMany(UserBuilding::class);

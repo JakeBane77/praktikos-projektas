@@ -935,6 +935,7 @@ class DashboardController extends Controller
     }
 
     /**
+     * @param  Collection<int, Minigame>  $minigames
      * @param  array{gold: int, wood: int, stone: int, food: int}  $productionRates
      * @return array<int, array{resource: string, label: string, currentProduction: int, reward: int, rewardLabel: string, completions: int, resourcesGained: int}>
      */
