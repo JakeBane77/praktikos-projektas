@@ -30,6 +30,36 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
+test('new users can visit the dashboard when counter achievements exist', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    Achievement::create([
+        'name' => 'First Counter Collect',
+        'slug' => 'first-counter-collect',
+        'description' => 'Collect manually once.',
+        'type' => 'manual_collects',
+        'target_value' => 1,
+    ]);
+
+    Achievement::create([
+        'name' => 'First Counter Prestige',
+        'slug' => 'first-counter-prestige',
+        'description' => 'Prestige once.',
+        'type' => 'prestiges',
+        'target_value' => 1,
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk();
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'manual_collects' => 0,
+        'prestiges' => 0,
+    ]);
+});
+
 test('authenticated users can visit immersive mode with game data', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
