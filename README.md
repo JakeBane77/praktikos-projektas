@@ -106,11 +106,23 @@ php artisan weather:update # manually launch the schedule
 #docker (sail) commands
 
 vendor/bin/sail up -d # start container
-vendor/bin/sail down # close container
+
 vendor/bin/sail artisan migrate --seed
 vendor/bin/sail npm install
 vendor/bin/sail npm run dev
 vendor/bin/sail php artisan schedule:work
+
+vendor/bin/sail down # close container
+
+#docker commands
+docker compose up -d
+
+docker compose exec laravel.test npm install
+docker compose exec laravel.test npm run build
+docker compose exec laravel.test php artisan optimize:clear
+docker compose exec laravel.test php artisan migrate --seed
+
+docker compose down -d
 
 #test commands
 php artisan test # runs pest unit tests
