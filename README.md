@@ -65,7 +65,7 @@ composer dev
 
 Then open:
 
-```text
+```web page
 http://localhost:8000
 ```
 
@@ -80,7 +80,7 @@ With Laravel Sail:
 
 Then open:
 
-```text
+```web page
 http://localhost
 ```
 

@@ -7,6 +7,7 @@ import {
     CloudSun,
     Coins,
     Gamepad2,
+    Github,
     Hammer,
     Mountain,
     RotateCcw,
@@ -17,6 +18,8 @@ import {
 import AppearanceTabs from '@/components/AppearanceTabs.vue';
 import oakTree from '@/components/minigames/assets/trees/oak.svg';
 import { dashboard, immersive, login, register } from '@/routes';
+
+const projectUrl = 'https://github.com/JakeBane77/praktikos-projektas';
 
 const resourceCards = [
     {
@@ -103,6 +106,16 @@ const featureCards = [
                 <div class="hidden sm:block">
                     <AppearanceTabs />
                 </div>
+
+                <a
+                    :href="projectUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="hidden items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-[#243627] transition hover:bg-[#e9e1d3] sm:inline-flex dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
+                >
+                    <Github class="h-4 w-4" />
+                    GitHub
+                </a>
 
                 <template v-if="$page.props.auth.user">
                     <Link

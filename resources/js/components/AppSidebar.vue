@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, Joystick } from 'lucide-vue-next';
+import { Github, Joystick, LayoutGrid } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
+import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
@@ -28,6 +29,14 @@ const mainNavItems: NavItem[] = [
         icon: Joystick,
     },
 ];
+
+const footerNavItems: NavItem[] = [
+    {
+        title: 'Project source code',
+        href: 'https://github.com/JakeBane77/praktikos-projektas',
+        icon: Github,
+    },
+];
 </script>
 
 <template>
@@ -49,6 +58,7 @@ const mainNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
+            <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>
