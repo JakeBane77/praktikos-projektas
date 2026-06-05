@@ -57,7 +57,7 @@ php artisan db:seed --class=FactoryDemoSeeder
 
 ## Usage
 
-Run the Laravel server, queue worker, and Vite dev server together:
+Run the Laravel server, Vite dev server, queue worker, scheduler together:
 
 ```bash
 composer dev
@@ -104,7 +104,6 @@ php artisan schedule:list # show all active schedules
 php artisan weather:update # manually launch the schedule
 
 #docker (sail) commands
-
 vendor/bin/sail up -d # start container
 
 vendor/bin/sail artisan migrate --seed
