@@ -23,7 +23,12 @@ import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
 import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
-import { formatRate, getTotalResources } from '@/lib/game';
+import {
+    formatExactNumber,
+    formatGameNumber,
+    formatRate,
+    getTotalResources,
+} from '@/lib/game';
 import type {
     AchievementUnlock,
     Building,
@@ -68,6 +73,7 @@ const activeAchievementUnlockIndex = ref(0);
 const serverTimeMilliseconds = ref(Date.now());
 const isUpdatingWeatherLocation = ref(false);
 const weatherLocationStatus = ref<string | null>(null);
+const expandedResourceNumberKeys = ref<Set<string>>(new Set());
 const buildings = computed<Building[]>(() => props.buildings);
 const minigames = computed<Minigame[]>(() => props.minigames);
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
@@ -206,15 +212,15 @@ const isAchievementUnlockModalOpen = computed(
         !isPrestigeConfirmOpen.value,
 );
 const prestigeRankLabel = computed(
-    () => `#${props.prestigeStats.rank.toLocaleString()}`,
+    () => `#${formatExactNumber(props.prestigeStats.rank)}`,
 );
 const defaultLeaderboardRankLabel = computed(() =>
     defaultLeaderboard.value
-        ? `#${defaultLeaderboard.value.currentRank.toLocaleString()}`
+        ? `#${formatExactNumber(defaultLeaderboard.value.currentRank)}`
         : '#-',
 );
 const prestigeRequirementLabel = computed(() =>
-    props.prestigeStats.requirement.toLocaleString(),
+    formatGameNumber(props.prestigeStats.requirement),
 );
 const prestigeProgressPercent = computed(() =>
     props.prestigeStats.requirement > 0
@@ -300,6 +306,34 @@ function formatServerDateTime(milliseconds: number): string {
         parts.find((part) => part.type === type)?.value ?? '00';
 
     return `${partValue('year')}-${partValue('month')}-${partValue('day')} ${partValue('hour')}:${partValue('minute')}:${partValue('second')}`;
+}
+
+function isResourceNumberExpanded(key: string): boolean {
+    return expandedResourceNumberKeys.value.has(key);
+}
+
+function toggleResourceNumber(key: string): void {
+    const nextExpandedKeys = new Set(expandedResourceNumberKeys.value);
+
+    if (nextExpandedKeys.has(key)) {
+        nextExpandedKeys.delete(key);
+    } else {
+        nextExpandedKeys.add(key);
+    }
+
+    expandedResourceNumberKeys.value = nextExpandedKeys;
+}
+
+function resourceNumberLabel(key: string, value: number): string {
+    return isResourceNumberExpanded(key)
+        ? formatExactNumber(value)
+        : formatGameNumber(value);
+}
+
+function resourceNumberTitle(key: string): string {
+    return isResourceNumberExpanded(key)
+        ? 'Show compact number'
+        : 'Show full number';
 }
 
 watch(
@@ -942,9 +976,28 @@ function upgradeBuilding(building: Building) {
                             <p class="text-sm font-semibold">
                                 {{ resource.label }}
                             </p>
-                            <p class="mt-3 text-3xl font-bold">
-                                {{ resource.amount.toLocaleString() }}
-                            </p>
+                            <button
+                                type="button"
+                                class="mt-3 block max-w-full cursor-pointer text-left text-3xl font-bold break-words"
+                                :aria-label="`${resource.label}: ${formatExactNumber(resource.amount)}`"
+                                :title="
+                                    resourceNumberTitle(
+                                        `current-${resource.key}`,
+                                    )
+                                "
+                                @click="
+                                    toggleResourceNumber(
+                                        `current-${resource.key}`,
+                                    )
+                                "
+                            >
+                                {{
+                                    resourceNumberLabel(
+                                        `current-${resource.key}`,
+                                        resource.amount,
+                                    )
+                                }}
+                            </button>
                         </div>
                         <component
                             :is="resource.icon"
@@ -1089,7 +1142,9 @@ function upgradeBuilding(building: Building) {
                                     class="mt-2 text-sm text-[#696250] dark:text-[#b6ae9d]"
                                 >
                                     {{
-                                        minigame.currentProduction.toLocaleString()
+                                        formatGameNumber(
+                                            minigame.currentProduction,
+                                        )
                                     }}
                                     /hour
                                 </p>
@@ -1122,7 +1177,7 @@ function upgradeBuilding(building: Building) {
                                     Completed
                                 </span>
                                 <span class="font-semibold">
-                                    {{ minigame.completions.toLocaleString() }}
+                                    {{ formatGameNumber(minigame.completions) }}
                                 </span>
                             </div>
                             <div
@@ -1135,7 +1190,9 @@ function upgradeBuilding(building: Building) {
                                 </span>
                                 <span class="font-semibold">
                                     {{
-                                        minigame.resourcesGained.toLocaleString()
+                                        formatGameNumber(
+                                            minigame.resourcesGained,
+                                        )
                                     }}
                                 </span>
                             </div>
@@ -1188,7 +1245,7 @@ function upgradeBuilding(building: Building) {
                         <p
                             class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
                         >
-                            {{ lifetimeTotalResources.toLocaleString() }}
+                            {{ formatGameNumber(lifetimeTotalResources) }}
                             lifetime resources
                         </p>
                     </div>
@@ -1211,11 +1268,28 @@ function upgradeBuilding(building: Building) {
                                         {{ resource.label }}
                                     </p>
                                 </div>
-                                <p
-                                    class="text-right text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                                <button
+                                    type="button"
+                                    class="max-w-full cursor-pointer text-right text-sm font-semibold break-words text-[#47663b] dark:text-[#9dcc84]"
+                                    :aria-label="`${resource.label} lifetime collected: ${formatExactNumber(resource.amount)}`"
+                                    :title="
+                                        resourceNumberTitle(
+                                            `lifetime-${resource.key}`,
+                                        )
+                                    "
+                                    @click="
+                                        toggleResourceNumber(
+                                            `lifetime-${resource.key}`,
+                                        )
+                                    "
                                 >
-                                    {{ resource.amount.toLocaleString() }}
-                                </p>
+                                    {{
+                                        resourceNumberLabel(
+                                            `lifetime-${resource.key}`,
+                                            resource.amount,
+                                        )
+                                    }}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1292,7 +1366,11 @@ function upgradeBuilding(building: Building) {
                                     Score
                                 </p>
                                 <p class="mt-2 text-xl font-bold">
-                                    {{ defaultLeaderboard.currentValueLabel }}
+                                    {{
+                                        formatGameNumber(
+                                            defaultLeaderboard.currentValue,
+                                        )
+                                    }}
                                 </p>
                             </div>
                         </div>
@@ -1345,7 +1423,7 @@ function upgradeBuilding(building: Building) {
                             Prestiges
                         </p>
                         <p class="mt-3 text-3xl font-bold">
-                            {{ props.prestigeStats.count.toLocaleString() }}
+                            {{ formatGameNumber(props.prestigeStats.count) }}
                         </p>
                     </div>
 
@@ -1376,7 +1454,7 @@ function upgradeBuilding(building: Building) {
                             Current roads
                         </p>
                         <p class="mt-3 text-3xl font-bold">
-                            {{ props.roadStats.length.toLocaleString() }} km
+                            {{ formatGameNumber(props.roadStats.length) }} km
                         </p>
                     </div>
 
@@ -1657,7 +1735,7 @@ function upgradeBuilding(building: Building) {
                         <p
                             class="text-sm font-bold text-[#47663b] dark:text-[#9dcc84]"
                         >
-                            {{ props.roadStats.length.toLocaleString() }} km
+                            {{ formatGameNumber(props.roadStats.length) }} km
                         </p>
                     </div>
                     <div class="flex items-center justify-between gap-4">
@@ -1670,7 +1748,7 @@ function upgradeBuilding(building: Building) {
                             class="text-sm font-bold text-[#47663b] dark:text-[#9dcc84]"
                         >
                             {{
-                                (props.prestigeStats.count + 1).toLocaleString()
+                                formatGameNumber(props.prestigeStats.count + 1)
                             }}
                         </p>
                     </div>
@@ -1888,7 +1966,9 @@ function upgradeBuilding(building: Building) {
                         </p>
                         <p class="mt-2 text-2xl font-bold">
                             #{{
-                                selectedLeaderboard.currentRank.toLocaleString()
+                                formatExactNumber(
+                                    selectedLeaderboard.currentRank,
+                                )
                             }}
                         </p>
                     </div>
@@ -1901,7 +1981,11 @@ function upgradeBuilding(building: Building) {
                             Your score
                         </p>
                         <p class="mt-2 text-2xl font-bold">
-                            {{ selectedLeaderboard.currentValueLabel }}
+                            {{
+                                formatGameNumber(
+                                    selectedLeaderboard.currentValue,
+                                )
+                            }}
                         </p>
                     </div>
                     <div
@@ -1951,7 +2035,7 @@ function upgradeBuilding(building: Building) {
                             "
                         >
                             <span class="font-bold">
-                                #{{ entry.rank.toLocaleString() }}
+                                #{{ formatExactNumber(entry.rank) }}
                             </span>
                             <span class="min-w-0 truncate font-semibold">
                                 {{ entry.userName }}
@@ -1963,7 +2047,7 @@ function upgradeBuilding(building: Building) {
                                 </span>
                             </span>
                             <span class="text-right font-bold">
-                                {{ entry.valueLabel }}
+                                {{ formatGameNumber(entry.value) }}
                             </span>
                         </div>
                     </div>
@@ -2045,11 +2129,28 @@ function upgradeBuilding(building: Building) {
                         >
                             Current resources
                         </p>
-                        <p class="mt-2 text-xl font-bold">
+                        <button
+                            type="button"
+                            class="mt-2 block max-w-full cursor-pointer text-left text-xl font-bold break-words"
+                            :aria-label="`Current ${selectedMinigame.resource} resources: ${formatExactNumber(selectedMinigameResourceAmount)}`"
+                            :title="
+                                resourceNumberTitle(
+                                    `minigame-current-${selectedMinigame.resource}`,
+                                )
+                            "
+                            @click="
+                                toggleResourceNumber(
+                                    `minigame-current-${selectedMinigame.resource}`,
+                                )
+                            "
+                        >
                             {{
-                                selectedMinigameResourceAmount.toLocaleString()
+                                resourceNumberLabel(
+                                    `minigame-current-${selectedMinigame.resource}`,
+                                    selectedMinigameResourceAmount,
+                                )
                             }}
-                        </p>
+                        </button>
                     </div>
                     <div
                         class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
@@ -2060,7 +2161,7 @@ function upgradeBuilding(building: Building) {
                             Completions
                         </p>
                         <p class="mt-2 text-xl font-bold">
-                            {{ selectedMinigame.completions.toLocaleString() }}
+                            {{ formatGameNumber(selectedMinigame.completions) }}
                         </p>
                     </div>
                     <div
@@ -2073,7 +2174,9 @@ function upgradeBuilding(building: Building) {
                         </p>
                         <p class="mt-2 text-xl font-bold">
                             {{
-                                selectedMinigame.resourcesGained.toLocaleString()
+                                formatGameNumber(
+                                    selectedMinigame.resourcesGained,
+                                )
                             }}
                         </p>
                     </div>

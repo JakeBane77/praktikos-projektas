@@ -114,6 +114,35 @@ export function getTotalResources(resources: Resources): number {
     );
 }
 
+const exactNumberFormatter = new Intl.NumberFormat('en');
+const compactNumberFormatter = new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+});
+
+export function formatExactNumber(value: number): string {
+    return exactNumberFormatter.format(value);
+}
+
+export function formatGameNumber(value: number): string {
+    if (Math.abs(value) < 100_000) {
+        return formatExactNumber(value);
+    }
+
+    const absoluteValue = Math.abs(value);
+    const compactScale =
+        absoluteValue >= 1_000_000_000_000
+            ? 1_000_000_000_000
+            : absoluteValue >= 1_000_000_000
+              ? 1_000_000_000
+              : absoluteValue >= 1_000_000
+                ? 1_000_000
+                : 1_000;
+    const truncatedValue = Math.trunc((value / compactScale) * 10) / 10;
+
+    return compactNumberFormatter.format(truncatedValue * compactScale);
+}
+
 export function formatRate(rate: number): string {
-    return `+${rate}/hour`;
+    return `+${formatGameNumber(rate)}/hour`;
 }

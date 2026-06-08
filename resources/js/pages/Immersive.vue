@@ -25,6 +25,7 @@ import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import { useImmersiveTestingPanel } from '@/composables/useImmersiveTestingPanel';
+import { formatExactNumber, formatGameNumber } from '@/lib/game';
 import type {
     AchievementUnlock,
     Building,
@@ -358,6 +359,7 @@ const hasWonMinigame = ref(false);
 const selectedLeaderboardKey = ref(props.leaderboards.defaultKey);
 const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
+const expandedResourceNumberKeys = ref<Set<string>>(new Set());
 let userTimeInterval: number | undefined;
 let timeLoopInterval: number | undefined;
 const { isImmersiveTestingPanelOpen } = useImmersiveTestingPanel();
@@ -560,7 +562,7 @@ const isAchievementUnlockModalOpen = computed(
 );
 
 const prestigeRequirementLabel = computed(() =>
-    props.prestigeStats.requirement.toLocaleString(),
+    formatGameNumber(props.prestigeStats.requirement),
 );
 
 const prestigeProgressPercent = computed(() =>
@@ -583,7 +585,7 @@ const prestigeButtonLabel = computed(() =>
 
 const leaderboardButtonLabel = computed(() =>
     defaultLeaderboard.value
-        ? `Leaderboard rank #${defaultLeaderboard.value.currentRank.toLocaleString()}`
+        ? `Leaderboard rank #${formatExactNumber(defaultLeaderboard.value.currentRank)}`
         : 'Leaderboard',
 );
 
@@ -707,7 +709,7 @@ const achievementsButtonClass = iconButtonMenuClass;
 
 const achievementsButtonLabel = computed(
     () =>
-        `${unlockedAchievementCount.value.toLocaleString()} of ${achievements.value.length.toLocaleString()} achievements unlocked`,
+        `${formatExactNumber(unlockedAchievementCount.value)} of ${formatExactNumber(achievements.value.length)} achievements unlocked`,
 );
 
 const upgradesButtonLabel = computed(() =>
@@ -753,7 +755,7 @@ const roadLabel = computed(() => {
     const roads = buildingLevels.value.road;
 
     if (roads > 0) {
-        return `${compactNumber(roads)} km built`;
+        return `${formatGameNumber(roads)} km built`;
     }
 
     return 'No roads built';
@@ -915,15 +917,32 @@ function clamp(value: number, minimum: number, maximum: number): number {
     return Math.min(maximum, Math.max(minimum, value));
 }
 
-function compactNumber(value: number): string {
-    return new Intl.NumberFormat('en', {
-        notation: 'compact',
-        maximumFractionDigits: 1,
-    }).format(value);
+function isResourceNumberExpanded(key: string): boolean {
+    return expandedResourceNumberKeys.value.has(key);
 }
 
-function formatNumber(value: number): string {
-    return new Intl.NumberFormat('en').format(value);
+function toggleResourceNumber(key: string): void {
+    const nextExpandedKeys = new Set(expandedResourceNumberKeys.value);
+
+    if (nextExpandedKeys.has(key)) {
+        nextExpandedKeys.delete(key);
+    } else {
+        nextExpandedKeys.add(key);
+    }
+
+    expandedResourceNumberKeys.value = nextExpandedKeys;
+}
+
+function resourceNumberLabel(key: string, value: number): string {
+    return isResourceNumberExpanded(key)
+        ? formatExactNumber(value)
+        : formatGameNumber(value);
+}
+
+function resourceNumberTitle(key: string): string {
+    return isResourceNumberExpanded(key)
+        ? 'Show compact number'
+        : 'Show full number';
 }
 
 function minigameButtonClass(): string {
@@ -1465,17 +1484,34 @@ function timeFromInputValue(value: string): Date {
                                     class="mt-1 text-xs text-[#696250] dark:text-[#b8c2b0]"
                                 >
                                     +{{
-                                        formatNumber(
+                                        formatGameNumber(
                                             props.resourceRates[resource.key],
                                         )
                                     }}/hour
                                 </p>
                             </div>
-                            <p class="self-center text-base font-bold">
+                            <button
+                                type="button"
+                                class="max-w-full cursor-pointer self-center text-right text-base font-bold break-words"
+                                :aria-label="`${resource.label}: ${formatExactNumber(props.resources[resource.key])}`"
+                                :title="
+                                    resourceNumberTitle(
+                                        `current-${resource.key}`,
+                                    )
+                                "
+                                @click="
+                                    toggleResourceNumber(
+                                        `current-${resource.key}`,
+                                    )
+                                "
+                            >
                                 {{
-                                    formatNumber(props.resources[resource.key])
+                                    resourceNumberLabel(
+                                        `current-${resource.key}`,
+                                        props.resources[resource.key],
+                                    )
                                 }}
-                            </p>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1672,7 +1708,9 @@ function timeFromInputValue(value: string): Date {
                                     Current roads
                                 </p>
                                 <p class="mt-1 font-bold">
-                                    {{ formatNumber(props.roadStats.length) }}
+                                    {{
+                                        formatGameNumber(props.roadStats.length)
+                                    }}
                                     km
                                 </p>
                             </div>
@@ -1710,7 +1748,9 @@ function timeFromInputValue(value: string): Date {
                                 </p>
                                 <p class="mt-1 font-bold">
                                     {{
-                                        props.prestigeStats.count.toLocaleString()
+                                        formatGameNumber(
+                                            props.prestigeStats.count,
+                                        )
                                     }}
                                 </p>
                             </div>
@@ -1722,7 +1762,9 @@ function timeFromInputValue(value: string): Date {
                                 </p>
                                 <p class="mt-1 font-bold">
                                     #{{
-                                        props.prestigeStats.rank.toLocaleString()
+                                        formatExactNumber(
+                                            props.prestigeStats.rank,
+                                        )
                                     }}
                                 </p>
                             </div>
@@ -2334,7 +2376,9 @@ function timeFromInputValue(value: string): Date {
                         </p>
                         <p class="mt-2 text-2xl font-bold">
                             #{{
-                                selectedLeaderboard.currentRank.toLocaleString()
+                                formatExactNumber(
+                                    selectedLeaderboard.currentRank,
+                                )
                             }}
                         </p>
                     </div>
@@ -2347,7 +2391,11 @@ function timeFromInputValue(value: string): Date {
                             Your score
                         </p>
                         <p class="mt-2 text-2xl font-bold">
-                            {{ selectedLeaderboard.currentValueLabel }}
+                            {{
+                                formatGameNumber(
+                                    selectedLeaderboard.currentValue,
+                                )
+                            }}
                         </p>
                     </div>
                     <div
@@ -2397,7 +2445,7 @@ function timeFromInputValue(value: string): Date {
                             "
                         >
                             <span class="font-bold">
-                                #{{ entry.rank.toLocaleString() }}
+                                #{{ formatExactNumber(entry.rank) }}
                             </span>
                             <span class="min-w-0 truncate font-semibold">
                                 {{ entry.userName }}
@@ -2409,7 +2457,7 @@ function timeFromInputValue(value: string): Date {
                                 </span>
                             </span>
                             <span class="text-right font-bold">
-                                {{ entry.valueLabel }}
+                                {{ formatGameNumber(entry.value) }}
                             </span>
                         </div>
                     </div>
@@ -2482,9 +2530,28 @@ function timeFromInputValue(value: string): Date {
                         >
                             Current resources
                         </p>
-                        <p class="mt-2 text-xl font-bold">
-                            {{ formatNumber(selectedMinigameResourceAmount) }}
-                        </p>
+                        <button
+                            type="button"
+                            class="mt-2 block max-w-full cursor-pointer text-left text-xl font-bold break-words"
+                            :aria-label="`Current ${selectedMinigame.resource} resources: ${formatExactNumber(selectedMinigameResourceAmount)}`"
+                            :title="
+                                resourceNumberTitle(
+                                    `minigame-current-${selectedMinigame.resource}`,
+                                )
+                            "
+                            @click="
+                                toggleResourceNumber(
+                                    `minigame-current-${selectedMinigame.resource}`,
+                                )
+                            "
+                        >
+                            {{
+                                resourceNumberLabel(
+                                    `minigame-current-${selectedMinigame.resource}`,
+                                    selectedMinigameResourceAmount,
+                                )
+                            }}
+                        </button>
                     </div>
                     <div
                         class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
@@ -2495,7 +2562,7 @@ function timeFromInputValue(value: string): Date {
                             Completions
                         </p>
                         <p class="mt-2 text-xl font-bold">
-                            {{ formatNumber(selectedMinigame.completions) }}
+                            {{ formatGameNumber(selectedMinigame.completions) }}
                         </p>
                     </div>
                     <div
@@ -2507,7 +2574,11 @@ function timeFromInputValue(value: string): Date {
                             Total gained
                         </p>
                         <p class="mt-2 text-xl font-bold">
-                            {{ formatNumber(selectedMinigame.resourcesGained) }}
+                            {{
+                                formatGameNumber(
+                                    selectedMinigame.resourcesGained,
+                                )
+                            }}
                         </p>
                     </div>
                 </div>
