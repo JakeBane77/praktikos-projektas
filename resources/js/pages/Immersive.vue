@@ -5,9 +5,7 @@ import {
     Bell,
     CheckCircle2,
     Coins,
-    Gamepad2,
     Hammer,
-    Lock,
     Mountain,
     Pause,
     Play,
@@ -20,6 +18,13 @@ import {
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import AchievementUnlockModal from '@/components/game-modals/AchievementUnlockModal.vue';
+import AchievementsModal from '@/components/game-modals/AchievementsModal.vue';
+import BuildingsModal from '@/components/game-modals/BuildingsModal.vue';
+import LeaderboardModal from '@/components/game-modals/LeaderboardModal.vue';
+import MinigameModal from '@/components/game-modals/MinigameModal.vue';
+import OfflineProgressModal from '@/components/game-modals/OfflineProgressModal.vue';
+import PrestigeConfirmModal from '@/components/game-modals/PrestigeConfirmModal.vue';
 import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
 import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
@@ -347,7 +352,12 @@ const weatherCodeOverride = ref('');
 const isActionMenuOpen = ref(false);
 const isResourcesMenuOpen = ref(false);
 const isPrestigeMenuOpen = ref(false);
-type GameModal = 'achievements' | 'buildings' | 'leaderboard' | 'minigame';
+type GameModal =
+    | 'achievements'
+    | 'buildings'
+    | 'leaderboard'
+    | 'minigame'
+    | 'prestige-confirm';
 
 const activeGameModal = ref<GameModal | null>(null);
 const showOnlyAvailableUpgrades = ref(true);
@@ -455,10 +465,6 @@ const visibleUpgradeBuildings = computed(() =>
         : props.buildings.filter((building) => !building.isMaxLevel),
 );
 
-const hasVisibleUpgradeBuildings = computed(
-    () => visibleUpgradeBuildings.value.length > 0,
-);
-
 const minigames = computed<Minigame[]>(() => props.minigames);
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
 const achievements = computed(() => props.achievements);
@@ -479,12 +485,6 @@ const achievementUnlockButtonLabel = computed(() =>
     activeAchievementUnlockIndex.value + 1 < achievementUnlockCount.value
         ? 'Next'
         : 'Done',
-);
-
-const visibleAchievements = computed(() =>
-    hideCompletedAchievements.value
-        ? achievements.value.filter((achievement) => !achievement.isUnlocked)
-        : achievements.value,
 );
 
 const unlockedAchievementCount = computed(
@@ -564,6 +564,9 @@ const isBuildingsModalOpen = computed(
 const isAchievementsModalOpen = computed(
     () => activeGameModal.value === 'achievements',
 );
+const isPrestigeConfirmModalOpen = computed(
+    () => activeGameModal.value === 'prestige-confirm',
+);
 const isOfflineProgressModalOpen = computed(
     () =>
         props.offlineProgress !== null &&
@@ -571,7 +574,8 @@ const isOfflineProgressModalOpen = computed(
         !isBuildingsModalOpen.value &&
         !isAchievementsModalOpen.value &&
         !isLeaderboardModalOpen.value &&
-        !isMinigameOpen.value,
+        !isMinigameOpen.value &&
+        !isPrestigeConfirmModalOpen.value,
 );
 const isAchievementUnlockModalOpen = computed(
     () =>
@@ -580,7 +584,8 @@ const isAchievementUnlockModalOpen = computed(
         !isBuildingsModalOpen.value &&
         !isAchievementsModalOpen.value &&
         !isLeaderboardModalOpen.value &&
-        !isMinigameOpen.value,
+        !isMinigameOpen.value &&
+        !isPrestigeConfirmModalOpen.value,
 );
 
 const prestigeRequirementLabel = computed(() =>
@@ -1042,6 +1047,13 @@ function roadBuildableAmountFor(building: Building): number {
     );
 }
 
+function updateRoadBuildAmount(payload: {
+    buildingId: number;
+    amount: number;
+}): void {
+    roadBuildAmounts.value[payload.buildingId] = payload.amount;
+}
+
 function closeOfflineProgress(): void {
     isOfflineProgressDismissed.value = true;
 }
@@ -1268,6 +1280,26 @@ function closeAchievements(): void {
     }
 }
 
+function openPrestigeConfirm(): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isPrestigeMenuOpen.value = false;
+    isActionMenuOpen.value = false;
+    isResourcesMenuOpen.value = false;
+    closeOfflineProgress();
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'prestige-confirm';
+}
+
+function closePrestigeConfirm(): void {
+    if (activeGameModal.value === 'prestige-confirm') {
+        activeGameModal.value = null;
+    }
+}
+
 function closeActiveGameModal(): void {
     if (isOfflineProgressModalOpen.value) {
         closeOfflineProgress();
@@ -1287,6 +1319,12 @@ function closeActiveGameModal(): void {
         return;
     }
 
+    if (activeGameModal.value === 'prestige-confirm') {
+        closePrestigeConfirm();
+
+        return;
+    }
+
     if (activeGameModal.value === 'leaderboard') {
         closeLeaderboard();
 
@@ -1300,6 +1338,8 @@ function confirmPrestige(): void {
     if (!props.prestigeStats.canPrestige || isPrestiging.value) {
         return;
     }
+
+    closePrestigeConfirm();
 
     router.post(
         '/dashboard/prestige',
@@ -1800,7 +1840,7 @@ function timeFromInputValue(value: string): Date {
                             :disabled="
                                 !props.prestigeStats.canPrestige || isPrestiging
                             "
-                            @click="confirmPrestige"
+                            @click="openPrestigeConfirm"
                         >
                             <RotateCcw class="h-4 w-4" />
                             {{
@@ -2098,7 +2138,7 @@ function timeFromInputValue(value: string): Date {
                             type="button"
                             class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#76b7d7] bg-[#dff2ff] px-3 py-2 font-semibold text-[#12313d] transition hover:bg-[#cfebfb] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#8fd8ff]/35 dark:bg-[#8fd8ff]/12 dark:text-[#d9f5ff] dark:hover:bg-[#8fd8ff]/18"
                             :disabled="isPrestiging"
-                            @click="confirmPrestige"
+                            @click="openPrestigeConfirm"
                         >
                             <RotateCcw class="h-4 w-4" />
                             {{ isPrestiging ? 'Prestiging...' : 'Prestige' }}
@@ -2167,6 +2207,7 @@ function timeFromInputValue(value: string): Date {
                 isAchievementsModalOpen ||
                 isLeaderboardModalOpen ||
                 isMinigameOpen ||
+                isPrestigeConfirmModalOpen ||
                 isOfflineProgressModalOpen ||
                 isAchievementUnlockModalOpen
             "
@@ -2174,765 +2215,89 @@ function timeFromInputValue(value: string): Date {
             class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
             @click.self="closeActiveGameModal"
         >
-            <section
+            <BuildingsModal
                 v-if="isBuildingsModalOpen"
-                class="max-h-[calc(100vh-3rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
-            >
-                <header class="flex items-start justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="rounded-md bg-[#243627] p-2 text-white">
-                            <Hammer class="h-5 w-5" />
-                        </div>
-                        <div>
-                            <p
-                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                            >
-                                Buildings
-                            </p>
-                            <h2 class="mt-1 text-2xl font-bold">
-                                Upgrade status
-                            </h2>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close buildings"
-                        @click="closeBuildings"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div
-                    class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <p class="text-sm text-[#696250] dark:text-[#b6ae9d]">
-                        Upgrade buildings and expand roads from immersive mode.
-                    </p>
-                    <label
-                        class="inline-flex items-center gap-2 text-sm font-semibold text-[#5d6356] dark:text-[#c6c0b3]"
-                    >
-                        <input
-                            v-model="showOnlyAvailableUpgrades"
-                            type="checkbox"
-                            class="h-4 w-4 rounded border-[#b7aa91] text-[#243627] focus:ring-[#47663b] dark:border-[#554f42]"
-                        />
-                        Show only available
-                    </label>
-                </div>
-
-                <div class="mt-5 grid gap-3">
-                    <div
-                        v-if="!hasVisibleUpgradeBuildings"
-                        class="rounded-md border border-[#e4dac7] p-4 text-sm text-[#5d6356] dark:border-[#35332c] dark:text-[#c6c0b3]"
-                    >
-                        {{
-                            showOnlyAvailableUpgrades
-                                ? 'No building upgrades are currently affordable.'
-                                : 'No further building upgrades are available.'
-                        }}
-                    </div>
-
-                    <article
-                        v-for="building in visibleUpgradeBuildings"
-                        v-else
-                        :key="building.id"
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <div
-                            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
-                        >
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <h3 class="text-lg font-semibold">
-                                        {{ building.name }}
-                                    </h3>
-                                    <span
-                                        class="rounded-sm bg-[#e9e1d3] px-2 py-1 text-xs font-semibold text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]"
-                                    >
-                                        {{ building.levelLabel }}
-                                    </span>
-                                </div>
-                                <p
-                                    v-if="building.description"
-                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
-                                >
-                                    {{ building.description }}
-                                </p>
-                                <p
-                                    class="mt-3 text-sm text-[#696250] dark:text-[#b6ae9d]"
-                                >
-                                    {{ building.upgradeCost }}
-                                </p>
-                                <p
-                                    v-if="upgradeAvailabilityLabelFor(building)"
-                                    class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                                >
-                                    Next upgrade:
-                                    {{ upgradeAvailabilityLabelFor(building) }}
-                                </p>
-                                <p
-                                    v-if="
-                                        building.isRoad && !building.isMaxLevel
-                                    "
-                                    class="mt-2 text-sm font-semibold text-[#7b633d] dark:text-[#caa66c]"
-                                >
-                                    Can build now:
-                                    {{
-                                        formatExactNumber(
-                                            roadBuildableAmountFor(building),
-                                        )
-                                    }}
-                                    km
-                                </p>
-                            </div>
-
-                            <div
-                                class="flex shrink-0 flex-col gap-3 sm:items-end"
-                            >
-                                <label
-                                    v-if="building.isRoad"
-                                    class="flex items-center gap-2 text-sm font-semibold text-[#696250] dark:text-[#b8c2b0]"
-                                >
-                                    Build km
-                                    <input
-                                        v-model.number="
-                                            roadBuildAmounts[building.id]
-                                        "
-                                        type="number"
-                                        min="1"
-                                        :max="MAX_ROAD_BUILD_AMOUNT"
-                                        step="1"
-                                        class="h-10 w-36 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-sm text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
-                                        placeholder="1"
-                                    />
-                                </label>
-                                <button
-                                    type="button"
-                                    class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#b99145]/35 bg-[#ead9b6] px-4 py-2 text-sm font-semibold text-[#5a4320] transition hover:bg-[#dfc996] disabled:cursor-not-allowed disabled:opacity-55 dark:border-[#e0b461]/25 dark:bg-[#e0b461]/10 dark:text-[#fff0c8] dark:hover:bg-[#e0b461]/20"
-                                    :disabled="
-                                        upgradingBuildingId !== null ||
-                                        !building.canUpgrade
-                                    "
-                                    @click="upgradeBuilding(building)"
-                                >
-                                    {{
-                                        upgradingBuildingId === building.id
-                                            ? 'Upgrading...'
-                                            : building.canUpgrade
-                                              ? 'Upgrade'
-                                              : 'Unavailable'
-                                    }}
-                                </button>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-            </section>
-
-            <section
+                :buildings="visibleUpgradeBuildings"
+                :upgrading-building-id="upgradingBuildingId"
+                :road-build-amounts="roadBuildAmounts"
+                :max-road-build-amount="MAX_ROAD_BUILD_AMOUNT"
+                title="Buildings"
+                subtitle="Upgrade status"
+                description="Upgrade buildings and expand roads from immersive mode."
+                max-width-class="max-w-4xl"
+                :show-filter="true"
+                :show-only-available="showOnlyAvailableUpgrades"
+                :empty-message="
+                    showOnlyAvailableUpgrades
+                        ? 'No building upgrades are currently affordable.'
+                        : 'No further building upgrades are available.'
+                "
+                :upgrade-availability-label-for="upgradeAvailabilityLabelFor"
+                :road-buildable-amount-for="roadBuildableAmountFor"
+                @close="closeBuildings"
+                @upgrade="upgradeBuilding"
+                @update:show-only-available="showOnlyAvailableUpgrades = $event"
+                @update-road-amount="updateRoadBuildAmount"
+            />
+            <AchievementsModal
                 v-else-if="isAchievementsModalOpen"
-                class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
-            >
-                <header class="flex items-start justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="rounded-md bg-[#243627] p-2 text-white">
-                            <Award class="h-5 w-5" />
-                        </div>
-                        <div>
-                            <p
-                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                            >
-                                Achievements
-                            </p>
-                            <h2 class="mt-1 text-2xl font-bold">Milestones</h2>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close achievements"
-                        @click="closeAchievements"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div
-                    class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <p class="text-sm text-[#696250] dark:text-[#b6ae9d]">
-                        Production bonuses unlocked by milestones
-                    </p>
-                    <div class="flex flex-wrap items-center gap-4">
-                        <label
-                            class="inline-flex items-center gap-2 text-sm font-semibold text-[#5d6356] dark:text-[#c6c0b3]"
-                        >
-                            <input
-                                v-model="hideCompletedAchievements"
-                                type="checkbox"
-                                class="h-4 w-4 rounded border-[#b7aa91] text-[#243627] focus:ring-[#47663b] dark:border-[#554f42]"
-                            />
-                            Hide completed
-                        </label>
-                        <p
-                            class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                        >
-                            {{ unlockedAchievementCount }} /
-                            {{ achievements.length }} unlocked
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    class="mt-5 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
-                >
-                    <h3 class="text-sm font-semibold">Current bonuses</h3>
-                    <div
-                        v-if="achievementBonuses.length > 0"
-                        class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
-                    >
-                        <div
-                            v-for="bonus in achievementBonuses"
-                            :key="bonus.id"
-                            class="rounded-md border border-[#e4dac7] px-3 py-2 dark:border-[#35332c]"
-                        >
-                            <div
-                                class="flex items-center justify-between gap-3"
-                            >
-                                <p class="text-sm font-semibold">
-                                    {{ bonus.label }}
-                                </p>
-                                <p
-                                    class="text-sm font-bold text-[#47663b] dark:text-[#9dcc84]"
-                                >
-                                    {{ bonus.bonusLabel }}
-                                </p>
-                            </div>
-                            <p
-                                class="mt-1 text-xs font-medium text-[#7a705d] dark:text-[#aaa18f]"
-                            >
-                                base production
-                            </p>
-                        </div>
-                    </div>
-                    <p
-                        v-else
-                        class="mt-3 text-sm text-[#5d6356] dark:text-[#c6c0b3]"
-                    >
-                        No active bonuses yet.
-                    </p>
-                </div>
-
-                <div
-                    v-if="visibleAchievements.length > 0"
-                    class="mt-5 grid gap-3 lg:grid-cols-2"
-                >
-                    <article
-                        v-for="achievement in visibleAchievements"
-                        :key="achievement.id"
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <h3 class="font-semibold">
-                                        {{ achievement.name }}
-                                    </h3>
-                                    <span
-                                        :class="[
-                                            'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-semibold',
-                                            achievement.isUnlocked
-                                                ? 'bg-[#dce9d1] text-[#263f20] dark:bg-[#273820] dark:text-[#bde4a5]'
-                                                : 'bg-[#e9e1d3] text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]',
-                                        ]"
-                                    >
-                                        <CheckCircle2
-                                            v-if="achievement.isUnlocked"
-                                            class="h-3.5 w-3.5"
-                                        />
-                                        <Lock v-else class="h-3.5 w-3.5" />
-                                        {{
-                                            achievement.isUnlocked
-                                                ? 'Unlocked'
-                                                : 'Locked'
-                                        }}
-                                    </span>
-                                </div>
-                                <p
-                                    v-if="achievement.description"
-                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
-                                >
-                                    {{ achievement.description }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <div
-                                class="flex items-center justify-between gap-4 text-xs font-semibold text-[#7a705d] dark:text-[#aaa18f]"
-                            >
-                                <span>Progress</span>
-                                <span>{{ achievement.progressLabel }}</span>
-                            </div>
-                            <div
-                                class="mt-2 h-2 overflow-hidden rounded-full bg-[#e9e1d3] dark:bg-[#24281d]"
-                            >
-                                <div
-                                    class="h-full rounded-full bg-[#47663b] dark:bg-[#9dcc84]"
-                                    :style="{
-                                        width: `${achievement.progressPercent}%`,
-                                    }"
-                                />
-                            </div>
-                        </div>
-
-                        <p
-                            class="mt-3 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                        >
-                            {{ achievement.rewardLabel }}
-                        </p>
-                    </article>
-                </div>
-
-                <p
-                    v-else
-                    class="mt-5 rounded-md border border-[#e4dac7] p-4 text-sm text-[#5d6356] dark:border-[#35332c] dark:text-[#c6c0b3]"
-                >
-                    {{
-                        achievements.length > 0
-                            ? 'Completed achievements hidden.'
-                            : 'No achievements configured yet.'
-                    }}
-                </p>
-            </section>
-
-            <section
+                :achievements="achievements"
+                :achievement-bonuses="achievementBonuses"
+                :hide-completed="hideCompletedAchievements"
+                @close="closeAchievements"
+                @update:hide-completed="hideCompletedAchievements = $event"
+            />
+            <LeaderboardModal
                 v-else-if="isLeaderboardModalOpen && selectedLeaderboard"
-                class="max-h-[calc(100vh-3rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
-            >
-                <header class="flex items-start justify-between gap-4">
-                    <div>
-                        <p
-                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                        >
-                            Leaderboard
-                        </p>
-                        <h2 class="mt-1 text-2xl font-bold">Top 50 players</h2>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close leaderboard"
-                        @click="closeLeaderboard"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div class="mt-5 flex flex-wrap gap-2">
-                    <button
-                        v-for="leaderboard in leaderboards"
-                        :key="leaderboard.key"
-                        type="button"
-                        class="rounded-md border px-3 py-2 text-sm font-semibold transition"
-                        :class="
-                            selectedLeaderboard.key === leaderboard.key
-                                ? 'border-[#243627] bg-[#243627] text-white'
-                                : 'border-[#d7cbb8] text-[#4f574b] hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]'
-                        "
-                        @click="selectedLeaderboardKey = leaderboard.key"
-                    >
-                        {{ leaderboard.label }}
-                    </button>
-                </div>
-
-                <div class="mt-5 grid gap-3 sm:grid-cols-3">
-                    <div
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <p
-                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                        >
-                            Your rank
-                        </p>
-                        <p class="mt-2 text-2xl font-bold">
-                            #{{
-                                formatExactNumber(
-                                    selectedLeaderboard.currentRank,
-                                )
-                            }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <p
-                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                        >
-                            Your score
-                        </p>
-                        <p class="mt-2 text-2xl font-bold">
-                            {{
-                                formatGameNumber(
-                                    selectedLeaderboard.currentValue,
-                                )
-                            }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <p
-                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                        >
-                            Metric
-                        </p>
-                        <p class="mt-2 text-2xl font-bold">
-                            {{ selectedLeaderboard.metricLabel }}
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    class="mt-5 overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c]"
-                >
-                    <div
-                        class="grid grid-cols-[4rem_1fr_7rem] gap-3 border-b border-[#e4dac7] bg-[#f6f0e5] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:bg-[#151910] dark:text-[#b6ae9d]"
-                    >
-                        <span>Rank</span>
-                        <span>Player</span>
-                        <span class="text-right">Score</span>
-                    </div>
-
-                    <div
-                        v-if="selectedLeaderboard.entries.length === 0"
-                        class="px-4 py-8 text-center text-sm font-medium text-[#696250] dark:text-[#b6ae9d]"
-                    >
-                        No players on this leaderboard yet.
-                    </div>
-
-                    <div
-                        v-else
-                        class="divide-y divide-[#e4dac7] dark:divide-[#35332c]"
-                    >
-                        <div
-                            v-for="entry in selectedLeaderboard.entries"
-                            :key="`${selectedLeaderboard.key}-${entry.userId}`"
-                            class="grid grid-cols-[4rem_1fr_7rem] items-center gap-3 px-4 py-3 text-sm"
-                            :class="
-                                entry.isCurrentUser
-                                    ? 'bg-[#edf6e8] text-[#243627] dark:bg-[#1d2a17] dark:text-[#d7edc5]'
-                                    : ''
-                            "
-                        >
-                            <span class="font-bold">
-                                #{{ formatExactNumber(entry.rank) }}
-                            </span>
-                            <span class="min-w-0 truncate font-semibold">
-                                {{ entry.userName }}
-                                <span
-                                    v-if="entry.isCurrentUser"
-                                    class="ml-2 rounded-sm bg-[#243627] px-2 py-0.5 text-xs text-white"
-                                >
-                                    You
-                                </span>
-                            </span>
-                            <span class="text-right font-bold">
-                                {{ formatGameNumber(entry.value) }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section
-                v-else-if="isMinigameOpen && selectedMinigame"
-                class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
-            >
-                <header class="flex items-start justify-between gap-4">
-                    <div>
-                        <p
-                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                        >
-                            Minigame
-                        </p>
-                        <h2 class="mt-1 text-2xl font-bold">
-                            {{ selectedMinigame.label }}
-                        </h2>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] disabled:cursor-not-allowed disabled:opacity-60 dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close minigame"
-                        :disabled="activeMinigameResource !== null"
-                        @click="closeMinigame"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div class="relative">
-                    <component
-                        :is="selectedMinigameComponent"
-                        :key="selectedMinigame.resource"
-                        :is-saving="
-                            activeMinigameResource === selectedMinigame.resource
-                        "
-                        :is-completed="hasWonMinigame"
-                        @complete="completeSelectedMinigame"
-                    />
-                    <button
-                        v-if="hasWonMinigame && activeMinigameResource === null"
-                        type="button"
-                        class="absolute inset-0 z-50 cursor-pointer rounded-md bg-transparent"
-                        aria-label="Continue playing"
-                        @click="continueMinigame"
-                    ></button>
-                </div>
-
-                <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <p
-                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                        >
-                            Reward
-                        </p>
-                        <p class="mt-2 text-xl font-bold">
-                            {{ selectedMinigame.rewardLabel }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <p
-                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                        >
-                            Current resources
-                        </p>
-                        <button
-                            type="button"
-                            class="mt-2 block max-w-full cursor-pointer text-left text-xl font-bold break-words"
-                            :aria-label="`Current ${selectedMinigame.resource} resources: ${formatExactNumber(selectedMinigameResourceAmount)}`"
-                            :title="
-                                resourceNumberTitle(
-                                    `minigame-current-${selectedMinigame.resource}`,
-                                )
-                            "
-                            @click="
-                                toggleResourceNumber(
-                                    `minigame-current-${selectedMinigame.resource}`,
-                                )
-                            "
-                        >
-                            {{
-                                resourceNumberLabel(
-                                    `minigame-current-${selectedMinigame.resource}`,
-                                    selectedMinigameResourceAmount,
-                                )
-                            }}
-                        </button>
-                    </div>
-                    <div
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <p
-                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                        >
-                            Completions
-                        </p>
-                        <p class="mt-2 text-xl font-bold">
-                            {{ formatGameNumber(selectedMinigame.completions) }}
-                        </p>
-                    </div>
-                    <div
-                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                    >
-                        <p
-                            class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                        >
-                            Total gained
-                        </p>
-                        <p class="mt-2 text-xl font-bold">
-                            {{
-                                formatGameNumber(
-                                    selectedMinigame.resourcesGained,
-                                )
-                            }}
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    v-if="hasWonMinigame"
-                    class="mt-5 flex flex-col gap-3 border-t border-[#e4dac7] pt-4 sm:flex-row sm:justify-end dark:border-[#35332c]"
-                >
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                        @click="continueMinigame"
-                    >
-                        <Gamepad2 class="h-4 w-4" />
-                        Continue playing
-                    </button>
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center rounded-md border border-[#b7aa91] px-4 py-2.5 text-sm font-semibold text-[#243627] transition hover:bg-[#ebe4d7] dark:border-[#554f42] dark:text-[#f3efe4] dark:hover:bg-[#24281d]"
-                        @click="closeMinigame"
-                    >
-                        Stop playing
-                    </button>
-                </div>
-            </section>
-            <section
+                :leaderboards="leaderboards"
+                :selected-leaderboard="selectedLeaderboard"
+                @close="closeLeaderboard"
+                @select-leaderboard="selectedLeaderboardKey = $event"
+            />
+            <MinigameModal
+                v-else-if="
+                    isMinigameOpen &&
+                    selectedMinigame &&
+                    selectedMinigameComponent
+                "
+                :minigame="selectedMinigame"
+                :minigame-component="selectedMinigameComponent"
+                :active-minigame-resource="activeMinigameResource"
+                :has-won="hasWonMinigame"
+                :current-resource-amount="selectedMinigameResourceAmount"
+                :resource-number-label="resourceNumberLabel"
+                :resource-number-title="resourceNumberTitle"
+                @close="closeMinigame"
+                @complete="completeSelectedMinigame"
+                @continue="continueMinigame"
+                @toggle-resource-number="toggleResourceNumber"
+            />
+            <PrestigeConfirmModal
+                v-else-if="isPrestigeConfirmModalOpen"
+                :requirement-label="prestigeRequirementLabel"
+                :current-road-length="props.roadStats.length"
+                :prestige-count-after-reset="props.prestigeStats.count + 1"
+                :is-prestiging="isPrestiging"
+                @close="closePrestigeConfirm"
+                @confirm="confirmPrestige"
+            />
+            <OfflineProgressModal
                 v-else-if="isOfflineProgressModalOpen && props.offlineProgress"
-                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
-            >
-                <header class="flex items-start justify-between gap-4">
-                    <div class="flex items-start gap-4">
-                        <div class="rounded-md bg-[#243627] p-3 text-white">
-                            <Sparkles class="h-6 w-6" />
-                        </div>
-                        <div>
-                            <p
-                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                            >
-                                Offline progress
-                            </p>
-                            <h2 class="mt-1 text-2xl font-bold">
-                                Welcome back
-                            </h2>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                        aria-label="Close offline progress"
-                        @click="closeOfflineProgress"
-                    >
-                        <X class="h-5 w-5" />
-                    </button>
-                </header>
-
-                <div
-                    class="mt-5 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                >
-                    <p
-                        class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                    >
-                        Time away
-                    </p>
-                    <p class="mt-2 text-3xl font-bold">
-                        {{ offlineProgressDurationLabel }}
-                    </p>
-                </div>
-
-                <div class="mt-4 grid gap-2">
-                    <div
-                        v-for="resource in offlineProgressResourceRows"
-                        :key="resource.key"
-                        class="flex items-center justify-between gap-4 rounded-md border border-[#e4dac7] p-3 dark:border-[#35332c]"
-                    >
-                        <div class="flex items-center gap-3">
-                            <component
-                                :is="resource.icon"
-                                class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
-                            />
-                            <p class="font-semibold">
-                                {{ resource.label }}
-                            </p>
-                        </div>
-                        <p
-                            class="text-right font-bold text-[#47663b] dark:text-[#9dcc84]"
-                        >
-                            +{{ formatExactNumber(resource.amount) }}
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    class="mt-5 flex items-center justify-between gap-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
-                >
-                    <p
-                        class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                    >
-                        +{{ formatExactNumber(props.offlineProgress.total) }}
-                        total resources
-                    </p>
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
-                        @click="closeOfflineProgress"
-                    >
-                        Continue
-                    </button>
-                </div>
-            </section>
-            <section
+                :offline-progress="props.offlineProgress"
+                :duration-label="offlineProgressDurationLabel"
+                :resource-rows="offlineProgressResourceRows"
+                @close="closeOfflineProgress"
+            />
+            <AchievementUnlockModal
                 v-else-if="
                     isAchievementUnlockModalOpen && currentAchievementUnlock
                 "
-                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
-            >
-                <div class="flex items-start gap-4">
-                    <div class="rounded-md bg-[#243627] p-3 text-white">
-                        <Award class="h-6 w-6" />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p
-                            class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                        >
-                            Achievement unlocked
-                        </p>
-                        <h2 class="mt-1 text-2xl font-bold">
-                            {{ currentAchievementUnlock.name }}
-                        </h2>
-                        <p
-                            v-if="currentAchievementUnlock.description"
-                            class="mt-3 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
-                        >
-                            {{ currentAchievementUnlock.description }}
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    class="mt-5 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
-                >
-                    <div class="flex items-center gap-2">
-                        <CheckCircle2
-                            class="h-5 w-5 text-[#47663b] dark:text-[#9dcc84]"
-                        />
-                        <p class="text-sm font-semibold">Bonus activated</p>
-                    </div>
-                    <p
-                        class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                    >
-                        {{ currentAchievementUnlock.rewardLabel }}
-                    </p>
-                </div>
-
-                <div
-                    class="mt-5 flex items-center justify-between gap-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
-                >
-                    <p
-                        class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
-                    >
-                        {{ achievementUnlockPosition }} /
-                        {{ achievementUnlockCount }}
-                    </p>
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
-                        @click="advanceAchievementUnlockPopup"
-                    >
-                        {{ achievementUnlockButtonLabel }}
-                    </button>
-                </div>
-            </section>
+                :achievement-unlock="currentAchievementUnlock"
+                :position="achievementUnlockPosition"
+                :count="achievementUnlockCount"
+                :button-label="achievementUnlockButtonLabel"
+                @advance="advanceAchievementUnlockPopup"
+            />
         </div>
     </Teleport>
 </template>
