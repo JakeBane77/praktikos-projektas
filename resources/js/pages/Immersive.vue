@@ -18,8 +18,8 @@ import {
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
-import AchievementUnlockModal from '@/components/game-modals/AchievementUnlockModal.vue';
 import AchievementsModal from '@/components/game-modals/AchievementsModal.vue';
+import AchievementUnlockModal from '@/components/game-modals/AchievementUnlockModal.vue';
 import BuildingsModal from '@/components/game-modals/BuildingsModal.vue';
 import LeaderboardModal from '@/components/game-modals/LeaderboardModal.vue';
 import MinigameModal from '@/components/game-modals/MinigameModal.vue';
