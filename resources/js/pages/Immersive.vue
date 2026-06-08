@@ -25,7 +25,13 @@ import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import { useImmersiveTestingPanel } from '@/composables/useImmersiveTestingPanel';
-import { formatExactNumber, formatGameNumber } from '@/lib/game';
+import {
+    affordableRoadAmount,
+    formatExactNumber,
+    formatGameNumber,
+    formatHoursDuration,
+    upgradeAvailabilityFor,
+} from '@/lib/game';
 import type {
     AchievementUnlock,
     Building,
@@ -361,6 +367,7 @@ const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
 const expandedResourceNumberKeys = ref<Set<string>>(new Set());
 const isOfflineProgressDismissed = ref(false);
+const predictionBaseMilliseconds = Date.now();
 let userTimeInterval: number | undefined;
 let timeLoopInterval: number | undefined;
 const { isImmersiveTestingPanelOpen } = useImmersiveTestingPanel();
@@ -981,6 +988,53 @@ function formatOfflineProgressDuration(elapsedHours: number): string {
     }
 
     return parts.join(', ');
+}
+
+function upgradeAvailabilityLabelFor(building: Building): string | null {
+    const availability = upgradeAvailabilityFor(
+        building,
+        props.resources,
+        props.resourceRates,
+    );
+
+    if (availability === null) {
+        return null;
+    }
+
+    if (availability.hours === null || availability.hours <= 0) {
+        return availability.label;
+    }
+
+    const targetMilliseconds =
+        predictionBaseMilliseconds + availability.hours * 60 * 60_000;
+    const remainingHours = Math.ceil(
+        Math.max(0, targetMilliseconds - userTime.value.timestamp) /
+            (60 * 60_000),
+    );
+
+    if (remainingHours <= 0) {
+        return 'Available now';
+    }
+
+    return `Available in ${formatHoursDuration(remainingHours)} (${formatUpgradeAvailableAt(targetMilliseconds)})`;
+}
+
+function formatUpgradeAvailableAt(milliseconds: number): string {
+    return new Intl.DateTimeFormat('en-GB', {
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).format(new Date(milliseconds));
+}
+
+function roadBuildableAmountFor(building: Building): number {
+    return affordableRoadAmount(
+        building,
+        props.resources,
+        MAX_ROAD_BUILD_AMOUNT,
+    );
 }
 
 function closeOfflineProgress(): void {
@@ -1671,6 +1725,25 @@ function timeFromInputValue(value: string): Date {
                                 class="mt-2 text-xs text-[#696250] dark:text-[#b8c2b0]"
                             >
                                 {{ building.upgradeCost }}
+                            </p>
+                            <p
+                                v-if="upgradeAvailabilityLabelFor(building)"
+                                class="mt-2 text-xs font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                            >
+                                Next upgrade:
+                                {{ upgradeAvailabilityLabelFor(building) }}
+                            </p>
+                            <p
+                                v-if="building.isRoad && !building.isMaxLevel"
+                                class="mt-2 text-xs font-semibold text-[#7b633d] dark:text-[#caa66c]"
+                            >
+                                Can build now:
+                                {{
+                                    formatExactNumber(
+                                        roadBuildableAmountFor(building),
+                                    )
+                                }}
+                                km
                             </p>
                             <label
                                 v-if="building.isRoad"

@@ -119,6 +119,10 @@ class DashboardController extends Controller
                 'description' => $this->buildingDescription($building),
                 'production' => $this->buildingProductionLabel($building, $productionBonuses),
                 'upgradeCost' => $this->upgradeCostLabel($building),
+                'upgradeCosts' => $this->upgradeCostsFor($building),
+                'baseCosts' => $this->baseCostsFor($building->buildingType),
+                'upgradeCostMultiplier' => (float) $building->buildingType->upgrade_cost_multiplier,
+                'maxLevel' => $building->buildingType->max_level,
                 'isRoad' => $this->isRoad($building),
                 'isMaxLevel' => $this->isMaxLevel($building),
                 'canUpgrade' => ! $this->isMaxLevel($building)
@@ -1141,6 +1145,16 @@ class DashboardController extends Controller
             ->map(fn (int $amount, string $resource): string => number_format($amount).' '.$resource);
 
         return $costs->implode(', ');
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function baseCostsFor(BuildingType $buildingType): array
+    {
+        return collect($buildingType->base_costs ?? [])
+            ->mapWithKeys(fn (mixed $amount, string $resource): array => [$resource => (int) $amount])
+            ->all();
     }
 
     private function buildingLevelLabel(UserBuilding $building): string

@@ -24,10 +24,13 @@ import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import {
+    affordableRoadAmount,
     formatExactNumber,
     formatGameNumber,
+    formatHoursDuration,
     formatRate,
     getTotalResources,
+    upgradeAvailabilityFor,
 } from '@/lib/game';
 import type {
     AchievementUnlock,
@@ -75,6 +78,7 @@ const isUpdatingWeatherLocation = ref(false);
 const weatherLocationStatus = ref<string | null>(null);
 const expandedResourceNumberKeys = ref<Set<string>>(new Set());
 const isOfflineProgressDismissed = ref(false);
+const predictionBaseMilliseconds = ref(Date.now());
 const buildings = computed<Building[]>(() => props.buildings);
 const minigames = computed<Minigame[]>(() => props.minigames);
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
@@ -311,6 +315,7 @@ function syncServerTime() {
     serverTimeBaseMilliseconds = Number.isNaN(parsedServerTime)
         ? Date.now()
         : parsedServerTime;
+    predictionBaseMilliseconds.value = serverTimeBaseMilliseconds;
     serverTimeClientStartedAt = Date.now();
     serverTimeMilliseconds.value = serverTimeBaseMilliseconds;
 }
@@ -374,6 +379,53 @@ function formatOfflineProgressDuration(elapsedHours: number): string {
     }
 
     return parts.join(', ');
+}
+
+function upgradeAvailabilityLabelFor(building: Building): string | null {
+    const availability = upgradeAvailabilityFor(
+        building,
+        props.resources,
+        props.resourceRates,
+    );
+
+    if (availability === null) {
+        return null;
+    }
+
+    if (availability.hours === null || availability.hours <= 0) {
+        return availability.label;
+    }
+
+    const targetMilliseconds =
+        predictionBaseMilliseconds.value + availability.hours * 60 * 60_000;
+    const remainingHours = Math.ceil(
+        Math.max(0, targetMilliseconds - serverTimeMilliseconds.value) /
+            (60 * 60_000),
+    );
+
+    if (remainingHours <= 0) {
+        return 'Available now';
+    }
+
+    return `Available in ${formatHoursDuration(remainingHours)} (${formatUpgradeAvailableAt(targetMilliseconds)})`;
+}
+
+function formatUpgradeAvailableAt(milliseconds: number): string {
+    return new Intl.DateTimeFormat('en-GB', {
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).format(new Date(milliseconds));
+}
+
+function roadBuildableAmountFor(building: Building): number {
+    return affordableRoadAmount(
+        building,
+        props.resources,
+        MAX_ROAD_BUILD_AMOUNT,
+    );
 }
 
 function closeOfflineProgress() {
@@ -1964,6 +2016,25 @@ function upgradeBuilding(building: Building) {
                                 {{ building.isRoad ? 'Next km cost' : 'Cost' }}:
                                 {{ building.upgradeCost }}
                             </template>
+                        </p>
+                        <p
+                            v-if="upgradeAvailabilityLabelFor(building)"
+                            class="mt-2 text-xs font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            Next upgrade:
+                            {{ upgradeAvailabilityLabelFor(building) }}
+                        </p>
+                        <p
+                            v-if="building.isRoad && !building.isMaxLevel"
+                            class="mt-2 text-xs font-semibold text-[#7b633d] dark:text-[#caa66c]"
+                        >
+                            Can build now:
+                            {{
+                                formatExactNumber(
+                                    roadBuildableAmountFor(building),
+                                )
+                            }}
+                            km
                         </p>
                     </article>
                 </div>
