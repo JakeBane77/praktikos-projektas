@@ -578,7 +578,15 @@ test('dashboard applies passive production for full elapsed hours', function () 
         'last_produced_at' => now()->subHours(3)->subMinutes(30),
     ]);
 
-    $this->get(route('dashboard'))->assertOk();
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('offlineProgress.elapsedHours', 3)
+            ->where('offlineProgress.resources.gold', 15)
+            ->where('offlineProgress.resources.wood', 0)
+            ->where('offlineProgress.resources.stone', 0)
+            ->where('offlineProgress.resources.food', 0)
+            ->where('offlineProgress.total', 15));
 
     $resources = UserResource::where('user_id', $user->id)->firstOrFail();
 

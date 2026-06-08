@@ -360,6 +360,7 @@ const selectedLeaderboardKey = ref(props.leaderboards.defaultKey);
 const isTimeLooping = ref(false);
 const timeLoopSpeedMs = ref(500);
 const expandedResourceNumberKeys = ref<Set<string>>(new Set());
+const isOfflineProgressDismissed = ref(false);
 let userTimeInterval: number | undefined;
 let timeLoopInterval: number | undefined;
 const { isImmersiveTestingPanelOpen } = useImmersiveTestingPanel();
@@ -553,9 +554,18 @@ const isLeaderboardModalOpen = computed(
 const isAchievementsModalOpen = computed(
     () => activeGameModal.value === 'achievements',
 );
+const isOfflineProgressModalOpen = computed(
+    () =>
+        props.offlineProgress !== null &&
+        !isOfflineProgressDismissed.value &&
+        !isAchievementsModalOpen.value &&
+        !isLeaderboardModalOpen.value &&
+        !isMinigameOpen.value,
+);
 const isAchievementUnlockModalOpen = computed(
     () =>
         Boolean(currentAchievementUnlock.value) &&
+        !isOfflineProgressModalOpen.value &&
         !isAchievementsModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value,
@@ -710,6 +720,18 @@ const achievementsButtonClass = iconButtonMenuClass;
 const achievementsButtonLabel = computed(
     () =>
         `${formatExactNumber(unlockedAchievementCount.value)} of ${formatExactNumber(achievements.value.length)} achievements unlocked`,
+);
+const offlineProgressDurationLabel = computed(() =>
+    formatOfflineProgressDuration(props.offlineProgress?.elapsedHours ?? 0),
+);
+const offlineProgressResourceRows = computed(() =>
+    resourceRows
+        .map((resource) => ({
+            ...resource,
+            amount: props.offlineProgress?.resources[resource.key] ?? 0,
+            icon: resourceIcons[resource.key],
+        }))
+        .filter((resource) => resource.amount > 0),
 );
 
 const upgradesButtonLabel = computed(() =>
@@ -945,6 +967,26 @@ function resourceNumberTitle(key: string): string {
         : 'Show full number';
 }
 
+function formatOfflineProgressDuration(elapsedHours: number): string {
+    const days = Math.floor(elapsedHours / 24);
+    const hours = elapsedHours % 24;
+    const parts: string[] = [];
+
+    if (days > 0) {
+        parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
+    }
+
+    if (hours > 0 || parts.length === 0) {
+        parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
+    }
+
+    return parts.join(', ');
+}
+
+function closeOfflineProgress(): void {
+    isOfflineProgressDismissed.value = true;
+}
+
 function minigameButtonClass(): string {
     return iconButtonMinigameClass;
 }
@@ -1098,6 +1140,7 @@ function upgradeBuilding(building: Building): void {
 function togglePrestigeMenu(): void {
     isPrestigeMenuOpen.value = !isPrestigeMenuOpen.value;
     activeGameModal.value = null;
+    closeOfflineProgress();
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
     isUpgradesMenuOpen.value = false;
@@ -1116,6 +1159,7 @@ function openLeaderboard(): void {
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
     isUpgradesMenuOpen.value = false;
+    closeOfflineProgress();
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'leaderboard';
@@ -1130,6 +1174,7 @@ function openAchievements(): void {
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
     isUpgradesMenuOpen.value = false;
+    closeOfflineProgress();
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'achievements';
@@ -1148,6 +1193,12 @@ function closeAchievements(): void {
 }
 
 function closeActiveGameModal(): void {
+    if (isOfflineProgressModalOpen.value) {
+        closeOfflineProgress();
+
+        return;
+    }
+
     if (activeGameModal.value === 'achievements') {
         closeAchievements();
 
@@ -1217,6 +1268,7 @@ function openMinigame(minigame: Minigame): void {
     isResourcesMenuOpen.value = false;
     isUpgradesMenuOpen.value = false;
     isPrestigeMenuOpen.value = false;
+    closeOfflineProgress();
     selectedMinigameResource.value = minigame.resource;
     hasWonMinigame.value = false;
     activeGameModal.value = 'minigame';
@@ -2142,6 +2194,7 @@ function timeFromInputValue(value: string): Date {
                 isAchievementsModalOpen ||
                 isLeaderboardModalOpen ||
                 isMinigameOpen ||
+                isOfflineProgressModalOpen ||
                 isAchievementUnlockModalOpen
             "
             data-game-modal-layer
@@ -2601,6 +2654,90 @@ function timeFromInputValue(value: string): Date {
                         @click="closeMinigame"
                     >
                         Stop playing
+                    </button>
+                </div>
+            </section>
+            <section
+                v-else-if="isOfflineProgressModalOpen && props.offlineProgress"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-4">
+                        <div class="rounded-md bg-[#243627] p-3 text-white">
+                            <Sparkles class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Offline progress
+                            </p>
+                            <h2 class="mt-1 text-2xl font-bold">
+                                Welcome back
+                            </h2>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close offline progress"
+                        @click="closeOfflineProgress"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div
+                    class="mt-5 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                >
+                    <p
+                        class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                    >
+                        Time away
+                    </p>
+                    <p class="mt-2 text-3xl font-bold">
+                        {{ offlineProgressDurationLabel }}
+                    </p>
+                </div>
+
+                <div class="mt-4 grid gap-2">
+                    <div
+                        v-for="resource in offlineProgressResourceRows"
+                        :key="resource.key"
+                        class="flex items-center justify-between gap-4 rounded-md border border-[#e4dac7] p-3 dark:border-[#35332c]"
+                    >
+                        <div class="flex items-center gap-3">
+                            <component
+                                :is="resource.icon"
+                                class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
+                            />
+                            <p class="font-semibold">
+                                {{ resource.label }}
+                            </p>
+                        </div>
+                        <p
+                            class="text-right font-bold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            +{{ formatExactNumber(resource.amount) }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 flex items-center justify-between gap-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <p
+                        class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                    >
+                        +{{ formatExactNumber(props.offlineProgress.total) }}
+                        total resources
+                    </p>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
+                        @click="closeOfflineProgress"
+                    >
+                        Continue
                     </button>
                 </div>
             </section>

@@ -61,7 +61,7 @@ class DashboardController extends Controller
         $resources = $this->resourcesFor($user);
         $buildings = $this->buildingsFor($user);
         $productionBonuses = $this->productionBonusesFor($user);
-        $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
+        $offlineProgress = $this->applyPassiveProduction($resources, $buildings, $productionBonuses);
         $achievements = $this->syncAchievementsFor($user, $resources, $buildings);
         $minigames = $this->minigamesFor($user);
         $productionBonuses = $this->productionBonusesFor($user);
@@ -97,6 +97,7 @@ class DashboardController extends Controller
             ],
             'lastCollectedAt' => $resources->last_collected_at?->format('H:i') ?? 'Never',
             'canCollect' => $this->canCollect($resources),
+            'offlineProgress' => $offlineProgress,
             'roadStats' => [
                 'length' => $roadLength,
             ],
@@ -1017,19 +1018,22 @@ class DashboardController extends Controller
      * @param  iterable<UserBuilding>  $buildings
      * @param  array{all: int, buildingTypes: array<int, int>}  $productionBonuses
      */
-    private function applyPassiveProduction(UserResource $resources, iterable $buildings, array $productionBonuses = self::DEFAULT_PRODUCTION_BONUSES): void
+    /**
+     * @return array{elapsedHours: int, resources: array{gold: int, wood: int, stone: int, food: int}, total: int}|null
+     */
+    private function applyPassiveProduction(UserResource $resources, iterable $buildings, array $productionBonuses = self::DEFAULT_PRODUCTION_BONUSES): ?array
     {
         if ($resources->last_produced_at === null) {
             $resources->last_produced_at = now();
             $resources->save();
 
-            return;
+            return null;
         }
 
         $elapsedHours = (int) $resources->last_produced_at->diffInHours(now());
 
         if ($elapsedHours <= 0) {
-            return;
+            return null;
         }
 
         $rates = $this->productionRatesFor($buildings, $productionBonuses);
@@ -1051,7 +1055,9 @@ class DashboardController extends Controller
         $resources->last_produced_at = $resources->last_produced_at->copy()->addHours($elapsedHours);
         $resources->save();
 
-        if (array_sum($amounts) > 0) {
+        $totalAmount = (int) array_sum($amounts);
+
+        if ($totalAmount > 0) {
             ResourceCollection::create([
                 'user_id' => $resources->user_id,
                 'gold' => $amounts['gold'],
@@ -1061,7 +1067,15 @@ class DashboardController extends Controller
                 'source' => 'passive',
                 'collected_at' => now(),
             ]);
+
+            return [
+                'elapsedHours' => $elapsedHours,
+                'resources' => $amounts,
+                'total' => $totalAmount,
+            ];
         }
+
+        return null;
     }
 
     /**

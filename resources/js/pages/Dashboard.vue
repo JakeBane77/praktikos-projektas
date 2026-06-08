@@ -74,6 +74,7 @@ const serverTimeMilliseconds = ref(Date.now());
 const isUpdatingWeatherLocation = ref(false);
 const weatherLocationStatus = ref<string | null>(null);
 const expandedResourceNumberKeys = ref<Set<string>>(new Set());
+const isOfflineProgressDismissed = ref(false);
 const buildings = computed<Building[]>(() => props.buildings);
 const minigames = computed<Minigame[]>(() => props.minigames);
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
@@ -203,9 +204,19 @@ const isLeaderboardModalOpen = computed(
         activeGameModal.value === 'leaderboard' &&
         selectedLeaderboard.value !== null,
 );
+const isOfflineProgressModalOpen = computed(
+    () =>
+        props.offlineProgress !== null &&
+        !isOfflineProgressDismissed.value &&
+        !isBuildingsOpen.value &&
+        !isLeaderboardModalOpen.value &&
+        !isMinigameOpen.value &&
+        !isPrestigeConfirmOpen.value,
+);
 const isAchievementUnlockModalOpen = computed(
     () =>
         Boolean(currentAchievementUnlock.value) &&
+        !isOfflineProgressModalOpen.value &&
         !isBuildingsOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value &&
@@ -263,6 +274,19 @@ const weatherLocationUpdatedLabel = computed(() =>
 );
 const weatherConditionLabel = computed(() =>
     getWeatherConditionLabel(props.weather.conditions),
+);
+const offlineProgressDurationLabel = computed(() =>
+    formatOfflineProgressDuration(props.offlineProgress?.elapsedHours ?? 0),
+);
+const offlineProgressResourceRows = computed(() =>
+    resourceDisplayOrder
+        .map((key) => ({
+            key,
+            label: resourceLabels[key],
+            amount: props.offlineProgress?.resources[key] ?? 0,
+            icon: resourceIcons[key],
+        }))
+        .filter((resource) => resource.amount > 0),
 );
 
 type OpenMeteoCurrentWeatherResponse = {
@@ -334,6 +358,26 @@ function resourceNumberTitle(key: string): string {
     return isResourceNumberExpanded(key)
         ? 'Show compact number'
         : 'Show full number';
+}
+
+function formatOfflineProgressDuration(elapsedHours: number): string {
+    const days = Math.floor(elapsedHours / 24);
+    const hours = elapsedHours % 24;
+    const parts: string[] = [];
+
+    if (days > 0) {
+        parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
+    }
+
+    if (hours > 0 || parts.length === 0) {
+        parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
+    }
+
+    return parts.join(', ');
+}
+
+function closeOfflineProgress() {
+    isOfflineProgressDismissed.value = true;
 }
 
 watch(
@@ -719,6 +763,7 @@ function openMinigame(minigame: Minigame) {
 
     isBuildingsOpen.value = false;
     isPrestigeConfirmOpen.value = false;
+    closeOfflineProgress();
     selectedMinigameResource.value = minigame.resource;
     hasWonMinigame.value = false;
     activeGameModal.value = 'minigame';
@@ -781,6 +826,7 @@ function advanceAchievementUnlockPopup() {
 function openBuildings() {
     activeGameModal.value = null;
     isPrestigeConfirmOpen.value = false;
+    closeOfflineProgress();
     isBuildingsOpen.value = true;
 }
 
@@ -789,6 +835,7 @@ function closeBuildings() {
 }
 
 function openPrestigeConfirm() {
+    closeOfflineProgress();
     isPrestigeConfirmOpen.value = true;
 }
 
@@ -803,6 +850,7 @@ function openLeaderboard(leaderboardKey = defaultLeaderboard.value?.key) {
 
     isBuildingsOpen.value = false;
     isPrestigeConfirmOpen.value = false;
+    closeOfflineProgress();
 
     if (leaderboardKey) {
         selectedLeaderboardKey.value = leaderboardKey;
@@ -820,6 +868,12 @@ function closeLeaderboard() {
 }
 
 function closeActiveGameModal() {
+    if (isOfflineProgressModalOpen.value) {
+        closeOfflineProgress();
+
+        return;
+    }
+
     if (isBuildingsOpen.value) {
         closeBuildings();
 
@@ -1786,6 +1840,7 @@ function upgradeBuilding(building: Building) {
                 isBuildingsOpen ||
                 isLeaderboardModalOpen ||
                 isMinigameOpen ||
+                isOfflineProgressModalOpen ||
                 isAchievementUnlockModalOpen
             "
             data-game-modal-layer
@@ -2200,6 +2255,90 @@ function upgradeBuilding(building: Building) {
                         @click="closeMinigame"
                     >
                         Stop playing
+                    </button>
+                </div>
+            </section>
+            <section
+                v-else-if="isOfflineProgressModalOpen && props.offlineProgress"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-4">
+                        <div class="rounded-md bg-[#243627] p-3 text-white">
+                            <PackagePlus class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Offline progress
+                            </p>
+                            <h2 class="mt-1 text-2xl font-bold">
+                                Welcome back
+                            </h2>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close offline progress"
+                        @click="closeOfflineProgress"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div
+                    class="mt-5 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                >
+                    <p
+                        class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                    >
+                        Time away
+                    </p>
+                    <p class="mt-2 text-3xl font-bold">
+                        {{ offlineProgressDurationLabel }}
+                    </p>
+                </div>
+
+                <div class="mt-4 grid gap-2">
+                    <div
+                        v-for="resource in offlineProgressResourceRows"
+                        :key="resource.key"
+                        class="flex items-center justify-between gap-4 rounded-md border border-[#e4dac7] p-3 dark:border-[#35332c]"
+                    >
+                        <div class="flex items-center gap-3">
+                            <component
+                                :is="resource.icon"
+                                class="h-5 w-5 text-[#7b633d] dark:text-[#caa66c]"
+                            />
+                            <p class="font-semibold">
+                                {{ resource.label }}
+                            </p>
+                        </div>
+                        <p
+                            class="text-right font-bold text-[#47663b] dark:text-[#9dcc84]"
+                        >
+                            +{{ formatExactNumber(resource.amount) }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 flex items-center justify-between gap-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <p
+                        class="text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                    >
+                        +{{ formatExactNumber(props.offlineProgress.total) }}
+                        total resources
+                    </p>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d]"
+                        @click="closeOfflineProgress"
+                    >
+                        Continue
                     </button>
                 </div>
             </section>

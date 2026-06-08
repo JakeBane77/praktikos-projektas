@@ -47,6 +47,12 @@ export type AchievementUnlock = {
     rewardLabel: string;
 };
 
+export type OfflineProgress = {
+    elapsedHours: number;
+    resources: Resources;
+    total: number;
+};
+
 export type Minigame = {
     resource: ResourceKey;
     label: string;
@@ -87,6 +93,7 @@ export type DashboardGameData = {
     resourceRates: ResourceRates;
     lastCollectedAt: string;
     canCollect: boolean;
+    offlineProgress: OfflineProgress | null;
     roadStats: {
         length: number;
     };
