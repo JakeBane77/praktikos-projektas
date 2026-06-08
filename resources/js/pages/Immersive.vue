@@ -157,6 +157,7 @@ const minigameButtonPositions: Record<
 };
 
 const MAX_ROAD_BUILD_AMOUNT = 10_000_000;
+const WEATHER_ANIMATION_FPS = 60;
 
 const resourceRows = [
     { key: 'wood', label: 'Wood' },
@@ -1118,6 +1119,9 @@ function cloudStyle(cloud: CloudPlacement): Record<string, string> {
         width: `${cloud.width * 0.3}%`,
         '--cloud-drift': `${cloud.drift}%`,
         '--cloud-duration': `${cloud.duration}s`,
+        '--cloud-steps': String(
+            Math.max(1, Math.round(cloud.duration * WEATHER_ANIMATION_FPS)),
+        ),
         '--cloud-delay': `${cloud.delay}s`,
     };
 }
@@ -1129,6 +1133,9 @@ function rainDropStyle(drop: WeatherParticle): Record<string, string> {
         '--rain-scale': String(drop.size),
         '--rain-delay': `${drop.delay}s`,
         '--rain-duration': `${drop.duration}s`,
+        '--rain-steps': String(
+            Math.max(1, Math.round(drop.duration * WEATHER_ANIMATION_FPS)),
+        ),
     };
 }
 
@@ -1140,6 +1147,9 @@ function snowFlakeStyle(flake: WeatherParticle): Record<string, string> {
         height: `${flake.size}rem`,
         '--snow-delay': `${flake.delay}s`,
         '--snow-duration': `${flake.duration}s`,
+        '--snow-steps': String(
+            Math.max(1, Math.round(flake.duration * WEATHER_ANIMATION_FPS)),
+        ),
         '--snow-drift': `${((flake.id * 17) % 28) - 14}vw`,
     };
 }
@@ -2364,7 +2374,8 @@ function timeFromInputValue(value: string): Date {
     max-width: none;
     pointer-events: none;
     user-select: none;
-    animation: cloud-drift var(--cloud-duration) ease-in-out infinite alternate;
+    animation: cloud-drift var(--cloud-duration) steps(var(--cloud-steps), end)
+        infinite alternate;
     animation-delay: var(--cloud-delay);
     transform: translate(calc(var(--cloud-drift) * -1), -50%);
 }
@@ -2400,7 +2411,8 @@ function timeFromInputValue(value: string): Date {
         rgb(217 245 255 / 0),
         rgb(217 245 255 / 0.78)
     );
-    animation: rain-fall var(--rain-duration) linear infinite;
+    animation: rain-fall var(--rain-duration) steps(var(--rain-steps), end)
+        infinite;
     animation-delay: var(--rain-delay);
 }
 
@@ -2418,7 +2430,8 @@ function timeFromInputValue(value: string): Date {
     border-radius: 999px;
     background: rgb(245 251 255 / 0.92);
     box-shadow: 0 0 0.5rem rgb(245 251 255 / 0.45);
-    animation: snow-fall var(--snow-duration) linear infinite;
+    animation: snow-fall var(--snow-duration) steps(var(--snow-steps), end)
+        infinite;
     animation-delay: var(--snow-delay);
 }
 
@@ -2441,7 +2454,7 @@ function timeFromInputValue(value: string): Date {
         rgb(238 242 232 / 0)
     );
     filter: blur(1.5rem);
-    animation: fog-drift 38s ease-in-out infinite alternate;
+    animation: fog-drift 38s steps(2280, end) infinite alternate;
 }
 
 .immersive-fog-a {
@@ -2451,6 +2464,7 @@ function timeFromInputValue(value: string): Date {
 .immersive-fog-b {
     top: 56%;
     animation-duration: 52s;
+    animation-timing-function: steps(3120, end);
     animation-delay: -18s;
 }
 

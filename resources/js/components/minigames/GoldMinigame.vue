@@ -38,6 +38,9 @@ const COLLISION_MIN_Y = 73;
 const COLLISION_MAX_Y = 89;
 const IMPACT_DURATION_MS = 420;
 const SPEED_PENALTY_RECOVERY_PER_SECOND = 7;
+const ANIMATION_FPS = 60;
+const ANIMATION_TICK_MILLISECONDS = 1000 / ANIMATION_FPS;
+const MAX_ELAPSED_SECONDS = 0.1;
 
 const activeTheme = ref<GoldRunTheme>(goldRunThemes[0]);
 const playerLane = ref<Lane>(STARTING_LANE);
@@ -50,7 +53,7 @@ const hasSubmittedCompletion = ref(false);
 const impactUntil = ref(0);
 const speedPenalty = ref(0);
 
-let animationFrame: number | undefined;
+let animationInterval: number | undefined;
 let lastAnimationAt: number | undefined;
 let nextObstacleId = 1;
 let nextImpactId = 1;
@@ -213,36 +216,39 @@ function startAnimation() {
     if (
         typeof window === 'undefined' ||
         props.isCompleted ||
-        animationFrame !== undefined
+        animationInterval !== undefined
     ) {
         return;
     }
 
-    lastAnimationAt = undefined;
-    animationFrame = window.requestAnimationFrame(animate);
+    lastAnimationAt = performance.now();
+    animationInterval = window.setInterval(
+        animate,
+        ANIMATION_TICK_MILLISECONDS,
+    );
 }
 
 function stopAnimation() {
-    if (typeof window === 'undefined' || animationFrame === undefined) {
+    if (typeof window === 'undefined' || animationInterval === undefined) {
         return;
     }
 
-    window.cancelAnimationFrame(animationFrame);
-    animationFrame = undefined;
+    window.clearInterval(animationInterval);
+    animationInterval = undefined;
     lastAnimationAt = undefined;
 }
 
-function animate(timestamp: number) {
+function animate() {
     if (props.isCompleted || hasSubmittedCompletion.value) {
-        animationFrame = undefined;
-        lastAnimationAt = undefined;
+        stopAnimation();
 
         return;
     }
 
+    const timestamp = performance.now();
     const previousTimestamp = lastAnimationAt ?? timestamp;
     const elapsedSeconds = Math.min(
-        0.05,
+        MAX_ELAPSED_SECONDS,
         (timestamp - previousTimestamp) / 1000,
     );
 
@@ -322,11 +328,7 @@ function animate(timestamp: number) {
 
     if (distance.value >= activeTheme.value.targetDistance) {
         completeGame();
-
-        return;
     }
-
-    animationFrame = window.requestAnimationFrame(animate);
 }
 
 function setLane(lane: Lane) {
@@ -495,19 +497,19 @@ function completeGame() {
 
 <style scoped>
 .gold-impact-scene {
-    animation: gold-impact-scene 180ms linear 2;
+    animation: gold-impact-scene 180ms steps(11, end) 2;
 }
 
 .gold-impact-cart {
-    animation: gold-impact-cart 260ms ease-out;
+    animation: gold-impact-cart 260ms steps(16, end);
 }
 
 .gold-impact-flash {
-    animation: gold-impact-flash 420ms ease-out forwards;
+    animation: gold-impact-flash 420ms steps(25, end) forwards;
 }
 
 .gold-impact-burst {
-    animation: gold-impact-burst 420ms ease-out forwards;
+    animation: gold-impact-burst 420ms steps(25, end) forwards;
 }
 
 .gold-road-motion {

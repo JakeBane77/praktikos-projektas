@@ -24,6 +24,9 @@ const activeTree = ref<WoodTreeDefinition>(woodTrees[0]);
 const hasSubmittedCompletion = ref(false);
 
 const CLICK_COOLDOWN_MILLISECONDS = 500;
+const ANIMATION_FPS = 60;
+const ANIMATION_TICK_MILLISECONDS = 1000 / ANIMATION_FPS;
+const MAX_ELAPSED_SECONDS = 0.1;
 
 const healthPercent = computed(() =>
     maxHealth.value > 0
@@ -59,7 +62,7 @@ const statusLabel = computed(() => {
     return 'Ready';
 });
 
-let animationFrame: number | undefined;
+let animationInterval: number | undefined;
 let lastAnimationAt: number | undefined;
 
 watch(
@@ -119,36 +122,39 @@ function startAnimation() {
     if (
         typeof window === 'undefined' ||
         props.isCompleted ||
-        animationFrame !== undefined
+        animationInterval !== undefined
     ) {
         return;
     }
 
-    lastAnimationAt = undefined;
-    animationFrame = window.requestAnimationFrame(animate);
+    lastAnimationAt = performance.now();
+    animationInterval = window.setInterval(
+        animate,
+        ANIMATION_TICK_MILLISECONDS,
+    );
 }
 
 function stopAnimation() {
-    if (typeof window === 'undefined' || animationFrame === undefined) {
+    if (typeof window === 'undefined' || animationInterval === undefined) {
         return;
     }
 
-    window.cancelAnimationFrame(animationFrame);
-    animationFrame = undefined;
+    window.clearInterval(animationInterval);
+    animationInterval = undefined;
     lastAnimationAt = undefined;
 }
 
-function animate(timestamp: number) {
+function animate() {
     if (props.isCompleted) {
-        animationFrame = undefined;
-        lastAnimationAt = undefined;
+        stopAnimation();
 
         return;
     }
 
+    const timestamp = performance.now();
     const previousTimestamp = lastAnimationAt ?? timestamp;
     const elapsedSeconds = Math.min(
-        0.05,
+        MAX_ELAPSED_SECONDS,
         (timestamp - previousTimestamp) / 1000,
     );
 
@@ -171,8 +177,6 @@ function animate(timestamp: number) {
         0,
         cooldownUntil.value - Date.now(),
     );
-
-    animationFrame = window.requestAnimationFrame(animate);
 }
 
 function hit() {
