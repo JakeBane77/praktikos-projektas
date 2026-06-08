@@ -346,11 +346,10 @@ const settlementStageOverride = ref('');
 const weatherCodeOverride = ref('');
 const isActionMenuOpen = ref(false);
 const isResourcesMenuOpen = ref(false);
-const isUpgradesMenuOpen = ref(false);
 const isPrestigeMenuOpen = ref(false);
-const activeGameModal = ref<'achievements' | 'leaderboard' | 'minigame' | null>(
-    null,
-);
+type GameModal = 'achievements' | 'buildings' | 'leaderboard' | 'minigame';
+
+const activeGameModal = ref<GameModal | null>(null);
 const showOnlyAvailableUpgrades = ref(true);
 const hideCompletedAchievements = ref(true);
 const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
@@ -558,6 +557,10 @@ const isLeaderboardModalOpen = computed(
         selectedLeaderboard.value !== null,
 );
 
+const isBuildingsModalOpen = computed(
+    () => activeGameModal.value === 'buildings',
+);
+
 const isAchievementsModalOpen = computed(
     () => activeGameModal.value === 'achievements',
 );
@@ -565,6 +568,7 @@ const isOfflineProgressModalOpen = computed(
     () =>
         props.offlineProgress !== null &&
         !isOfflineProgressDismissed.value &&
+        !isBuildingsModalOpen.value &&
         !isAchievementsModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value,
@@ -573,6 +577,7 @@ const isAchievementUnlockModalOpen = computed(
     () =>
         Boolean(currentAchievementUnlock.value) &&
         !isOfflineProgressModalOpen.value &&
+        !isBuildingsModalOpen.value &&
         !isAchievementsModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value,
@@ -1197,7 +1202,6 @@ function togglePrestigeMenu(): void {
     closeOfflineProgress();
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
-    isUpgradesMenuOpen.value = false;
 }
 
 function openLeaderboard(): void {
@@ -1212,11 +1216,24 @@ function openLeaderboard(): void {
     isPrestigeMenuOpen.value = false;
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
-    isUpgradesMenuOpen.value = false;
     closeOfflineProgress();
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'leaderboard';
+}
+
+function openBuildings(): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isPrestigeMenuOpen.value = false;
+    isActionMenuOpen.value = false;
+    isResourcesMenuOpen.value = false;
+    closeOfflineProgress();
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'buildings';
 }
 
 function openAchievements(): void {
@@ -1227,11 +1244,16 @@ function openAchievements(): void {
     isPrestigeMenuOpen.value = false;
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
-    isUpgradesMenuOpen.value = false;
     closeOfflineProgress();
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'achievements';
+}
+
+function closeBuildings(): void {
+    if (activeGameModal.value === 'buildings') {
+        activeGameModal.value = null;
+    }
 }
 
 function closeLeaderboard(): void {
@@ -1249,6 +1271,12 @@ function closeAchievements(): void {
 function closeActiveGameModal(): void {
     if (isOfflineProgressModalOpen.value) {
         closeOfflineProgress();
+
+        return;
+    }
+
+    if (activeGameModal.value === 'buildings') {
+        closeBuildings();
 
         return;
     }
@@ -1320,7 +1348,6 @@ function openMinigame(minigame: Minigame): void {
 
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
-    isUpgradesMenuOpen.value = false;
     isPrestigeMenuOpen.value = false;
     closeOfflineProgress();
     selectedMinigameResource.value = minigame.resource;
@@ -1633,138 +1660,10 @@ function timeFromInputValue(value: string): Date {
                     :class="upgradesButtonClass"
                     :aria-label="upgradesButtonLabel"
                     :title="upgradesButtonLabel"
-                    @click="isUpgradesMenuOpen = !isUpgradesMenuOpen"
+                    @click="openBuildings"
                 >
                     <Hammer class="h-5 w-5" />
                 </button>
-
-                <div
-                    v-if="isUpgradesMenuOpen"
-                    class="immersive-popover absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
-                >
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p
-                                class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                            >
-                                Buildings
-                            </p>
-                            <h2 class="mt-1 text-lg font-bold">
-                                Upgrade status
-                            </h2>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
-                            aria-label="Close upgrades menu"
-                            @click="isUpgradesMenuOpen = false"
-                        >
-                            <X class="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    <label
-                        class="mt-4 flex items-center justify-between gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 text-sm font-semibold dark:border-white/10 dark:bg-white/[0.04]"
-                    >
-                        <span>Show only available</span>
-                        <input
-                            v-model="showOnlyAvailableUpgrades"
-                            type="checkbox"
-                            class="h-4 w-4 accent-[#243627]"
-                        />
-                    </label>
-
-                    <div class="mt-4 grid gap-2">
-                        <div
-                            v-if="!hasVisibleUpgradeBuildings"
-                            class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 text-[#696250] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#b8c2b0]"
-                        >
-                            {{
-                                showOnlyAvailableUpgrades
-                                    ? 'No building upgrades are currently affordable.'
-                                    : 'No further building upgrades are available.'
-                            }}
-                        </div>
-
-                        <div
-                            v-for="building in visibleUpgradeBuildings"
-                            v-else
-                            :key="building.id"
-                            class="rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
-                        >
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <p class="font-semibold">
-                                        {{ building.name }}
-                                    </p>
-                                    <p
-                                        class="mt-1 text-xs text-[#696250] dark:text-[#b8c2b0]"
-                                    >
-                                        {{ building.levelLabel }}
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center justify-center rounded border border-[#b99145]/35 bg-[#ead9b6] px-3 py-1.5 text-xs font-semibold text-[#5a4320] transition hover:bg-[#dfc996] disabled:cursor-not-allowed disabled:opacity-55 dark:border-[#e0b461]/25 dark:bg-[#e0b461]/10 dark:text-[#fff0c8] dark:hover:bg-[#e0b461]/20"
-                                    :disabled="
-                                        upgradingBuildingId !== null ||
-                                        !building.canUpgrade
-                                    "
-                                    @click="upgradeBuilding(building)"
-                                >
-                                    {{
-                                        upgradingBuildingId === building.id
-                                            ? 'Upgrading...'
-                                            : building.canUpgrade
-                                              ? 'Upgrade'
-                                              : 'Unavailable'
-                                    }}
-                                </button>
-                            </div>
-                            <p
-                                class="mt-2 text-xs text-[#696250] dark:text-[#b8c2b0]"
-                            >
-                                {{ building.upgradeCost }}
-                            </p>
-                            <p
-                                v-if="upgradeAvailabilityLabelFor(building)"
-                                class="mt-2 text-xs font-semibold text-[#47663b] dark:text-[#9dcc84]"
-                            >
-                                Next upgrade:
-                                {{ upgradeAvailabilityLabelFor(building) }}
-                            </p>
-                            <p
-                                v-if="building.isRoad && !building.isMaxLevel"
-                                class="mt-2 text-xs font-semibold text-[#7b633d] dark:text-[#caa66c]"
-                            >
-                                Can build now:
-                                {{
-                                    formatExactNumber(
-                                        roadBuildableAmountFor(building),
-                                    )
-                                }}
-                                km
-                            </p>
-                            <label
-                                v-if="building.isRoad"
-                                class="mt-3 flex items-center gap-2 text-xs font-semibold text-[#696250] dark:text-[#b8c2b0]"
-                            >
-                                Build km
-                                <input
-                                    v-model.number="
-                                        roadBuildAmounts[building.id]
-                                    "
-                                    type="number"
-                                    min="1"
-                                    :max="MAX_ROAD_BUILD_AMOUNT"
-                                    step="1"
-                                    class="h-9 w-32 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-sm text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
-                                    placeholder="1"
-                                />
-                            </label>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <button
@@ -2264,6 +2163,7 @@ function timeFromInputValue(value: string): Date {
     <Teleport to="body">
         <div
             v-if="
+                isBuildingsModalOpen ||
                 isAchievementsModalOpen ||
                 isLeaderboardModalOpen ||
                 isMinigameOpen ||
@@ -2275,7 +2175,164 @@ function timeFromInputValue(value: string): Date {
             @click.self="closeActiveGameModal"
         >
             <section
-                v-if="isAchievementsModalOpen"
+                v-if="isBuildingsModalOpen"
+                class="max-h-[calc(100vh-3rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <header class="flex items-start justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="rounded-md bg-[#243627] p-2 text-white">
+                            <Hammer class="h-5 w-5" />
+                        </div>
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                Buildings
+                            </p>
+                            <h2 class="mt-1 text-2xl font-bold">
+                                Upgrade status
+                            </h2>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md p-2 text-[#5d6356] transition hover:bg-[#ebe4d7] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                        aria-label="Close buildings"
+                        @click="closeBuildings"
+                    >
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div
+                    class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <p class="text-sm text-[#696250] dark:text-[#b6ae9d]">
+                        Upgrade buildings and expand roads from immersive mode.
+                    </p>
+                    <label
+                        class="inline-flex items-center gap-2 text-sm font-semibold text-[#5d6356] dark:text-[#c6c0b3]"
+                    >
+                        <input
+                            v-model="showOnlyAvailableUpgrades"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-[#b7aa91] text-[#243627] focus:ring-[#47663b] dark:border-[#554f42]"
+                        />
+                        Show only available
+                    </label>
+                </div>
+
+                <div class="mt-5 grid gap-3">
+                    <div
+                        v-if="!hasVisibleUpgradeBuildings"
+                        class="rounded-md border border-[#e4dac7] p-4 text-sm text-[#5d6356] dark:border-[#35332c] dark:text-[#c6c0b3]"
+                    >
+                        {{
+                            showOnlyAvailableUpgrades
+                                ? 'No building upgrades are currently affordable.'
+                                : 'No further building upgrades are available.'
+                        }}
+                    </div>
+
+                    <article
+                        v-for="building in visibleUpgradeBuildings"
+                        v-else
+                        :key="building.id"
+                        class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                    >
+                        <div
+                            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                        >
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-lg font-semibold">
+                                        {{ building.name }}
+                                    </h3>
+                                    <span
+                                        class="rounded-sm bg-[#e9e1d3] px-2 py-1 text-xs font-semibold text-[#4e432f] dark:bg-[#24281d] dark:text-[#d8ccb8]"
+                                    >
+                                        {{ building.levelLabel }}
+                                    </span>
+                                </div>
+                                <p
+                                    v-if="building.description"
+                                    class="mt-2 text-sm leading-6 text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    {{ building.description }}
+                                </p>
+                                <p
+                                    class="mt-3 text-sm text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    {{ building.upgradeCost }}
+                                </p>
+                                <p
+                                    v-if="upgradeAvailabilityLabelFor(building)"
+                                    class="mt-2 text-sm font-semibold text-[#47663b] dark:text-[#9dcc84]"
+                                >
+                                    Next upgrade:
+                                    {{ upgradeAvailabilityLabelFor(building) }}
+                                </p>
+                                <p
+                                    v-if="
+                                        building.isRoad && !building.isMaxLevel
+                                    "
+                                    class="mt-2 text-sm font-semibold text-[#7b633d] dark:text-[#caa66c]"
+                                >
+                                    Can build now:
+                                    {{
+                                        formatExactNumber(
+                                            roadBuildableAmountFor(building),
+                                        )
+                                    }}
+                                    km
+                                </p>
+                            </div>
+
+                            <div
+                                class="flex shrink-0 flex-col gap-3 sm:items-end"
+                            >
+                                <label
+                                    v-if="building.isRoad"
+                                    class="flex items-center gap-2 text-sm font-semibold text-[#696250] dark:text-[#b8c2b0]"
+                                >
+                                    Build km
+                                    <input
+                                        v-model.number="
+                                            roadBuildAmounts[building.id]
+                                        "
+                                        type="number"
+                                        min="1"
+                                        :max="MAX_ROAD_BUILD_AMOUNT"
+                                        step="1"
+                                        class="h-10 w-36 rounded-md border border-[#cfc1a8] bg-[#fffaf0] px-3 text-sm text-[#1f241c] transition outline-none focus:border-[#9a7a46] dark:border-[#4a4438] dark:bg-[#12140f] dark:text-[#f3efe4] dark:focus:border-[#caa66c]"
+                                        placeholder="1"
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#b99145]/35 bg-[#ead9b6] px-4 py-2 text-sm font-semibold text-[#5a4320] transition hover:bg-[#dfc996] disabled:cursor-not-allowed disabled:opacity-55 dark:border-[#e0b461]/25 dark:bg-[#e0b461]/10 dark:text-[#fff0c8] dark:hover:bg-[#e0b461]/20"
+                                    :disabled="
+                                        upgradingBuildingId !== null ||
+                                        !building.canUpgrade
+                                    "
+                                    @click="upgradeBuilding(building)"
+                                >
+                                    {{
+                                        upgradingBuildingId === building.id
+                                            ? 'Upgrading...'
+                                            : building.canUpgrade
+                                              ? 'Upgrade'
+                                              : 'Unavailable'
+                                    }}
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section
+                v-else-if="isAchievementsModalOpen"
                 class="max-h-[calc(100vh-3rem)] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
             >
                 <header class="flex items-start justify-between gap-4">
