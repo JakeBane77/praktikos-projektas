@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('is_open')->default(true);
             $table->timestamps();
 
-            $table->index('leader_id');
+            $table->unique('leader_id');
             $table->index(['is_open', 'created_at']);
         });
     }

@@ -19,8 +19,7 @@ return new class extends Migration
             $table->unsignedBigInteger('total_contributed')->default(0);
             $table->timestamp('joined_at')->useCurrent();
 
-            $table->unique(['alliance_id', 'user_id']);
-            $table->index('user_id');
+            $table->unique('user_id');
             $table->index(['alliance_id', 'role']);
             $table->index(['alliance_id', 'total_contributed']);
         });
