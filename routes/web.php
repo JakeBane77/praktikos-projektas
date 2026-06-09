@@ -23,6 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('dashboard.weather-location.default');
 
     Route::post('alliances', [AllianceController::class, 'store'])->name('alliances.store');
+    Route::patch('alliances/{alliance}', [AllianceController::class, 'update'])->name('alliances.update');
     Route::post('alliances/{alliance}/join', [AllianceController::class, 'join'])->name('alliances.join');
     Route::delete('alliances/{alliance}/leave', [AllianceController::class, 'leave'])->name('alliances.leave');
     Route::delete('alliances/{alliance}', [AllianceController::class, 'destroy'])->name('alliances.destroy');

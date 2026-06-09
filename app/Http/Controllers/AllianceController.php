@@ -11,6 +11,7 @@ use App\Models\UserResource;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +33,8 @@ class AllianceController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+
+        Gate::authorize('create', Alliance::class);
 
         if ($this->userHasAlliance($user)) {
             return $this->backWithError('alliance', 'You are already in an alliance.');
@@ -91,10 +94,41 @@ class AllianceController extends Controller
         return redirect()->to(url()->previous(route('dashboard')));
     }
 
+    public function update(Request $request, Alliance $alliance): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'min:3', 'max:80', Rule::unique('alliances', 'name')->ignore($alliance->id)],
+            'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'member_limit' => ['sometimes', 'integer', 'min:'.self::MEMBER_LIMIT_MIN, 'max:'.self::MEMBER_LIMIT_MAX],
+            'is_open' => ['sometimes', 'boolean'],
+        ]);
+
+        $leaderOnlyFields = array_intersect(
+            array_keys($validated),
+            ['name', 'description', 'member_limit'],
+        );
+
+        if ($leaderOnlyFields !== []) {
+            Gate::authorize('update', $alliance);
+        } elseif (array_key_exists('is_open', $validated)) {
+            Gate::authorize('updateVisibility', $alliance);
+        }
+
+        if (array_key_exists('name', $validated)) {
+            $validated['slug'] = $this->uniqueSlugFor($validated['name'], $alliance);
+        }
+
+        $alliance->update($validated);
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
     public function join(Request $request, Alliance $alliance): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
+
+        Gate::authorize('join', $alliance);
 
         if ($this->userHasAlliance($user)) {
             return $this->backWithError('alliance', 'You are already in an alliance.');
@@ -132,6 +166,8 @@ class AllianceController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        Gate::authorize('leave', $alliance);
+
         $membership = $user->allianceMembership()
             ->where('alliance_id', $alliance->id)
             ->first();
@@ -154,9 +190,7 @@ class AllianceController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        if ($alliance->leader_id !== $user->id) {
-            abort(403);
-        }
+        Gate::authorize('delete', $alliance);
 
         $alliance->delete();
 
@@ -168,6 +202,8 @@ class AllianceController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        Gate::authorize('contribute', $goal);
+
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
             'resource_type' => ['sometimes', 'string', Rule::in(self::RESOURCE_TYPES)],
@@ -177,15 +213,11 @@ class AllianceController extends Controller
             return $this->backWithError('alliance_goal', 'This goal requires '.$goal->resource_type.'.');
         }
 
-        $membership = $user->allianceMembership;
-
-        if (! $membership || $membership->alliance_id !== $goal->alliance_id) {
-            abort(403);
-        }
-
         if ($goal->status !== 'active') {
             return $this->backWithError('alliance_goal', 'This goal is not active.');
         }
+
+        $membership = $user->allianceMembership()->firstOrFail();
 
         DB::transaction(function () use ($goal, $membership, $user, $validated): void {
             $amount = (int) $validated['amount'];
@@ -254,13 +286,16 @@ class AllianceController extends Controller
             ->exists();
     }
 
-    private function uniqueSlugFor(string $name): string
+    private function uniqueSlugFor(string $name, ?Alliance $ignoreAlliance = null): string
     {
         $baseSlug = Str::slug($name);
         $slug = $baseSlug;
         $suffix = 2;
 
-        while (Alliance::query()->where('slug', $slug)->exists()) {
+        while (Alliance::query()
+            ->where('slug', $slug)
+            ->when($ignoreAlliance, fn ($query) => $query->whereKeyNot($ignoreAlliance->id))
+            ->exists()) {
             $slug = $baseSlug.'-'.$suffix;
             $suffix++;
         }

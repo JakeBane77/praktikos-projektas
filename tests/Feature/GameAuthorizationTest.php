@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Achievement;
+use App\Models\Alliance;
+use App\Models\AllianceGoal;
+use App\Models\AllianceMembership;
 use App\Models\BuildingType;
 use App\Models\Minigame;
 use App\Models\User;
@@ -118,4 +121,105 @@ test('users cannot upgrade another users building', function () {
         ->assertForbidden();
 
     expect($building->fresh()->level)->toBe(1);
+});
+
+test('alliance policies enforce leader and officer permissions', function () {
+    $leader = User::factory()->create();
+    $officer = User::factory()->create();
+    $member = User::factory()->create();
+    $outsideUser = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Stone Guard',
+        'slug' => 'stone-guard',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $officer->id,
+        'role' => 'officer',
+        'joined_at' => now(),
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $goal = AllianceGoal::create([
+        'alliance_id' => $alliance->id,
+        'name' => 'Wood Stockpile',
+        'resource_type' => 'wood',
+        'target_amount' => 1_000,
+        'current_amount' => 0,
+        'production_bonus_percent' => 5,
+        'bonus_duration_hours' => 24,
+        'status' => 'active',
+    ]);
+
+    expect($leader->can('update', $alliance))->toBeTrue()
+        ->and($leader->can('delete', $alliance))->toBeTrue()
+        ->and($leader->can('updateVisibility', $alliance))->toBeTrue()
+        ->and($officer->can('update', $alliance))->toBeFalse()
+        ->and($officer->can('delete', $alliance))->toBeFalse()
+        ->and($officer->can('updateVisibility', $alliance))->toBeTrue()
+        ->and($member->can('updateVisibility', $alliance))->toBeFalse()
+        ->and($outsideUser->can('updateVisibility', $alliance))->toBeFalse()
+        ->and($member->can('contribute', $goal))->toBeTrue()
+        ->and($outsideUser->can('contribute', $goal))->toBeFalse();
+});
+
+test('officers can only update alliance visibility through the controller', function () {
+    $leader = User::factory()->create();
+    $officer = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'River Pact',
+        'slug' => 'river-pact',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $officer->id,
+        'role' => 'officer',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($officer)
+        ->patch(route('alliances.update', $alliance), [
+            'is_open' => false,
+        ])
+        ->assertRedirect();
+
+    expect($alliance->fresh()->is_open)->toBeFalse();
+
+    $this->actingAs($officer)
+        ->patch(route('alliances.update', $alliance), [
+            'name' => 'Officer Rename',
+        ])
+        ->assertForbidden();
+
+    expect($alliance->fresh()->name)->toBe('River Pact');
 });

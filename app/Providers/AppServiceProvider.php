@@ -2,12 +2,16 @@
 
 namespace App\Providers;
 
+use App\Models\Alliance;
+use App\Models\AllianceGoal;
 use App\Models\Minigame;
 use App\Models\User;
 use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
+use App\Policies\AllianceGoalPolicy;
+use App\Policies\AlliancePolicy;
 use App\Policies\MinigamePolicy;
 use App\Policies\UserAchievementPolicy;
 use App\Policies\UserBuildingPolicy;
@@ -53,6 +57,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(UserResource::class, UserResourcePolicy::class);
         Gate::policy(Minigame::class, MinigamePolicy::class);
         Gate::policy(WeatherSnapshot::class, WeatherSnapshotPolicy::class);
+        Gate::policy(Alliance::class, AlliancePolicy::class);
+        Gate::policy(AllianceGoal::class, AllianceGoalPolicy::class);
     }
 
     /**
