@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AllianceController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +21,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('dashboard.weather-location');
     Route::post('dashboard/weather-location/default', [DashboardController::class, 'resetWeatherLocation'])
         ->name('dashboard.weather-location.default');
+
+    Route::post('alliances', [AllianceController::class, 'store'])->name('alliances.store');
+    Route::post('alliances/{alliance}/join', [AllianceController::class, 'join'])->name('alliances.join');
+    Route::delete('alliances/{alliance}/leave', [AllianceController::class, 'leave'])->name('alliances.leave');
+    Route::delete('alliances/{alliance}', [AllianceController::class, 'destroy'])->name('alliances.destroy');
+    Route::post('alliance-goals/{goal}/contribute', [AllianceController::class, 'contribute'])
+        ->name('alliance-goals.contribute');
 });
 
 require __DIR__.'/settings.php';
