@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Achievement;
+use App\Models\Alliance;
+use App\Models\AllianceMembership;
 use App\Models\BuildingType;
 use App\Models\Minigame;
 use App\Models\ResourceCollection;
@@ -72,6 +74,66 @@ test('authenticated users can visit immersive mode with game data', function () 
             ->has('buildings')
             ->has('roadStats')
             ->has('serverTime')
+        );
+});
+
+test('dashboard exposes other alliance members and contributions while user has an alliance', function () {
+    $user = User::factory()->create();
+    $currentLeader = User::factory()->create();
+    $otherLeader = User::factory()->create(['name' => 'Other Leader']);
+    $otherMember = User::factory()->create(['name' => 'Other Member']);
+    $this->actingAs($user);
+
+    $currentAlliance = Alliance::create([
+        'name' => 'Current Alliance',
+        'slug' => 'current-alliance',
+        'leader_id' => $currentLeader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $currentAlliance->id,
+        'user_id' => $user->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $otherAlliance = Alliance::create([
+        'name' => 'Other Alliance',
+        'slug' => 'other-alliance',
+        'leader_id' => $otherLeader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $otherAlliance->id,
+        'user_id' => $otherLeader->id,
+        'role' => 'leader',
+        'total_contributed' => 500,
+        'joined_at' => now(),
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $otherAlliance->id,
+        'user_id' => $otherMember->id,
+        'role' => 'member',
+        'total_contributed' => 1_000,
+        'joined_at' => now(),
+    ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.current.id', $currentAlliance->id)
+            ->where('alliances.available.0.id', $otherAlliance->id)
+            ->where('alliances.available.0.canJoin', false)
+            ->where('alliances.available.0.members.0.userId', $otherLeader->id)
+            ->where('alliances.available.0.members.0.role', 'leader')
+            ->where('alliances.available.0.members.0.totalContributed', 500)
+            ->where('alliances.available.0.members.1.userId', $otherMember->id)
+            ->where('alliances.available.0.members.1.totalContributed', 1_000)
         );
 });
 

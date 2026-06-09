@@ -185,12 +185,105 @@ class AllianceController extends Controller
         return redirect()->to(url()->previous(route('dashboard')));
     }
 
-    public function destroy(Request $request, Alliance $alliance): RedirectResponse
+    public function kick(Alliance $alliance, AllianceMembership $membership): RedirectResponse
+    {
+        if ((int) $membership->alliance_id !== (int) $alliance->id) {
+            abort(404);
+        }
+
+        Gate::authorize('kick', [$alliance, $membership]);
+
+        $membership->delete();
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
+    public function promote(Alliance $alliance, AllianceMembership $membership): RedirectResponse
+    {
+        if ((int) $membership->alliance_id !== (int) $alliance->id) {
+            abort(404);
+        }
+
+        Gate::authorize('promote', [$alliance, $membership]);
+
+        $membership->role = 'officer';
+        $membership->save();
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
+    public function demote(Alliance $alliance, AllianceMembership $membership): RedirectResponse
+    {
+        if ((int) $membership->alliance_id !== (int) $alliance->id) {
+            abort(404);
+        }
+
+        Gate::authorize('demote', [$alliance, $membership]);
+
+        $membership->role = 'member';
+        $membership->save();
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
+    public function transferLeadership(Request $request, Alliance $alliance, AllianceMembership $membership): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
 
+        if ((int) $membership->alliance_id !== (int) $alliance->id) {
+            abort(404);
+        }
+
+        Gate::authorize('transferLeadership', [$alliance, $membership]);
+
+        DB::transaction(function () use ($alliance, $membership, $user): void {
+            $lockedAlliance = Alliance::query()
+                ->whereKey($alliance->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $currentLeaderMembership = AllianceMembership::query()
+                ->where('alliance_id', $lockedAlliance->id)
+                ->where('user_id', $user->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $newLeaderMembership = AllianceMembership::query()
+                ->whereKey($membership->id)
+                ->where('alliance_id', $lockedAlliance->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((int) $newLeaderMembership->user_id === (int) $user->id) {
+                throw ValidationException::withMessages([
+                    'alliance' => 'Choose another alliance member as leader.',
+                ]);
+            }
+
+            $lockedAlliance->leader_id = $newLeaderMembership->user_id;
+            $lockedAlliance->save();
+
+            $currentLeaderMembership->role = 'officer';
+            $currentLeaderMembership->save();
+
+            $newLeaderMembership->role = 'leader';
+            $newLeaderMembership->save();
+        });
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
+    public function destroy(Alliance $alliance): RedirectResponse
+    {
         Gate::authorize('delete', $alliance);
+
+        if ($alliance->memberships()->count() > 1) {
+            return $this->backWithError(
+                'alliance',
+                'Alliance with members cannot be disbanded, kick all members or transfer leadership instead',
+            );
+        }
 
         $alliance->delete();
 

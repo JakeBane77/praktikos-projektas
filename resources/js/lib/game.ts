@@ -93,6 +93,49 @@ export type Leaderboard = {
     entries: LeaderboardEntry[];
 };
 
+export type AllianceMember = {
+    id: number;
+    userId: number;
+    name: string;
+    role: 'leader' | 'officer' | 'member';
+    totalContributed: number;
+    joinedAt: string | null;
+    isCurrentUser: boolean;
+    canKick: boolean;
+    canPromote: boolean;
+    canDemote: boolean;
+    canTransferLeadership: boolean;
+};
+
+export type AllianceSummary = {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+    leaderName: string;
+    memberLimit: number;
+    memberCount: number;
+    isOpen: boolean;
+    canJoin: boolean;
+    members: AllianceMember[];
+};
+
+export type CurrentAlliance = AllianceSummary & {
+    currentUserRole: 'leader' | 'officer' | 'member';
+    canUpdate: boolean;
+    canUpdateVisibility: boolean;
+    canLeave: boolean;
+    canDisband: boolean;
+    members: AllianceMember[];
+};
+
+export type AllianceState = {
+    current: CurrentAlliance | null;
+    available: AllianceSummary[];
+    canCreate: boolean;
+    creationCooldownEndsAt: string | null;
+};
+
 export type DashboardGameData = {
     serverTime: {
         iso: string;
@@ -120,6 +163,7 @@ export type DashboardGameData = {
         defaultKey: string;
         boards: Leaderboard[];
     };
+    alliances: AllianceState;
     minigames: Minigame[];
     buildings: Building[];
     achievements: Achievement[];

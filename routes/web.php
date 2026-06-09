@@ -26,6 +26,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('alliances/{alliance}', [AllianceController::class, 'update'])->name('alliances.update');
     Route::post('alliances/{alliance}/join', [AllianceController::class, 'join'])->name('alliances.join');
     Route::delete('alliances/{alliance}/leave', [AllianceController::class, 'leave'])->name('alliances.leave');
+    Route::patch('alliances/{alliance}/members/{membership}/promote', [AllianceController::class, 'promote'])->name('alliances.members.promote');
+    Route::patch('alliances/{alliance}/members/{membership}/demote', [AllianceController::class, 'demote'])->name('alliances.members.demote');
+    Route::patch('alliances/{alliance}/members/{membership}/transfer-leadership', [AllianceController::class, 'transferLeadership'])->name('alliances.members.transfer-leadership');
+    Route::delete('alliances/{alliance}/members/{membership}', [AllianceController::class, 'kick'])->name('alliances.members.kick');
     Route::delete('alliances/{alliance}', [AllianceController::class, 'destroy'])->name('alliances.destroy');
     Route::post('alliance-goals/{goal}/contribute', [AllianceController::class, 'contribute'])
         ->name('alliance-goals.contribute');

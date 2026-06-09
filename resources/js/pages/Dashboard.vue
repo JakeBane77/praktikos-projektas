@@ -13,11 +13,13 @@ import {
     RotateCcw,
     TreePine,
     Trophy,
+    UsersRound,
     Wheat,
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import AchievementUnlockModal from '@/components/game-modals/AchievementUnlockModal.vue';
+import AllianceModal from '@/components/game-modals/AllianceModal.vue';
 import BuildingsModal from '@/components/game-modals/BuildingsModal.vue';
 import LeaderboardModal from '@/components/game-modals/LeaderboardModal.vue';
 import MinigameModal from '@/components/game-modals/MinigameModal.vue';
@@ -66,8 +68,9 @@ const props = defineProps<DashboardGameData>();
 const isBuildingsOpen = ref(false);
 const isCollecting = ref(false);
 const isPrestiging = ref(false);
+const isSubmittingAlliance = ref(false);
 const activeGameModal = ref<
-    'leaderboard' | 'minigame' | 'prestige-confirm' | null
+    'alliance' | 'leaderboard' | 'minigame' | 'prestige-confirm' | null
 >(null);
 const upgradingBuildingId = ref<number | null>(null);
 const activeMinigameResource = ref<ResourceKey | null>(null);
@@ -213,6 +216,7 @@ const isLeaderboardModalOpen = computed(
         activeGameModal.value === 'leaderboard' &&
         selectedLeaderboard.value !== null,
 );
+const isAllianceModalOpen = computed(() => activeGameModal.value === 'alliance');
 const isPrestigeConfirmModalOpen = computed(
     () => activeGameModal.value === 'prestige-confirm',
 );
@@ -221,6 +225,7 @@ const isOfflineProgressModalOpen = computed(
         props.offlineProgress !== null &&
         !isOfflineProgressDismissed.value &&
         !isBuildingsOpen.value &&
+        !isAllianceModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value &&
         !isPrestigeConfirmModalOpen.value,
@@ -230,6 +235,7 @@ const isAchievementUnlockModalOpen = computed(
         Boolean(currentAchievementUnlock.value) &&
         !isOfflineProgressModalOpen.value &&
         !isBuildingsOpen.value &&
+        !isAllianceModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value &&
         !isPrestigeConfirmModalOpen.value,
@@ -899,6 +905,24 @@ function closeBuildings() {
     isBuildingsOpen.value = false;
 }
 
+function openAlliance() {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isBuildingsOpen.value = false;
+    closeOfflineProgress();
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'alliance';
+}
+
+function closeAlliance() {
+    if (activeGameModal.value === 'alliance') {
+        activeGameModal.value = null;
+    }
+}
+
 function openPrestigeConfirm() {
     if (activeMinigameResource.value !== null) {
         return;
@@ -959,6 +983,12 @@ function closeActiveGameModal() {
         return;
     }
 
+    if (activeGameModal.value === 'alliance') {
+        closeAlliance();
+
+        return;
+    }
+
     if (activeGameModal.value === 'leaderboard') {
         closeLeaderboard();
 
@@ -993,6 +1023,199 @@ function confirmPrestige() {
             },
             onFinish: () => {
                 isPrestiging.value = false;
+            },
+        },
+    );
+}
+
+function createAlliance(payload: {
+    name: string;
+    description: string | null;
+    member_limit: number;
+    is_open: boolean;
+}) {
+    router.post('/alliances', payload, {
+        preserveScroll: true,
+        onStart: () => {
+            isSubmittingAlliance.value = true;
+        },
+        onError: (errors) => {
+            if (errors.alliance) {
+                toast.error(errors.alliance);
+            }
+        },
+        onFinish: () => {
+            isSubmittingAlliance.value = false;
+        },
+    });
+}
+
+function joinAlliance(allianceId: number) {
+    router.post(
+        `/alliances/${allianceId}/join`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
+function updateAlliance(payload: {
+    allianceId: number;
+    description?: string | null;
+    is_open?: boolean;
+}) {
+    router.patch(`/alliances/${payload.allianceId}`, payload, {
+        preserveScroll: true,
+        onStart: () => {
+            isSubmittingAlliance.value = true;
+        },
+        onError: (errors) => {
+            if (errors.alliance) {
+                toast.error(errors.alliance);
+            }
+        },
+        onFinish: () => {
+            isSubmittingAlliance.value = false;
+        },
+    });
+}
+
+function leaveAlliance(allianceId: number) {
+    router.delete(`/alliances/${allianceId}/leave`, {
+        preserveScroll: true,
+        onStart: () => {
+            isSubmittingAlliance.value = true;
+        },
+        onError: (errors) => {
+            if (errors.alliance) {
+                toast.error(errors.alliance);
+            }
+        },
+        onFinish: () => {
+            isSubmittingAlliance.value = false;
+        },
+    });
+}
+
+function disbandAlliance(allianceId: number) {
+    router.delete(`/alliances/${allianceId}`, {
+        preserveScroll: true,
+        onStart: () => {
+            isSubmittingAlliance.value = true;
+        },
+        onError: (errors) => {
+            if (errors.alliance) {
+                toast.error(errors.alliance);
+            }
+        },
+        onFinish: () => {
+            isSubmittingAlliance.value = false;
+        },
+    });
+}
+
+function promoteAllianceMember(payload: {
+    allianceId: number;
+    membershipId: number;
+}) {
+    router.patch(
+        `/alliances/${payload.allianceId}/members/${payload.membershipId}/promote`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
+function demoteAllianceMember(payload: {
+    allianceId: number;
+    membershipId: number;
+}) {
+    router.patch(
+        `/alliances/${payload.allianceId}/members/${payload.membershipId}/demote`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
+function transferAllianceLeadership(payload: {
+    allianceId: number;
+    membershipId: number;
+}) {
+    router.patch(
+        `/alliances/${payload.allianceId}/members/${payload.membershipId}/transfer-leadership`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
+function kickAllianceMember(payload: {
+    allianceId: number;
+    membershipId: number;
+}) {
+    router.delete(
+        `/alliances/${payload.allianceId}/members/${payload.membershipId}`,
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
             },
         },
     );
@@ -1432,6 +1655,107 @@ function upgradeBuilding(building: Building) {
             <section>
                 <button
                     type="button"
+                    data-game-modal-launcher="alliance"
+                    class="w-full rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#c9b995] hover:shadow-md dark:border-[#38362f] dark:bg-[#1a1d15] dark:hover:border-[#5a523f]"
+                    @click="openAlliance"
+                >
+                    <div
+                        class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-md bg-[#243627] p-2 text-white">
+                                <UsersRound class="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p
+                                    class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                                >
+                                    Alliance
+                                </p>
+                                <h2 class="mt-1 text-lg font-semibold">
+                                    {{
+                                        props.alliances.current
+                                            ? props.alliances.current.name
+                                            : 'Find your alliance'
+                                    }}
+                                </h2>
+                                <p
+                                    class="mt-1 text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    {{
+                                        props.alliances.current
+                                            ? 'View members, roles, and alliance contribution rankings.'
+                                            : 'Create a new alliance or join an open group.'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
+                            <div
+                                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                            >
+                                <p
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Status
+                                </p>
+                                <p class="mt-2 text-xl font-bold">
+                                    {{
+                                        props.alliances.current
+                                            ? props.alliances.current.isOpen
+                                                ? 'Open'
+                                                : 'Private'
+                                            : 'No alliance'
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                            >
+                                <p
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Members
+                                </p>
+                                <p class="mt-2 text-xl font-bold">
+                                    {{
+                                        props.alliances.current
+                                            ? `${formatExactNumber(props.alliances.current.memberCount)} / ${formatExactNumber(props.alliances.current.memberLimit)}`
+                                            : formatExactNumber(
+                                                  props.alliances.available
+                                                      .length,
+                                              )
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+                            >
+                                <p
+                                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Role
+                                </p>
+                                <p class="mt-2 text-xl font-bold capitalize">
+                                    {{
+                                        props.alliances.current
+                                            ? props.alliances.current
+                                                  .currentUserRole
+                                            : props.alliances.canCreate
+                                              ? 'Founder'
+                                              : 'Cooldown'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </button>
+            </section>
+
+            <section>
+                <button
+                    type="button"
                     data-game-modal-launcher="leaderboard"
                     class="w-full rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#c9b995] hover:shadow-md dark:border-[#38362f] dark:bg-[#1a1d15] dark:hover:border-[#5a523f]"
                     @click="openLeaderboard()"
@@ -1807,6 +2131,7 @@ function upgradeBuilding(building: Building) {
         <div
             v-if="
                 isBuildingsOpen ||
+                isAllianceModalOpen ||
                 isLeaderboardModalOpen ||
                 isMinigameOpen ||
                 isPrestigeConfirmModalOpen ||
@@ -1828,6 +2153,21 @@ function upgradeBuilding(building: Building) {
                 @close="closeBuildings"
                 @upgrade="upgradeBuilding"
                 @update-road-amount="updateRoadBuildAmount"
+            />
+            <AllianceModal
+                v-else-if="isAllianceModalOpen"
+                :alliances="props.alliances"
+                :is-submitting="isSubmittingAlliance"
+                @close="closeAlliance"
+                @create="createAlliance"
+                @join="joinAlliance"
+                @update-alliance="updateAlliance"
+                @leave="leaveAlliance"
+                @disband="disbandAlliance"
+                @kick="kickAllianceMember"
+                @promote="promoteAllianceMember"
+                @demote="demoteAllianceMember"
+                @transfer-leadership="transferAllianceLeadership"
             />
             <LeaderboardModal
                 v-else-if="isLeaderboardModalOpen && selectedLeaderboard"

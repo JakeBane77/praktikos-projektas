@@ -11,6 +11,7 @@ use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('game policies allow access only to owned game state', function () {
     $owner = User::factory()->create();
@@ -177,6 +178,20 @@ test('alliance policies enforce leader and officer permissions', function () {
         ->and($officer->can('updateVisibility', $alliance))->toBeTrue()
         ->and($member->can('updateVisibility', $alliance))->toBeFalse()
         ->and($outsideUser->can('updateVisibility', $alliance))->toBeFalse()
+        ->and($leader->can('kick', [$alliance, $officer->allianceMembership]))->toBeTrue()
+        ->and($leader->can('kick', [$alliance, $member->allianceMembership]))->toBeTrue()
+        ->and($officer->can('kick', [$alliance, $member->allianceMembership]))->toBeTrue()
+        ->and($officer->can('kick', [$alliance, $leader->allianceMembership]))->toBeFalse()
+        ->and($officer->can('kick', [$alliance, $officer->allianceMembership]))->toBeFalse()
+        ->and($member->can('kick', [$alliance, $officer->allianceMembership]))->toBeFalse()
+        ->and($leader->can('promote', [$alliance, $member->allianceMembership]))->toBeTrue()
+        ->and($leader->can('demote', [$alliance, $officer->allianceMembership]))->toBeTrue()
+        ->and($leader->can('transferLeadership', [$alliance, $officer->allianceMembership]))->toBeTrue()
+        ->and($leader->can('transferLeadership', [$alliance, $member->allianceMembership]))->toBeTrue()
+        ->and($officer->can('promote', [$alliance, $member->allianceMembership]))->toBeFalse()
+        ->and($member->can('demote', [$alliance, $officer->allianceMembership]))->toBeFalse()
+        ->and($officer->can('transferLeadership', [$alliance, $member->allianceMembership]))->toBeFalse()
+        ->and($member->can('transferLeadership', [$alliance, $officer->allianceMembership]))->toBeFalse()
         ->and($member->can('contribute', $goal))->toBeTrue()
         ->and($outsideUser->can('contribute', $goal))->toBeFalse();
 });
@@ -222,4 +237,282 @@ test('officers can only update alliance visibility through the controller', func
         ->assertForbidden();
 
     expect($alliance->fresh()->name)->toBe('River Pact');
+});
+
+test('leader can update alliance description and visibility through the controller', function () {
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Silver Accord',
+        'slug' => 'silver-accord',
+        'description' => 'Original description',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($leader)
+        ->patch(route('alliances.update', $alliance), [
+            'description' => 'Updated alliance description',
+            'is_open' => false,
+        ])
+        ->assertRedirect();
+
+    $freshAlliance = $alliance->fresh();
+
+    expect($freshAlliance)->not->toBeNull()
+        ->and($freshAlliance->description)->toBe('Updated alliance description')
+        ->and($freshAlliance->is_open)->toBeFalse();
+});
+
+test('leader and officer can kick allowed alliance members', function () {
+    $leader = User::factory()->create();
+    $officer = User::factory()->create();
+    $member = User::factory()->create();
+    $secondMember = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Hill Banner',
+        'slug' => 'hill-banner',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $officer->id,
+        'role' => 'officer',
+        'joined_at' => now(),
+    ]);
+
+    $memberMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $secondMemberMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $secondMember->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($officer)
+        ->delete(route('alliances.members.kick', [$alliance, $memberMembership]))
+        ->assertRedirect();
+
+    expect($memberMembership->fresh())->toBeNull();
+
+    $this->actingAs($leader)
+        ->delete(route('alliances.members.kick', [$alliance, $secondMemberMembership]))
+        ->assertRedirect();
+
+    expect($secondMemberMembership->fresh())->toBeNull();
+});
+
+test('members can leave alliance but leaders must transfer or disband before leaving', function () {
+    $leader = User::factory()->create();
+    $member = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Oak Circle',
+        'slug' => 'oak-circle',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    $memberMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    expect($member->can('leave', $alliance))->toBeTrue()
+        ->and($leader->can('leave', $alliance))->toBeTrue();
+
+    $this->actingAs($leader)
+        ->delete(route('alliances.leave', $alliance))
+        ->assertSessionHasErrors(['alliance']);
+
+    $this->actingAs($member)
+        ->delete(route('alliances.leave', $alliance))
+        ->assertRedirect();
+
+    expect($memberMembership->fresh())->toBeNull();
+});
+
+test('leader can disband alliance only when no other members remain', function () {
+    $leader = User::factory()->create();
+    $member = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Last Banner',
+        'slug' => 'last-banner',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    $memberMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($leader)
+        ->delete(route('alliances.destroy', $alliance))
+        ->assertSessionHasErrors(['alliance']);
+
+    expect($alliance->fresh())->not->toBeNull();
+
+    $memberMembership->delete();
+
+    $this->actingAs($leader)
+        ->delete(route('alliances.destroy', $alliance))
+        ->assertRedirect();
+
+    expect($alliance->fresh())->toBeNull();
+});
+
+test('leader can promote and demote alliance members', function () {
+    $leader = User::factory()->create();
+    $member = User::factory()->create();
+    $officer = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Sun Foundry',
+        'slug' => 'sun-foundry',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    $memberMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $officerMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $officer->id,
+        'role' => 'officer',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($member)
+        ->patch(route('alliances.members.promote', [$alliance, $memberMembership]))
+        ->assertForbidden();
+
+    expect($memberMembership->fresh()->role)->toBe('member');
+
+    $this->actingAs($leader)
+        ->patch(route('alliances.members.promote', [$alliance, $memberMembership]))
+        ->assertRedirect();
+
+    expect($memberMembership->fresh()->role)->toBe('officer');
+
+    $this->actingAs($leader)
+        ->patch(route('alliances.members.demote', [$alliance, $officerMembership]))
+        ->assertRedirect();
+
+    expect($officerMembership->fresh()->role)->toBe('member');
+});
+
+test('leader can transfer alliance leadership to another member', function () {
+    $leader = User::factory()->create();
+    $member = User::factory()->create();
+    $outsideUser = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Crown Forge',
+        'slug' => 'crown-forge',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    $leaderMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'total_contributed' => 1_000,
+        'joined_at' => now(),
+    ]);
+
+    $memberMembership = AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($member)
+        ->patch(route('alliances.members.transfer-leadership', [$alliance, $leaderMembership]))
+        ->assertForbidden();
+
+    $this->actingAs($outsideUser)
+        ->patch(route('alliances.members.transfer-leadership', [$alliance, $memberMembership]))
+        ->assertForbidden();
+
+    $this->actingAs($leader)
+        ->patch(route('alliances.members.transfer-leadership', [$alliance, $memberMembership]))
+        ->assertRedirect();
+
+    expect($alliance->fresh()->leader_id)->toBe($member->id)
+        ->and($leaderMembership->fresh()->role)->toBe('officer')
+        ->and($memberMembership->fresh()->role)->toBe('leader');
+
+    $this->actingAs($leader)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.current.leaderName', $member->name)
+            ->where('alliances.current.members.0.userId', $member->id)
+            ->where('alliances.current.members.0.role', 'leader')
+            ->where('alliances.current.members.1.userId', $leader->id)
+            ->where('alliances.current.members.1.role', 'officer')
+        );
 });

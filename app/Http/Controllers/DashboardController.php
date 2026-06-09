@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Achievement;
+use App\Models\Alliance;
+use App\Models\AllianceCreationLog;
+use App\Models\AllianceMembership;
 use App\Models\BuildingType;
 use App\Models\Minigame;
 use App\Models\ResourceCollection;
@@ -37,6 +40,14 @@ class DashboardController extends Controller
     ];
 
     private const DAILY_PRODUCTION_HOURS = 6;
+
+    private const ALLIANCE_CREATION_COOLDOWN_HOURS = 24;
+
+    private const ALLIANCE_ROLE_ORDER = [
+        'leader' => 0,
+        'officer' => 1,
+        'member' => 2,
+    ];
 
     private const DEFAULT_PRODUCTION_BONUSES = [
         'all' => 0,
@@ -108,6 +119,7 @@ class DashboardController extends Controller
                 'requirement' => $prestigeRoadRequirement,
             ],
             'leaderboards' => $this->leaderboardCardsFor($user, $resources, $minigames),
+            'alliances' => $this->allianceCardsFor($user),
             'achievementBonuses' => $this->achievementBonusCardsFor($productionBonuses),
             'achievementUnlocks' => $this->achievementUnlockCardsFor($achievements),
             'minigames' => $this->minigameCardsFor($minigames, $productionRates),
@@ -706,6 +718,163 @@ class DashboardController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{current: array<string, mixed>|null, available: array<int, array<string, mixed>>, canCreate: bool, creationCooldownEndsAt: string|null}
+     */
+    private function allianceCardsFor(User $user): array
+    {
+        $currentAlliance = $this->currentAllianceFor($user);
+        $hasAlliance = $currentAlliance instanceof Alliance;
+        $cooldownEndsAt = $this->allianceCreationCooldownEndsAt($user);
+
+        $availableAlliances = Alliance::query()
+            ->with(['leader', 'memberships.user'])
+            ->withCount('memberships')
+            ->when($currentAlliance, fn ($query) => $query->whereKeyNot($currentAlliance->id))
+            ->orderByDesc('is_open')
+            ->orderByDesc('memberships_count')
+            ->orderBy('name')
+            ->limit(50)
+            ->get()
+            ->map(fn (Alliance $alliance): array => $this->allianceSummaryCardFor(
+                user: $user,
+                alliance: $alliance,
+                canJoin: ! $hasAlliance
+                    && $alliance->is_open
+                    && (int) $alliance->memberships_count < (int) $alliance->member_limit,
+            ))
+            ->values()
+            ->all();
+
+        return [
+            'current' => $currentAlliance instanceof Alliance
+                ? $this->currentAllianceCardFor($user, $currentAlliance)
+                : null,
+            'available' => $availableAlliances,
+            'canCreate' => ! $hasAlliance && $cooldownEndsAt === null,
+            'creationCooldownEndsAt' => $cooldownEndsAt?->toIso8601String(),
+        ];
+    }
+
+    private function currentAllianceFor(User $user): ?Alliance
+    {
+        $membership = $user->allianceMembership()
+            ->with('alliance')
+            ->first();
+
+        if ($membership instanceof AllianceMembership && $membership->alliance instanceof Alliance) {
+            return $membership->alliance;
+        }
+
+        return $user->ledAlliance()->first();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function currentAllianceCardFor(User $user, Alliance $alliance): array
+    {
+        $alliance->loadMissing(['leader', 'memberships.user']);
+        $alliance->loadCount('memberships');
+
+        $membership = $alliance->memberships
+            ->firstWhere('user_id', $user->id);
+
+        $role = $membership instanceof AllianceMembership
+            ? $membership->role
+            : ((int) $alliance->leader_id === (int) $user->id ? 'leader' : 'member');
+
+        return [
+            ...$this->allianceSummaryCardFor($user, $alliance, false),
+            'currentUserRole' => $role,
+            'canUpdate' => Gate::forUser($user)->allows('update', $alliance),
+            'canUpdateVisibility' => Gate::forUser($user)->allows('updateVisibility', $alliance),
+            'canLeave' => Gate::forUser($user)->allows('leave', $alliance),
+            'canDisband' => Gate::forUser($user)->allows('delete', $alliance),
+            'members' => $this->allianceMemberCardsFor($user, $alliance, true),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function allianceMemberCardsFor(User $user, Alliance $alliance, bool $includeActions): array
+    {
+        $alliance->loadMissing('memberships.user');
+
+        return $alliance->memberships
+            ->sort($this->compareAllianceMemberships(...))
+            ->map(fn (AllianceMembership $membership): array => [
+                'id' => $membership->id,
+                'userId' => $membership->user_id,
+                'name' => $membership->user->name,
+                'role' => $membership->role,
+                'totalContributed' => (int) $membership->total_contributed,
+                'joinedAt' => $membership->joined_at?->format('Y-m-d H:i'),
+                'isCurrentUser' => (int) $membership->user_id === (int) $user->id,
+                'canKick' => $includeActions && Gate::forUser($user)->allows('kick', [$alliance, $membership]),
+                'canPromote' => $includeActions && Gate::forUser($user)->allows('promote', [$alliance, $membership]),
+                'canDemote' => $includeActions && Gate::forUser($user)->allows('demote', [$alliance, $membership]),
+                'canTransferLeadership' => $includeActions && Gate::forUser($user)->allows('transferLeadership', [$alliance, $membership]),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function compareAllianceMemberships(AllianceMembership $first, AllianceMembership $second): int
+    {
+        $roleComparison = (self::ALLIANCE_ROLE_ORDER[$first->role] ?? 99)
+            <=> (self::ALLIANCE_ROLE_ORDER[$second->role] ?? 99);
+
+        if ($roleComparison !== 0) {
+            return $roleComparison;
+        }
+
+        $contributionComparison = (int) $second->total_contributed <=> (int) $first->total_contributed;
+
+        if ($contributionComparison !== 0) {
+            return $contributionComparison;
+        }
+
+        return strcasecmp($first->user->name, $second->user->name);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function allianceSummaryCardFor(User $user, Alliance $alliance, bool $canJoin): array
+    {
+        return [
+            'id' => $alliance->id,
+            'name' => $alliance->name,
+            'slug' => $alliance->slug,
+            'description' => $alliance->description,
+            'leaderName' => $alliance->leader->name,
+            'memberLimit' => (int) $alliance->member_limit,
+            'memberCount' => (int) ($alliance->memberships_count ?? $alliance->memberships()->count()),
+            'isOpen' => (bool) $alliance->is_open,
+            'canJoin' => $canJoin,
+            'members' => $this->allianceMemberCardsFor($user, $alliance, false),
+        ];
+    }
+
+    private function allianceCreationCooldownEndsAt(User $user): ?CarbonImmutable
+    {
+        $lastCreatedAt = AllianceCreationLog::query()
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->value('created_at');
+
+        if (! $lastCreatedAt) {
+            return null;
+        }
+
+        $cooldownEndsAt = CarbonImmutable::parse($lastCreatedAt)
+            ->addHours(self::ALLIANCE_CREATION_COOLDOWN_HOURS);
+
+        return $cooldownEndsAt->isFuture() ? $cooldownEndsAt : null;
     }
 
     /**
