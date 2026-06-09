@@ -917,6 +917,44 @@ const sceneClass = computed(() => ({
     'immersive-weather-snowing': displayedWeatherConditions.value.snowing,
 }));
 
+const sceneOverlayClass = computed(() => {
+    const conditions = displayedWeatherConditions.value;
+
+    if (conditions.thunderstorm) {
+        return 'immersive-overlay-thunderstorm';
+    }
+
+    if (conditions.raining) {
+        return 'immersive-overlay-raining';
+    }
+
+    if (conditions.foggy) {
+        return 'immersive-overlay-foggy';
+    }
+
+    if (conditions.snowing) {
+        return 'immersive-overlay-snowing';
+    }
+
+    if (conditions.cloudy) {
+        return 'immersive-overlay-cloudy';
+    }
+
+    if (conditions.clear) {
+        return 'immersive-overlay-clear';
+    }
+
+    if (skyState.value === 'dawn') {
+        return 'immersive-overlay-dawn';
+    }
+
+    if (skyState.value === 'dusk') {
+        return 'immersive-overlay-dusk';
+    }
+
+    return '';
+});
+
 watch(
     () => props.achievementUnlocks,
     (achievementUnlocks) => {
@@ -1531,6 +1569,11 @@ function timeFromInputValue(value: string): Date {
                 draggable="false"
                 @error="useEmptyAsset"
             />
+
+            <div
+                class="immersive-color-overlay"
+                :class="sceneOverlayClass"
+            ></div>
 
             <div
                 class="celestial-path-guide"
@@ -2334,9 +2377,17 @@ function timeFromInputValue(value: string): Date {
     user-select: none;
 }
 
+.immersive-color-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: transparent;
+}
+
 .immersive-celestial {
     position: absolute;
-    z-index: 1;
+    z-index: 2;
     width: clamp(7rem, 12vw, 12rem);
     height: auto;
     max-width: none;
@@ -2363,7 +2414,7 @@ function timeFromInputValue(value: string): Date {
 
 .immersive-cloud-box {
     position: absolute;
-    z-index: 2;
+    z-index: 3;
     overflow: hidden;
     pointer-events: none;
 }
@@ -2387,7 +2438,7 @@ function timeFromInputValue(value: string): Date {
 .immersive-weather-layer {
     position: absolute;
     inset: 0;
-    z-index: 3;
+    z-index: 4;
     overflow: hidden;
     pointer-events: none;
 }
@@ -2436,7 +2487,7 @@ function timeFromInputValue(value: string): Date {
 }
 
 .immersive-fog-layer {
-    z-index: 4;
+    z-index: 5;
     background:
         linear-gradient(180deg, rgb(226 232 222 / 0.24), transparent 38%),
         linear-gradient(0deg, rgb(226 232 222 / 0.2), transparent 42%);
@@ -2469,7 +2520,7 @@ function timeFromInputValue(value: string): Date {
 }
 
 .immersive-lightning-layer {
-    z-index: 5;
+    z-index: 6;
     background: rgb(217 245 255 / 0);
     animation: lightning-flash 7s step-end infinite;
 }
@@ -2508,33 +2559,36 @@ function timeFromInputValue(value: string): Date {
     animation-delay: -4.9s;
 }
 
-.immersive-scene-dawn .immersive-background {
-    filter: brightness(0.95) saturate(0.96);
+.immersive-overlay-dawn {
+    background: rgb(255 190 118 / 0.08);
 }
 
-.immersive-scene-dusk .immersive-background {
-    filter: brightness(0.82) saturate(0.88);
+.immersive-overlay-dusk {
+    background: rgb(41 26 46 / 0.22);
 }
 
-.immersive-weather-clear .immersive-background {
-    filter: brightness(1.04) saturate(1.05);
+.immersive-overlay-clear {
+    background: rgb(255 240 184 / 0.04);
 }
 
-.immersive-weather-cloudy .immersive-background {
-    filter: brightness(0.94) saturate(0.92);
+.immersive-overlay-cloudy {
+    background: rgb(47 56 59 / 0.13);
 }
 
-.immersive-weather-raining .immersive-background,
-.immersive-weather-thunderstorm .immersive-background {
-    filter: brightness(0.72) saturate(0.75) contrast(1.04);
+.immersive-overlay-raining {
+    background: rgb(13 29 38 / 0.32);
 }
 
-.immersive-weather-foggy .immersive-background {
-    filter: brightness(0.9) saturate(0.68) contrast(0.86);
+.immersive-overlay-thunderstorm {
+    background: rgb(7 16 30 / 0.42);
 }
 
-.immersive-weather-snowing .immersive-background {
-    filter: brightness(0.96) saturate(0.72) contrast(0.92);
+.immersive-overlay-foggy {
+    background: rgb(228 233 222 / 0.3);
+}
+
+.immersive-overlay-snowing {
+    background: rgb(229 243 250 / 0.22);
 }
 
 @media (max-width: 640px) {
