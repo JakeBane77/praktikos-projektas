@@ -137,6 +137,50 @@ test('dashboard exposes other alliance members and contributions while user has 
         );
 });
 
+test('dashboard alliance search filters available alliances by alliance name only', function () {
+    $user = User::factory()->create();
+    $matchingLeader = User::factory()->create(['name' => 'Plain Leader']);
+    $leaderNameOnlyMatch = User::factory()->create(['name' => 'Dragon Leader']);
+
+    $matchingAlliance = Alliance::create([
+        'name' => 'Dragon Watch',
+        'slug' => 'dragon-watch',
+        'leader_id' => $matchingLeader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $matchingAlliance->id,
+        'user_id' => $matchingLeader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    $leaderOnlyAlliance = Alliance::create([
+        'name' => 'Plain Watch',
+        'slug' => 'plain-watch',
+        'leader_id' => $leaderNameOnlyMatch->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $leaderOnlyAlliance->id,
+        'user_id' => $leaderNameOnlyMatch->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard', ['alliance_search' => 'Dragon']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.available.0.id', $matchingAlliance->id)
+            ->missing('alliances.available.1')
+        );
+});
+
 test('dashboard reads weather code from the database', function () {
     $user = User::factory()->create();
     $this->actingAs($user);

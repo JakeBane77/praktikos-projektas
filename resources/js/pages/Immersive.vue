@@ -376,6 +376,7 @@ const activeAchievementUnlockIndex = ref(0);
 const isCollecting = ref(false);
 const isPrestiging = ref(false);
 const isSubmittingAlliance = ref(false);
+let allianceSearchReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const activeMinigameResource = ref<ResourceKey | null>(null);
@@ -1006,6 +1007,10 @@ onBeforeUnmount(() => {
     }
 
     stopTimeLoop();
+
+    if (allianceSearchReloadTimeout !== null) {
+        clearTimeout(allianceSearchReloadTimeout);
+    }
 });
 
 watch(timeLoopSpeedMs, () => {
@@ -1345,6 +1350,7 @@ function openAlliance(): void {
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'alliance';
+    scheduleAllianceReload('');
 }
 
 function closeBuildings(): void {
@@ -1369,6 +1375,25 @@ function closeAlliance(): void {
     if (activeGameModal.value === 'alliance') {
         activeGameModal.value = null;
     }
+}
+
+function searchAlliances(query: string): void {
+    scheduleAllianceReload(query);
+}
+
+function scheduleAllianceReload(query: string): void {
+    if (allianceSearchReloadTimeout !== null) {
+        clearTimeout(allianceSearchReloadTimeout);
+    }
+
+    allianceSearchReloadTimeout = setTimeout(() => {
+        router.reload({
+            data: {
+                alliance_search: query.trim(),
+            },
+            only: ['alliances'],
+        });
+    }, 500);
 }
 
 function openPrestigeConfirm(): void {
@@ -1457,7 +1482,6 @@ function confirmPrestige(): void {
 function createAlliance(payload: {
     name: string;
     description: string | null;
-    member_limit: number;
     is_open: boolean;
 }): void {
     router.post('/alliances', payload, {
@@ -1497,6 +1521,27 @@ function joinAlliance(allianceId: number): void {
     );
 }
 
+function applyToAlliance(allianceId: number): void {
+    router.post(
+        `/alliances/${allianceId}/apply`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
 function updateAlliance(payload: {
     allianceId: number;
     description?: string | null;
@@ -1516,6 +1561,53 @@ function updateAlliance(payload: {
             isSubmittingAlliance.value = false;
         },
     });
+}
+
+function acceptAllianceApplication(payload: {
+    allianceId: number;
+    applicationId: number;
+}): void {
+    router.patch(
+        `/alliances/${payload.allianceId}/applications/${payload.applicationId}/accept`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
+function denyAllianceApplication(payload: {
+    allianceId: number;
+    applicationId: number;
+}): void {
+    router.delete(
+        `/alliances/${payload.allianceId}/applications/${payload.applicationId}`,
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance) {
+                    toast.error(errors.alliance);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
 }
 
 function leaveAlliance(allianceId: number): void {
@@ -2560,9 +2652,13 @@ function timeFromInputValue(value: string): Date {
                 :alliances="props.alliances"
                 :is-submitting="isSubmittingAlliance"
                 @close="closeAlliance"
+                @search="searchAlliances"
                 @create="createAlliance"
                 @join="joinAlliance"
+                @apply="applyToAlliance"
                 @update-alliance="updateAlliance"
+                @accept-application="acceptAllianceApplication"
+                @deny-application="denyAllianceApplication"
                 @leave="leaveAlliance"
                 @disband="disbandAlliance"
                 @kick="kickAllianceMember"

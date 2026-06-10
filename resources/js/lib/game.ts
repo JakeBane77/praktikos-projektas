@@ -107,6 +107,13 @@ export type AllianceMember = {
     canTransferLeadership: boolean;
 };
 
+export type AllianceApplication = {
+    id: number;
+    userId: number;
+    userName: string;
+    appliedAt: string | null;
+};
+
 export type AllianceSummary = {
     id: number;
     name: string;
@@ -117,6 +124,8 @@ export type AllianceSummary = {
     memberCount: number;
     isOpen: boolean;
     canJoin: boolean;
+    canApply: boolean;
+    hasPendingApplication: boolean;
     members: AllianceMember[];
 };
 
@@ -127,6 +136,7 @@ export type CurrentAlliance = AllianceSummary & {
     canLeave: boolean;
     canDisband: boolean;
     members: AllianceMember[];
+    applications: AllianceApplication[];
 };
 
 export type AllianceState = {

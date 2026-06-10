@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Achievement;
 use App\Models\Alliance;
+use App\Models\AllianceApplication;
 use App\Models\AllianceCreationLog;
 use App\Models\AllianceMembership;
 use App\Models\BuildingType;
@@ -43,6 +44,8 @@ class DashboardController extends Controller
 
     private const ALLIANCE_CREATION_COOLDOWN_HOURS = 24;
 
+    private const ALLIANCE_MEMBER_LIMIT = 20;
+
     private const ALLIANCE_ROLE_ORDER = [
         'leader' => 0,
         'officer' => 1,
@@ -56,18 +59,24 @@ class DashboardController extends Controller
 
     public function index(Request $request): Response
     {
-        return Inertia::render('Dashboard', $this->gameDataFor($request->user()));
+        return Inertia::render('Dashboard', $this->gameDataFor(
+            $request->user(),
+            $this->allianceSearchFor($request),
+        ));
     }
 
     public function immersive(Request $request): Response
     {
-        return Inertia::render('Immersive', $this->gameDataFor($request->user()));
+        return Inertia::render('Immersive', $this->gameDataFor(
+            $request->user(),
+            $this->allianceSearchFor($request),
+        ));
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function gameDataFor(User $user): array
+    private function gameDataFor(User $user, string $allianceSearch = ''): array
     {
         $resources = $this->resourcesFor($user);
         $buildings = $this->buildingsFor($user);
@@ -119,7 +128,7 @@ class DashboardController extends Controller
                 'requirement' => $prestigeRoadRequirement,
             ],
             'leaderboards' => $this->leaderboardCardsFor($user, $resources, $minigames),
-            'alliances' => $this->allianceCardsFor($user),
+            'alliances' => $this->allianceCardsFor($user, $allianceSearch),
             'achievementBonuses' => $this->achievementBonusCardsFor($productionBonuses),
             'achievementUnlocks' => $this->achievementUnlockCardsFor($achievements),
             'minigames' => $this->minigameCardsFor($minigames, $productionRates),
@@ -723,16 +732,17 @@ class DashboardController extends Controller
     /**
      * @return array{current: array<string, mixed>|null, available: array<int, array<string, mixed>>, canCreate: bool, creationCooldownEndsAt: string|null}
      */
-    private function allianceCardsFor(User $user): array
+    private function allianceCardsFor(User $user, string $search = ''): array
     {
         $currentAlliance = $this->currentAllianceFor($user);
         $hasAlliance = $currentAlliance instanceof Alliance;
         $cooldownEndsAt = $this->allianceCreationCooldownEndsAt($user);
 
         $availableAlliances = Alliance::query()
-            ->with(['leader', 'memberships.user'])
+            ->with(['applications.user', 'leader', 'memberships.user'])
             ->withCount('memberships')
             ->when($currentAlliance, fn ($query) => $query->whereKeyNot($currentAlliance->id))
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
             ->orderByDesc('is_open')
             ->orderByDesc('memberships_count')
             ->orderBy('name')
@@ -743,7 +753,7 @@ class DashboardController extends Controller
                 alliance: $alliance,
                 canJoin: ! $hasAlliance
                     && $alliance->is_open
-                    && (int) $alliance->memberships_count < (int) $alliance->member_limit,
+                    && (int) $alliance->memberships_count < self::ALLIANCE_MEMBER_LIMIT,
             ))
             ->values()
             ->all();
@@ -756,6 +766,14 @@ class DashboardController extends Controller
             'canCreate' => ! $hasAlliance && $cooldownEndsAt === null,
             'creationCooldownEndsAt' => $cooldownEndsAt?->toIso8601String(),
         ];
+    }
+
+    private function allianceSearchFor(Request $request): string
+    {
+        return str((string) $request->query('alliance_search', ''))
+            ->trim()
+            ->limit(80, '')
+            ->toString();
     }
 
     private function currentAllianceFor(User $user): ?Alliance
@@ -776,7 +794,7 @@ class DashboardController extends Controller
      */
     private function currentAllianceCardFor(User $user, Alliance $alliance): array
     {
-        $alliance->loadMissing(['leader', 'memberships.user']);
+        $alliance->loadMissing(['applications.user', 'leader', 'memberships.user']);
         $alliance->loadCount('memberships');
 
         $membership = $alliance->memberships
@@ -794,7 +812,29 @@ class DashboardController extends Controller
             'canLeave' => Gate::forUser($user)->allows('leave', $alliance),
             'canDisband' => Gate::forUser($user)->allows('delete', $alliance),
             'members' => $this->allianceMemberCardsFor($user, $alliance, true),
+            'applications' => Gate::forUser($user)->allows('updateVisibility', $alliance)
+                ? $this->allianceApplicationCardsFor($alliance)
+                : [],
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, userId: int, userName: string, appliedAt: string|null}>
+     */
+    private function allianceApplicationCardsFor(Alliance $alliance): array
+    {
+        $alliance->loadMissing('applications.user');
+
+        return $alliance->applications
+            ->sortBy('created_at')
+            ->map(fn (AllianceApplication $application): array => [
+                'id' => $application->id,
+                'userId' => $application->user_id,
+                'userName' => $application->user->name,
+                'appliedAt' => $application->created_at?->format('Y-m-d H:i'),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -846,16 +886,24 @@ class DashboardController extends Controller
      */
     private function allianceSummaryCardFor(User $user, Alliance $alliance, bool $canJoin): array
     {
+        $alliance->loadMissing('applications');
+        $application = $alliance->applications
+            ->firstWhere('user_id', $user->id);
+
         return [
             'id' => $alliance->id,
             'name' => $alliance->name,
             'slug' => $alliance->slug,
             'description' => $alliance->description,
             'leaderName' => $alliance->leader->name,
-            'memberLimit' => (int) $alliance->member_limit,
+            'memberLimit' => self::ALLIANCE_MEMBER_LIMIT,
             'memberCount' => (int) ($alliance->memberships_count ?? $alliance->memberships()->count()),
             'isOpen' => (bool) $alliance->is_open,
             'canJoin' => $canJoin,
+            'canApply' => ! $alliance->is_open
+                && ! $this->userHasAlliance($user)
+                && ! ($application instanceof AllianceApplication),
+            'hasPendingApplication' => $application instanceof AllianceApplication,
             'members' => $this->allianceMemberCardsFor($user, $alliance, false),
         ];
     }
@@ -875,6 +923,11 @@ class DashboardController extends Controller
             ->addHours(self::ALLIANCE_CREATION_COOLDOWN_HOURS);
 
         return $cooldownEndsAt->isFuture() ? $cooldownEndsAt : null;
+    }
+
+    private function userHasAlliance(User $user): bool
+    {
+        return $user->allianceMembership()->exists() || $user->ledAlliance()->exists();
     }
 
     /**

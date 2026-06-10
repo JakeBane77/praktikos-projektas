@@ -2,6 +2,7 @@
 
 use App\Models\Achievement;
 use App\Models\Alliance;
+use App\Models\AllianceApplication;
 use App\Models\AllianceGoal;
 use App\Models\AllianceMembership;
 use App\Models\BuildingType;
@@ -270,6 +271,128 @@ test('leader can update alliance description and visibility through the controll
     expect($freshAlliance)->not->toBeNull()
         ->and($freshAlliance->description)->toBe('Updated alliance description')
         ->and($freshAlliance->is_open)->toBeFalse();
+});
+
+test('alliance member limit is fixed when creating an alliance', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('alliances.store'), [
+            'name' => 'Fixed Limit',
+            'description' => 'Member limit should ignore input.',
+            'member_limit' => 100,
+            'is_open' => true,
+        ])
+        ->assertRedirect();
+
+    $alliance = Alliance::query()
+        ->where('name', 'Fixed Limit')
+        ->first();
+
+    expect($alliance)->not->toBeNull()
+        ->and($alliance->member_limit)->toBe(20);
+});
+
+test('users apply to private alliances and leaders or officers can accept applications', function () {
+    $leader = User::factory()->create();
+    $officer = User::factory()->create();
+    $applicant = User::factory()->create();
+    $member = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Closed Gate',
+        'slug' => 'closed-gate',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => false,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $officer->id,
+        'role' => 'officer',
+        'joined_at' => now(),
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($applicant)
+        ->post(route('alliances.join', $alliance))
+        ->assertForbidden();
+
+    $this->actingAs($applicant)
+        ->post(route('alliances.apply', $alliance))
+        ->assertRedirect();
+
+    $application = AllianceApplication::query()
+        ->where('alliance_id', $alliance->id)
+        ->where('user_id', $applicant->id)
+        ->first();
+
+    expect($application)->toBeInstanceOf(AllianceApplication::class);
+    assert($application instanceof AllianceApplication);
+
+    $this->actingAs($member)
+        ->patch(route('alliances.applications.accept', [$alliance, $application]))
+        ->assertForbidden();
+
+    $this->actingAs($officer)
+        ->patch(route('alliances.applications.accept', [$alliance, $application]))
+        ->assertRedirect();
+
+    expect(AllianceApplication::query()->whereKey($application->id)->exists())->toBeFalse()
+        ->and(AllianceMembership::query()
+            ->where('alliance_id', $alliance->id)
+            ->where('user_id', $applicant->id)
+            ->where('role', 'member')
+            ->exists())->toBeTrue();
+});
+
+test('leaders and officers can deny private alliance applications', function () {
+    $leader = User::factory()->create();
+    $applicant = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Quiet Hall',
+        'slug' => 'quiet-hall',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => false,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $leader->id,
+        'role' => 'leader',
+        'joined_at' => now(),
+    ]);
+
+    $application = AllianceApplication::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $applicant->id,
+    ]);
+
+    $this->actingAs($leader)
+        ->delete(route('alliances.applications.deny', [$alliance, $application]))
+        ->assertRedirect();
+
+    expect($application->fresh())->toBeNull()
+        ->and(AllianceMembership::query()
+            ->where('alliance_id', $alliance->id)
+            ->where('user_id', $applicant->id)
+            ->exists())->toBeFalse();
 });
 
 test('leader and officer can kick allowed alliance members', function () {

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property CarbonInterface|null $updated_at
  * @property-read User|null $leader
  * @property-read Collection<int, AllianceMembership> $memberships
+ * @property-read Collection<int, AllianceApplication> $applications
  * @property-read Collection<int, User> $members
  * @property-read Collection<int, AllianceGoal> $goals
  */
@@ -57,6 +58,14 @@ class Alliance extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(AllianceMembership::class);
+    }
+
+    /**
+     * @return HasMany<AllianceApplication, $this>
+     */
+    public function applications(): HasMany
+    {
+        return $this->hasMany(AllianceApplication::class);
     }
 
     /**

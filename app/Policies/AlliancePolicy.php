@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\Alliance;
+use App\Models\AllianceApplication;
 use App\Models\AllianceMembership;
 use App\Models\User;
 
@@ -16,6 +17,11 @@ class AlliancePolicy
     public function join(User $user, Alliance $alliance): bool
     {
         return $alliance->is_open && ! $this->hasAlliance($user);
+    }
+
+    public function apply(User $user, Alliance $alliance): bool
+    {
+        return ! $alliance->is_open && ! $this->hasAlliance($user);
     }
 
     public function leave(User $user, Alliance $alliance): bool
@@ -42,6 +48,15 @@ class AlliancePolicy
         return $membership !== null
             && (int) $membership->alliance_id === (int) $alliance->id
             && $membership->role === 'officer';
+    }
+
+    public function reviewApplication(User $user, Alliance $alliance, AllianceApplication $application): bool
+    {
+        if ((int) $application->alliance_id !== (int) $alliance->id) {
+            return false;
+        }
+
+        return $this->updateVisibility($user, $alliance);
     }
 
     public function kick(User $user, Alliance $alliance, AllianceMembership $targetMembership): bool

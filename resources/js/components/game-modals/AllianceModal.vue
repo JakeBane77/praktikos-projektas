@@ -12,7 +12,12 @@ import {
 } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
 import { formatExactNumber } from '@/lib/game';
-import type { AllianceMember, AllianceState, AllianceSummary } from '@/lib/game';
+import type {
+    AllianceApplication,
+    AllianceMember,
+    AllianceState,
+    AllianceSummary,
+} from '@/lib/game';
 
 const props = defineProps<{
     alliances: AllianceState;
@@ -21,15 +26,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     close: [];
+    search: [query: string];
     create: [
         payload: {
             name: string;
             description: string | null;
-            member_limit: number;
             is_open: boolean;
         },
     ];
     join: [allianceId: number];
+    apply: [allianceId: number];
     updateAlliance: [
         payload: {
             allianceId: number;
@@ -43,12 +49,13 @@ const emit = defineEmits<{
     promote: [payload: { allianceId: number; membershipId: number }];
     demote: [payload: { allianceId: number; membershipId: number }];
     transferLeadership: [payload: { allianceId: number; membershipId: number }];
+    acceptApplication: [payload: { allianceId: number; applicationId: number }];
+    denyApplication: [payload: { allianceId: number; applicationId: number }];
 }>();
 
 const createForm = reactive({
     name: '',
     description: '',
-    member_limit: 20,
     is_open: true,
 });
 const updateForm = reactive({
@@ -66,27 +73,7 @@ const roleChangeConfirmation = ref<{
 } | null>(null);
 
 const currentAlliance = computed(() => props.alliances.current);
-const filteredAlliances = computed(() => {
-    const query = allianceSearchQuery.value.trim().toLowerCase();
-
-    if (!query) {
-        return props.alliances.available;
-    }
-
-    return props.alliances.available.filter((alliance) => {
-        const searchableValues = [
-            alliance.name,
-            alliance.slug,
-            alliance.description ?? '',
-            alliance.leaderName,
-            ...alliance.members.map((member) => member.name),
-        ];
-
-        return searchableValues.some((value) =>
-            value.toLowerCase().includes(query),
-        );
-    });
-});
+const filteredAlliances = computed(() => props.alliances.available);
 const selectedAlliance = computed(
     () =>
         props.alliances.available.find(
@@ -159,6 +146,10 @@ watch(
     },
 );
 
+watch(allianceSearchQuery, (query) => {
+    emit('search', query);
+});
+
 function createAlliance(): void {
     if (!canSubmitCreate.value) {
         return;
@@ -167,7 +158,6 @@ function createAlliance(): void {
     emit('create', {
         name: createForm.name.trim(),
         description: createForm.description.trim() || null,
-        member_limit: createForm.member_limit,
         is_open: createForm.is_open,
     });
 }
@@ -178,6 +168,56 @@ function joinAlliance(alliance: AllianceSummary): void {
     }
 
     emit('join', alliance.id);
+}
+
+function applyToAlliance(alliance: AllianceSummary): void {
+    if (!alliance.canApply || props.isSubmitting) {
+        return;
+    }
+
+    emit('apply', alliance.id);
+}
+
+function acceptApplication(application: AllianceApplication): void {
+    if (!currentAlliance.value || props.isSubmitting) {
+        return;
+    }
+
+    emit('acceptApplication', {
+        allianceId: currentAlliance.value.id,
+        applicationId: application.id,
+    });
+}
+
+function denyApplication(application: AllianceApplication): void {
+    if (!currentAlliance.value || props.isSubmitting) {
+        return;
+    }
+
+    emit('denyApplication', {
+        allianceId: currentAlliance.value.id,
+        applicationId: application.id,
+    });
+}
+
+function allianceActionLabel(alliance: AllianceSummary): string {
+    if (props.isSubmitting && (alliance.canJoin || alliance.canApply)) {
+        return alliance.canJoin ? 'Joining...' : 'Applying...';
+    }
+
+    if (alliance.canJoin) {
+        return 'Join';
+    }
+
+    if (alliance.canApply) {
+        return 'Apply';
+    }
+
+    if (alliance.hasPendingApplication) {
+        return 'Applied';
+    }
+
+    return alliance.isOpen ? 'Full' : 'Private';
 }
 
 function selectAlliance(alliance: AllianceSummary): void {
@@ -738,6 +778,68 @@ function confirmKick(member: AllianceMember): void {
                     </div>
                 </div>
 
+                <div
+                    v-if="currentAlliance.canUpdateVisibility"
+                    class="mt-5 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-bold">Join applications</p>
+                        <span class="text-sm font-semibold">
+                            {{
+                                formatExactNumber(
+                                    currentAlliance.applications.length,
+                                )
+                            }}
+                            pending
+                        </span>
+                    </div>
+
+                    <div
+                        v-if="currentAlliance.applications.length === 0"
+                        class="mt-3 rounded-md border border-[#e4dac7] p-3 text-sm text-[#696250] dark:border-[#35332c] dark:text-[#b6ae9d]"
+                    >
+                        No pending applications.
+                    </div>
+
+                    <div v-else class="mt-3 grid gap-2">
+                        <div
+                            v-for="application in currentAlliance.applications"
+                            :key="application.id"
+                            class="flex flex-col gap-3 rounded-md border border-[#e4dac7] p-3 dark:border-[#35332c] sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div>
+                                <p class="font-semibold">
+                                    {{ application.userName }}
+                                </p>
+                                <p
+                                    v-if="application.appliedAt"
+                                    class="mt-1 text-xs text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Applied {{ application.appliedAt }}
+                                </p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button
+                                    type="button"
+                                    class="rounded-md bg-[#243627] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                                    :disabled="isSubmitting"
+                                    @click="acceptApplication(application)"
+                                >
+                                    Accept
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-md border border-[#b64b3f] px-3 py-2 text-sm font-semibold text-[#b64b3f] transition hover:bg-[#b64b3f] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#ff8f7f] dark:text-[#ffb0a5] dark:hover:bg-[#803227] dark:hover:text-white"
+                                    :disabled="isSubmitting"
+                                    @click="denyApplication(application)"
+                                >
+                                    Deny
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <form
                     v-if="
                         currentAlliance.canUpdate ||
@@ -850,14 +952,17 @@ function confirmKick(member: AllianceMember): void {
                     <input
                         v-model="allianceSearchQuery"
                         type="search"
-                        placeholder="Name, leader, member"
+                        placeholder="Alliance name"
                         class="rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#11150f] dark:text-[#f3efe4]"
                     />
                 </label>
             </div>
 
             <div
-                v-if="props.alliances.available.length === 0"
+                v-if="
+                    props.alliances.available.length === 0 &&
+                    allianceSearchQuery.trim() === ''
+                "
                 class="mt-4 rounded-md border border-[#e4dac7] p-4 text-sm text-[#696250] dark:border-[#35332c] dark:text-[#b6ae9d]"
             >
                 No other alliances available yet.
@@ -1025,29 +1130,16 @@ function confirmKick(member: AllianceMember): void {
                         ></textarea>
                     </label>
 
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <label class="grid gap-1 text-sm font-semibold">
-                            Member limit
-                            <input
-                                v-model.number="createForm.member_limit"
-                                type="number"
-                                min="2"
-                                max="100"
-                                class="rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#11150f] dark:text-[#f3efe4]"
-                            />
-                        </label>
-
-                        <label
-                            class="flex items-center justify-between gap-3 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold dark:border-[#4a4438]"
-                        >
-                            Open joining
-                            <input
-                                v-model="createForm.is_open"
-                                type="checkbox"
-                                class="h-5 w-5 accent-[#243627]"
-                            />
-                        </label>
-                    </div>
+                    <label
+                        class="flex items-center justify-between gap-3 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold dark:border-[#4a4438]"
+                    >
+                        Open joining
+                        <input
+                            v-model="createForm.is_open"
+                            type="checkbox"
+                            class="h-5 w-5 accent-[#243627]"
+                        />
+                    </label>
 
                     <button
                         type="submit"
@@ -1085,14 +1177,17 @@ function confirmKick(member: AllianceMember): void {
                         <input
                             v-model="allianceSearchQuery"
                             type="search"
-                            placeholder="Name, leader, member"
+                            placeholder="Alliance name"
                             class="rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#11150f] dark:text-[#f3efe4]"
                         />
                     </label>
                 </div>
 
                 <div
-                    v-if="alliances.available.length === 0"
+                    v-if="
+                        alliances.available.length === 0 &&
+                        allianceSearchQuery.trim() === ''
+                    "
                     class="mt-4 rounded-md border border-[#e4dac7] p-4 text-sm text-[#696250] dark:border-[#35332c] dark:text-[#b6ae9d]"
                 >
                     No alliances available yet.
@@ -1149,18 +1244,18 @@ function confirmKick(member: AllianceMember): void {
                             <button
                                 type="button"
                                 class="rounded-md bg-[#243627] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="!alliance.canJoin || isSubmitting"
-                                @click.stop="joinAlliance(alliance)"
-                            >
-                                {{
+                                :disabled="
+                                    (!alliance.canJoin &&
+                                        !alliance.canApply) ||
+                                    isSubmitting
+                                "
+                                @click.stop="
                                     alliance.canJoin
-                                        ? isSubmitting
-                                            ? 'Joining...'
-                                            : 'Join'
-                                        : alliance.isOpen
-                                          ? 'Full'
-                                          : 'Private'
-                                }}
+                                        ? joinAlliance(alliance)
+                                        : applyToAlliance(alliance)
+                                "
+                            >
+                                {{ allianceActionLabel(alliance) }}
                             </button>
                         </div>
                     </article>

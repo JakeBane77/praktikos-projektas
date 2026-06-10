@@ -25,7 +25,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('alliances', [AllianceController::class, 'store'])->name('alliances.store');
     Route::patch('alliances/{alliance}', [AllianceController::class, 'update'])->name('alliances.update');
     Route::post('alliances/{alliance}/join', [AllianceController::class, 'join'])->name('alliances.join');
+    Route::post('alliances/{alliance}/apply', [AllianceController::class, 'apply'])->name('alliances.apply');
     Route::delete('alliances/{alliance}/leave', [AllianceController::class, 'leave'])->name('alliances.leave');
+    Route::patch('alliances/{alliance}/applications/{application}/accept', [AllianceController::class, 'acceptApplication'])->name('alliances.applications.accept');
+    Route::delete('alliances/{alliance}/applications/{application}', [AllianceController::class, 'denyApplication'])->name('alliances.applications.deny');
     Route::patch('alliances/{alliance}/members/{membership}/promote', [AllianceController::class, 'promote'])->name('alliances.members.promote');
     Route::patch('alliances/{alliance}/members/{membership}/demote', [AllianceController::class, 'demote'])->name('alliances.members.demote');
     Route::patch('alliances/{alliance}/members/{membership}/transfer-leadership', [AllianceController::class, 'transferLeadership'])->name('alliances.members.transfer-leadership');

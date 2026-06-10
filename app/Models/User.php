@@ -28,6 +28,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property-read Alliance|null $ledAlliance
  * @property-read Alliance|null $alliance
  * @property-read AllianceMembership|null $allianceMembership
+ * @property-read Collection<int, AllianceApplication> $allianceApplications
  * @property-read Collection<int, AllianceCreationLog> $allianceCreationLogs
  * @property-read Collection<int, AllianceGoalContribution> $allianceGoalContributions
  */
@@ -113,6 +114,14 @@ class User extends Authenticatable implements PasskeyUser
             'id',
             'alliance_id',
         );
+    }
+
+    /**
+     * @return HasMany<AllianceApplication, $this>
+     */
+    public function allianceApplications(): HasMany
+    {
+        return $this->hasMany(AllianceApplication::class);
     }
 
     /**

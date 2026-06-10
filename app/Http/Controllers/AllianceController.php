@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Alliance;
+use App\Models\AllianceApplication;
 use App\Models\AllianceCreationLog;
 use App\Models\AllianceGoal;
 use App\Models\AllianceMembership;
@@ -20,9 +21,7 @@ class AllianceController extends Controller
 {
     private const CREATION_COOLDOWN_HOURS = 24;
 
-    private const MEMBER_LIMIT_MIN = 2;
-
-    private const MEMBER_LIMIT_MAX = 100;
+    private const MEMBER_LIMIT = 20;
 
     /**
      * @var list<string>
@@ -47,7 +46,6 @@ class AllianceController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:80', 'unique:alliances,name'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'member_limit' => ['sometimes', 'integer', 'min:'.self::MEMBER_LIMIT_MIN, 'max:'.self::MEMBER_LIMIT_MAX],
             'is_open' => ['sometimes', 'boolean'],
         ]);
 
@@ -74,7 +72,7 @@ class AllianceController extends Controller
                 'slug' => $this->uniqueSlugFor($validated['name']),
                 'description' => $validated['description'] ?? null,
                 'leader_id' => $lockedUser->id,
-                'member_limit' => $validated['member_limit'] ?? 20,
+                'member_limit' => self::MEMBER_LIMIT,
                 'is_open' => $validated['is_open'] ?? true,
             ]);
 
@@ -99,13 +97,12 @@ class AllianceController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'min:3', 'max:80', Rule::unique('alliances', 'name')->ignore($alliance->id)],
             'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'member_limit' => ['sometimes', 'integer', 'min:'.self::MEMBER_LIMIT_MIN, 'max:'.self::MEMBER_LIMIT_MAX],
             'is_open' => ['sometimes', 'boolean'],
         ]);
 
         $leaderOnlyFields = array_intersect(
             array_keys($validated),
-            ['name', 'description', 'member_limit'],
+            ['name', 'description'],
         );
 
         if ($leaderOnlyFields !== []) {
@@ -144,7 +141,7 @@ class AllianceController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($lockedAlliance->memberships()->count() >= $lockedAlliance->member_limit) {
+            if ($lockedAlliance->memberships()->count() >= self::MEMBER_LIMIT) {
                 throw ValidationException::withMessages([
                     'alliance' => 'This alliance is full.',
                 ]);
@@ -157,6 +154,109 @@ class AllianceController extends Controller
                 'joined_at' => now(),
             ]);
         });
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
+    public function apply(Request $request, Alliance $alliance): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        Gate::authorize('apply', $alliance);
+
+        if ($this->userHasAlliance($user)) {
+            return $this->backWithError('alliance', 'You are already in an alliance.');
+        }
+
+        if ($alliance->is_open) {
+            return $this->backWithError('alliance', 'This alliance is open. Join it directly.');
+        }
+
+        if ($alliance->memberships()->count() >= self::MEMBER_LIMIT) {
+            return $this->backWithError('alliance', 'This alliance is full.');
+        }
+
+        $application = AllianceApplication::query()
+            ->where('alliance_id', $alliance->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($application instanceof AllianceApplication) {
+            return $this->backWithError('alliance', 'You have already applied to this alliance.');
+        }
+
+        AllianceApplication::create([
+            'alliance_id' => $alliance->id,
+            'user_id' => $user->id,
+        ]);
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
+    public function acceptApplication(Alliance $alliance, AllianceApplication $application): RedirectResponse
+    {
+        if ((int) $application->alliance_id !== (int) $alliance->id) {
+            abort(404);
+        }
+
+        Gate::authorize('reviewApplication', [$alliance, $application]);
+
+        DB::transaction(function () use ($alliance, $application): void {
+            $lockedAlliance = Alliance::query()
+                ->whereKey($alliance->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedApplication = AllianceApplication::query()
+                ->whereKey($application->id)
+                ->where('alliance_id', $lockedAlliance->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $applicant = User::query()
+                ->whereKey($lockedApplication->user_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($this->userHasAlliance($applicant)) {
+                $lockedApplication->delete();
+
+                throw ValidationException::withMessages([
+                    'alliance' => 'This player is already in an alliance.',
+                ]);
+            }
+
+            if ($lockedAlliance->memberships()->count() >= self::MEMBER_LIMIT) {
+                throw ValidationException::withMessages([
+                    'alliance' => 'This alliance is full.',
+                ]);
+            }
+
+            AllianceMembership::create([
+                'alliance_id' => $lockedAlliance->id,
+                'user_id' => $lockedApplication->user_id,
+                'role' => 'member',
+                'joined_at' => now(),
+            ]);
+
+            AllianceApplication::query()
+                ->where('user_id', $lockedApplication->user_id)
+                ->delete();
+        });
+
+        return redirect()->to(url()->previous(route('dashboard')));
+    }
+
+    public function denyApplication(Alliance $alliance, AllianceApplication $application): RedirectResponse
+    {
+        if ((int) $application->alliance_id !== (int) $alliance->id) {
+            abort(404);
+        }
+
+        Gate::authorize('reviewApplication', [$alliance, $application]);
+
+        $application->delete();
 
         return redirect()->to(url()->previous(route('dashboard')));
     }
