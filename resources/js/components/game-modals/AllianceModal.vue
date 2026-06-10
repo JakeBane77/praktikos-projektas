@@ -687,11 +687,11 @@ function confirmKick(member: AllianceMember): void {
                     </button>
                 </div>
                 <div
-                    class="grid gap-3 border-b border-[#e4dac7] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:text-[#b6ae9d]"
+                    class="hidden gap-3 border-b border-[#e4dac7] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:text-[#b6ae9d] md:grid"
                     :class="
                         isEditingMembers
-                            ? 'grid-cols-[1fr_6.5rem_8rem_9rem]'
-                            : 'grid-cols-[1fr_6.5rem_8rem]'
+                            ? 'md:grid-cols-[1fr_6.5rem_8rem_9rem]'
+                            : 'md:grid-cols-[1fr_6.5rem_8rem]'
                     "
                 >
                     <span>Member</span>
@@ -708,18 +708,18 @@ function confirmKick(member: AllianceMember): void {
                     <div
                         v-for="member in currentAlliance.members"
                         :key="member.id"
-                        class="grid items-center gap-3 px-4 py-3 text-sm"
+                        class="grid grid-cols-[1fr_auto] gap-3 px-4 py-4 text-sm md:items-center md:py-3"
                         :class="[
                             isEditingMembers
-                                ? 'grid-cols-[1fr_6.5rem_8rem_9rem]'
-                                : 'grid-cols-[1fr_6.5rem_8rem]',
+                                ? 'md:grid-cols-[1fr_6.5rem_8rem_9rem]'
+                                : 'md:grid-cols-[1fr_6.5rem_8rem]',
                             member.isCurrentUser
                                 ? 'bg-[#edf6e8] text-[#243627] dark:bg-[#1d2a17] dark:text-[#d7edc5]'
                                 : '',
                         ]"
                     >
-                        <div class="min-w-0">
-                            <p class="truncate font-semibold">
+                        <div class="col-span-2 min-w-0 md:col-span-1">
+                            <p class="font-semibold md:truncate">
                                 {{ member.name }}
                                 <span
                                     v-if="member.isCurrentUser"
@@ -755,7 +755,7 @@ function confirmKick(member: AllianceMember): void {
 
                         <div
                             v-if="isEditingMembers"
-                            class="flex justify-end gap-1.5"
+                            class="col-span-2 flex flex-wrap justify-start gap-1.5 md:col-span-1 md:justify-end"
                         >
                             <button
                                 v-if="memberCanTransferLeadership(member)"
@@ -801,7 +801,7 @@ function confirmKick(member: AllianceMember): void {
 
                         <div
                             v-if="kickConfirmationMemberId === member.id"
-                            class="col-span-4 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
+                            class="col-span-2 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f] md:col-span-4"
                         >
                             <p
                                 class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
@@ -847,7 +847,7 @@ function confirmKick(member: AllianceMember): void {
                             v-if="
                                 roleChangeConfirmation?.memberId === member.id
                             "
-                            class="col-span-4 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
+                            class="col-span-2 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f] md:col-span-4"
                         >
                             <p
                                 class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
