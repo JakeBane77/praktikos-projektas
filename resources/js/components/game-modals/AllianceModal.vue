@@ -567,6 +567,55 @@ function confirmKick(member: AllianceMember): void {
                         </div>
                     </div>
                 </div>
+
+                <div
+                    v-if="currentAlliance.canDisband"
+                    class="mt-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                >
+                    <button
+                        type="button"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#b64b3f] px-4 py-2.5 text-sm font-semibold text-[#b64b3f] transition hover:bg-[#b64b3f] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#ff8f7f] dark:text-[#ffb0a5] dark:hover:bg-[#803227] dark:hover:text-white"
+                        :disabled="isSubmitting"
+                        @click="requestDisband"
+                    >
+                        <Trash2 class="h-4 w-4" />
+                        Disband alliance
+                    </button>
+
+                    <div
+                        v-if="isDisbandConfirmationOpen"
+                        class="mt-3 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
+                    >
+                        <p
+                            class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
+                        >
+                            Disband
+                            <span
+                                class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
+                            >
+                                {{ currentAlliance.name }}
+                            </span>
+                            ? Can't disband if other members remain.
+                        </p>
+                        <div class="mt-3 flex gap-2">
+                            <button
+                                type="button"
+                                class="flex-1 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                                @click="cancelDisband"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                class="flex-1 rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="isSubmitting"
+                                @click="confirmDisband"
+                            >
+                                Confirm disband
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div
@@ -883,56 +932,6 @@ function confirmKick(member: AllianceMember): void {
                         {{ isSubmitting ? 'Saving...' : 'Save changes' }}
                     </button>
                 </form>
-
-                <div
-                    v-if="currentAlliance.canDisband"
-                    class="mt-5 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
-                >
-                    <button
-                        type="button"
-                        class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#b64b3f] px-4 py-2.5 text-sm font-semibold text-[#b64b3f] transition hover:bg-[#b64b3f] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#ff8f7f] dark:text-[#ffb0a5] dark:hover:bg-[#803227] dark:hover:text-white"
-                        :disabled="isSubmitting"
-                        @click="requestDisband"
-                    >
-                        <Trash2 class="h-4 w-4" />
-                        Disband alliance
-                    </button>
-
-                    <div
-                        v-if="isDisbandConfirmationOpen"
-                        class="mt-3 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
-                    >
-                        <p
-                            class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
-                        >
-                            Disband
-                            <span
-                                class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
-                            >
-                                {{ currentAlliance.name }}
-                            </span>
-                            ? If other members remain, leadership must be
-                            assigned first.
-                        </p>
-                        <div class="mt-3 flex gap-2">
-                            <button
-                                type="button"
-                                class="flex-1 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                                @click="cancelDisband"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                class="flex-1 rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="isSubmitting"
-                                @click="confirmDisband"
-                            >
-                                Confirm disband
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
