@@ -1739,6 +1739,34 @@ function kickAllianceMember(payload: {
     );
 }
 
+function contributeAllianceGoal(payload: {
+    goalId: number;
+    resource_type: ResourceKey;
+    amount: number;
+}): void {
+    router.post(
+        `/alliance-goals/${payload.goalId}/contribute`,
+        {
+            resource_type: payload.resource_type,
+            amount: payload.amount,
+        },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance_goal) {
+                    toast.error(errors.alliance_goal);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
 function completeMinigame(minigame: Minigame): void {
     router.post(
         `/dashboard/minigames/${minigame.resource}/complete`,
@@ -2665,6 +2693,7 @@ function timeFromInputValue(value: string): Date {
                 @promote="promoteAllianceMember"
                 @demote="demoteAllianceMember"
                 @transfer-leadership="transferAllianceLeadership"
+                @contribute-goal="contributeAllianceGoal"
             />
             <LeaderboardModal
                 v-else-if="isLeaderboardModalOpen && selectedLeaderboard"

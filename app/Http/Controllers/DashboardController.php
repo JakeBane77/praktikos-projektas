@@ -15,6 +15,7 @@ use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
+use App\Services\AllianceGoalService;
 use App\Support\Weather;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
@@ -56,6 +57,8 @@ class DashboardController extends Controller
         'all' => 0,
         'buildingTypes' => [],
     ];
+
+    public function __construct(private readonly AllianceGoalService $allianceGoalService) {}
 
     public function index(Request $request): Response
     {
@@ -815,6 +818,8 @@ class DashboardController extends Controller
             'applications' => Gate::forUser($user)->allows('updateVisibility', $alliance)
                 ? $this->allianceApplicationCardsFor($alliance)
                 : [],
+            'goal' => $this->allianceGoalService->currentGoalCardFor($alliance),
+            'activeGoalBonus' => $this->allianceGoalService->previousBonusCardFor($alliance),
         ];
     }
 
@@ -959,6 +964,12 @@ class DashboardController extends Controller
                 $bonuses['buildingTypes'][$achievement->bonus_building_type_id] =
                     ($bonuses['buildingTypes'][$achievement->bonus_building_type_id] ?? 0) + $bonusPercent;
             });
+
+        $allianceBonusPercent = $this->allianceGoalService->activeBonusPercentFor($user);
+
+        if ($allianceBonusPercent > 0) {
+            $bonuses['all'] += $allianceBonusPercent;
+        }
 
         return $bonuses;
     }

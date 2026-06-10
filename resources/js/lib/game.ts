@@ -114,6 +114,42 @@ export type AllianceApplication = {
     appliedAt: string | null;
 };
 
+export type AllianceGoalStage = {
+    percentage: number;
+    percentageLabel: string;
+    amount: number;
+    amountLabel: string;
+    isReached: boolean;
+};
+
+export type AllianceGoal = {
+    id: number;
+    name: string;
+    resourceType: ResourceKey | null;
+    resourceLabel: string;
+    targetAmount: number;
+    targetAmountLabel: string;
+    currentAmount: number;
+    currentAmountLabel: string;
+    progressPercent: number;
+    stageCount: number;
+    reachedStageCount: number;
+    bonusPerStagePercent: number;
+    potentialBonusPercent: number;
+    earnedNextWeekBonusPercent: number;
+    weekStartsAt: string;
+    weekEndsAt: string;
+    status: 'active' | 'completed' | 'expired';
+    stages: AllianceGoalStage[];
+};
+
+export type AllianceGoalBonus = {
+    bonusPercent: number;
+    stageCount: number;
+    sourceGoalName: string | null;
+    label: string;
+};
+
 export type AllianceSummary = {
     id: number;
     name: string;
@@ -137,6 +173,8 @@ export type CurrentAlliance = AllianceSummary & {
     canDisband: boolean;
     members: AllianceMember[];
     applications: AllianceApplication[];
+    goal: AllianceGoal;
+    activeGoalBonus: AllianceGoalBonus;
 };
 
 export type AllianceState = {

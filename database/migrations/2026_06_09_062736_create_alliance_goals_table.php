@@ -15,16 +15,20 @@ return new class extends Migration
             $table->id();
             $table->foreignId('alliance_id')->constrained()->cascadeOnDelete();
             $table->string('name');
-            $table->enum('resource_type', ['gold', 'wood', 'stone', 'food']);
+            $table->string('resource_type')->nullable();
             $table->unsignedBigInteger('target_amount');
             $table->unsignedBigInteger('current_amount')->default(0);
             $table->unsignedInteger('production_bonus_percent')->default(0);
-            $table->unsignedInteger('bonus_duration_hours');
+            $table->unsignedInteger('bonus_duration_hours')->default(168);
+            $table->json('stage_percentages');
+            $table->timestamp('week_starts_at');
+            $table->timestamp('week_ends_at');
             $table->enum('status', ['active', 'completed', 'expired'])->default('active');
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
 
             $table->index(['alliance_id', 'status', 'resource_type']);
+            $table->index(['alliance_id', 'week_starts_at']);
             $table->index(['status', 'completed_at']);
         });
     }

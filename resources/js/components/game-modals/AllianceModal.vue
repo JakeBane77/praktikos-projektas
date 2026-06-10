@@ -17,6 +17,7 @@ import type {
     AllianceMember,
     AllianceState,
     AllianceSummary,
+    ResourceKey,
 } from '@/lib/game';
 
 const props = defineProps<{
@@ -51,6 +52,13 @@ const emit = defineEmits<{
     transferLeadership: [payload: { allianceId: number; membershipId: number }];
     acceptApplication: [payload: { allianceId: number; applicationId: number }];
     denyApplication: [payload: { allianceId: number; applicationId: number }];
+    contributeGoal: [
+        payload: {
+            goalId: number;
+            resource_type: ResourceKey;
+            amount: number;
+        },
+    ];
 }>();
 
 const createForm = reactive({
@@ -62,13 +70,20 @@ const updateForm = reactive({
     description: '',
     is_open: true,
 });
+const goalContributionForm = reactive<{
+    resource_type: ResourceKey;
+    amount: number;
+}>({
+    resource_type: 'wood',
+    amount: 1,
+});
 const isLeaveConfirmationOpen = ref(false);
 const isDisbandConfirmationOpen = ref(false);
 const kickConfirmationMemberId = ref<number | null>(null);
 const kickConfirmationInput = ref('');
 const allianceSearchQuery = ref('');
 const selectedAllianceId = ref<number | null>(null);
-type AllianceSection = 'current' | 'applications' | 'settings' | 'search';
+type AllianceSection = 'current' | 'goals' | 'applications' | 'settings' | 'search';
 const activeAllianceSection = ref<AllianceSection>('current');
 const isEditingMembers = ref(false);
 const roleChangeConfirmation = ref<{
@@ -134,6 +149,7 @@ const canShowApplicationsSection = computed(() => {
 const allianceSections = computed(() => {
     const sections: Array<{ key: AllianceSection; label: string }> = [
         { key: 'current', label: 'Current alliance' },
+        { key: 'goals', label: 'Goals' },
     ];
 
     if (canShowApplicationsSection.value) {
@@ -172,6 +188,7 @@ watch(
     (alliance) => {
         updateForm.description = alliance?.description ?? '';
         updateForm.is_open = alliance?.isOpen ?? true;
+        goalContributionForm.resource_type = alliance?.goal.resourceType ?? 'wood';
 
         if (
             activeAllianceSection.value === 'applications' &&
@@ -352,6 +369,20 @@ function updateAlliance(): void {
     }
 
     emit('updateAlliance', payload);
+}
+
+function contributeToGoal(): void {
+    const goal = currentAlliance.value?.goal;
+
+    if (!goal || props.isSubmitting || goalContributionForm.amount < 1) {
+        return;
+    }
+
+    emit('contributeGoal', {
+        goalId: goal.id,
+        resource_type: goal.resourceType ?? goalContributionForm.resource_type,
+        amount: Math.floor(goalContributionForm.amount),
+    });
 }
 
 function requestLeave(): void {
@@ -918,7 +949,157 @@ function confirmKick(member: AllianceMember): void {
                 </div>
             </div>
 
+            <section
+                v-else-if="activeAllianceSection === 'goals'"
+                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+            >
                 <div
+                    class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                >
+                    <div>
+                        <h3 class="text-lg font-bold">Alliance goals</h3>
+                        <p class="mt-1 text-sm text-[#696250] dark:text-[#b6ae9d]">
+                            Donate this week to unlock next week's production
+                            bonus.
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-md border border-[#e4dac7] px-3 py-2 text-sm dark:border-[#35332c]"
+                    >
+                        <p class="font-semibold">
+                            {{ currentAlliance.activeGoalBonus.label }}
+                        </p>
+                        <p class="mt-1 text-xs text-[#696250] dark:text-[#b6ae9d]">
+                            {{
+                                formatExactNumber(
+                                    currentAlliance.activeGoalBonus.stageCount,
+                                )
+                            }}
+                            stages reached last week
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]">
+                    <div
+                        class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                    >
+                        <div>
+                            <p
+                                class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                            >
+                                This week
+                            </p>
+                            <h4 class="mt-1 text-lg font-bold">
+                                {{ currentAlliance.goal.name }}
+                            </h4>
+                            <p
+                                class="mt-1 text-sm text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                {{ currentAlliance.goal.resourceLabel }} -
+                                {{ currentAlliance.goal.currentAmountLabel }} /
+                                {{ currentAlliance.goal.targetAmountLabel }}
+                            </p>
+                        </div>
+                        <span class="text-sm font-semibold">
+                            Ends {{ currentAlliance.goal.weekEndsAt }}
+                        </span>
+                    </div>
+
+                    <div
+                        class="mt-4 h-3 overflow-hidden rounded-full bg-[#e4dac7] dark:bg-[#35332c]"
+                    >
+                        <div
+                            class="h-full rounded-full bg-[#243627] dark:bg-[#caa66c]"
+                            :style="{
+                                width: `${currentAlliance.goal.progressPercent}%`,
+                            }"
+                        ></div>
+                    </div>
+
+                    <div class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                        <div
+                            v-for="stage in currentAlliance.goal.stages"
+                            :key="stage.percentageLabel"
+                            class="rounded-md border p-3 text-sm"
+                            :class="
+                                stage.isReached
+                                    ? 'border-[#4f7d46] bg-[#edf6e8] text-[#243627] dark:border-[#9dcc84] dark:bg-[#1d2a17] dark:text-[#d7edc5]'
+                                    : 'border-[#e4dac7] dark:border-[#35332c]'
+                            "
+                        >
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="font-bold">
+                                    {{ stage.percentageLabel }}
+                                </span>
+                                <span class="text-xs font-semibold">
+                                    {{ stage.isReached ? 'Reached' : 'Locked' }}
+                                </span>
+                            </div>
+                            <p class="mt-1 text-xs">
+                                {{ stage.amountLabel }} donated
+                            </p>
+                        </div>
+                    </div>
+
+                    <form
+                        class="mt-4 grid gap-3 border-t border-[#e4dac7] pt-4 dark:border-[#35332c] sm:grid-cols-[1fr_1fr_auto]"
+                        @submit.prevent="contributeToGoal"
+                    >
+                        <label
+                            v-if="currentAlliance.goal.resourceType === null"
+                            class="grid gap-1 text-sm font-semibold"
+                        >
+                            Resource
+                            <select
+                                v-model="goalContributionForm.resource_type"
+                                class="rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#11150f] dark:text-[#f3efe4]"
+                            >
+                                <option value="wood">Wood</option>
+                                <option value="food">Food</option>
+                                <option value="stone">Stone</option>
+                                <option value="gold">Gold</option>
+                            </select>
+                        </label>
+                        <div
+                            v-else
+                            class="rounded-md border border-[#e4dac7] px-3 py-2 text-sm dark:border-[#35332c]"
+                        >
+                            <p class="text-xs text-[#696250] dark:text-[#b6ae9d]">
+                                Resource
+                            </p>
+                            <p class="font-semibold">
+                                {{ currentAlliance.goal.resourceLabel }}
+                            </p>
+                        </div>
+
+                        <label class="grid gap-1 text-sm font-semibold">
+                            Amount
+                            <input
+                                v-model.number="goalContributionForm.amount"
+                                type="number"
+                                min="1"
+                                step="1"
+                                class="rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#11150f] dark:text-[#f3efe4]"
+                            />
+                        </label>
+
+                        <button
+                            type="submit"
+                            class="rounded-md bg-[#243627] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60 sm:self-end"
+                            :disabled="
+                                isSubmitting ||
+                                goalContributionForm.amount < 1 ||
+                                currentAlliance.goal.status !== 'active'
+                            "
+                        >
+                            Donate
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <div
                 v-else-if="
                     activeAllianceSection === 'applications' &&
                     canShowApplicationsSection

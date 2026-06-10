@@ -1313,6 +1313,34 @@ function kickAllianceMember(payload: {
     );
 }
 
+function contributeAllianceGoal(payload: {
+    goalId: number;
+    resource_type: ResourceKey;
+    amount: number;
+}) {
+    router.post(
+        `/alliance-goals/${payload.goalId}/contribute`,
+        {
+            resource_type: payload.resource_type,
+            amount: payload.amount,
+        },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance_goal) {
+                    toast.error(errors.alliance_goal);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
 function roadBuildAmount(building: Building): number {
     const amount = Number(roadBuildAmounts.value[building.id] ?? 1);
 
@@ -2264,6 +2292,7 @@ function upgradeBuilding(building: Building) {
                 @promote="promoteAllianceMember"
                 @demote="demoteAllianceMember"
                 @transfer-leadership="transferAllianceLeadership"
+                @contribute-goal="contributeAllianceGoal"
             />
             <LeaderboardModal
                 v-else-if="isLeaderboardModalOpen && selectedLeaderboard"

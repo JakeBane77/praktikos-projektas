@@ -9,6 +9,7 @@ use App\Models\AllianceGoal;
 use App\Models\AllianceMembership;
 use App\Models\User;
 use App\Models\UserResource;
+use App\Services\AllianceGoalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,8 @@ class AllianceController extends Controller
      * @var list<string>
      */
     private const RESOURCE_TYPES = ['gold', 'wood', 'stone', 'food'];
+
+    public function __construct(private readonly AllianceGoalService $allianceGoalService) {}
 
     public function store(Request $request): RedirectResponse
     {
@@ -399,10 +402,10 @@ class AllianceController extends Controller
 
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
-            'resource_type' => ['sometimes', 'string', Rule::in(self::RESOURCE_TYPES)],
+            'resource_type' => ['required', 'string', Rule::in(self::RESOURCE_TYPES)],
         ]);
 
-        if (($validated['resource_type'] ?? $goal->resource_type) !== $goal->resource_type) {
+        if ($goal->resource_type !== null && $validated['resource_type'] !== $goal->resource_type) {
             return $this->backWithError('alliance_goal', 'This goal requires '.$goal->resource_type.'.');
         }
 
@@ -410,11 +413,15 @@ class AllianceController extends Controller
             return $this->backWithError('alliance_goal', 'This goal is not active.');
         }
 
+        if ($goal->week_ends_at->isPast()) {
+            return $this->backWithError('alliance_goal', 'This goal has expired.');
+        }
+
         $membership = $user->allianceMembership()->firstOrFail();
 
         DB::transaction(function () use ($goal, $membership, $user, $validated): void {
             $amount = (int) $validated['amount'];
-            $resourceType = $goal->resource_type;
+            $resourceType = (string) $validated['resource_type'];
 
             $resources = UserResource::query()
                 ->where('user_id', $user->id)
@@ -429,6 +436,21 @@ class AllianceController extends Controller
             if ($lockedGoal->status !== 'active') {
                 throw ValidationException::withMessages([
                     'alliance_goal' => 'This goal is not active.',
+                ]);
+            }
+
+            if ($lockedGoal->week_ends_at->isPast()) {
+                $lockedGoal->status = 'expired';
+                $lockedGoal->save();
+
+                throw ValidationException::withMessages([
+                    'alliance_goal' => 'This goal has expired.',
+                ]);
+            }
+
+            if ($lockedGoal->resource_type !== null && $resourceType !== $lockedGoal->resource_type) {
+                throw ValidationException::withMessages([
+                    'alliance_goal' => 'This goal requires '.$lockedGoal->resource_type.'.',
                 ]);
             }
 
@@ -453,12 +475,8 @@ class AllianceController extends Controller
                 $lockedGoal->current_amount + $amount,
             );
 
-            if ($lockedGoal->current_amount >= $lockedGoal->target_amount) {
-                $lockedGoal->status = 'completed';
-                $lockedGoal->completed_at = now();
-            }
-
             $lockedGoal->save();
+            $this->allianceGoalService->refreshGoalStatus($lockedGoal);
 
             $membership->increment('total_contributed', $amount);
         });
