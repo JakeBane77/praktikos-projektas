@@ -65,12 +65,17 @@ const updateForm = reactive({
 const isLeaveConfirmationOpen = ref(false);
 const isDisbandConfirmationOpen = ref(false);
 const kickConfirmationMemberId = ref<number | null>(null);
+const kickConfirmationInput = ref('');
 const allianceSearchQuery = ref('');
 const selectedAllianceId = ref<number | null>(null);
+type AllianceSection = 'current' | 'applications' | 'settings' | 'search';
+const activeAllianceSection = ref<AllianceSection>('current');
+const isEditingMembers = ref(false);
 const roleChangeConfirmation = ref<{
     memberId: number;
     action: 'promote' | 'demote' | 'transferLeadership';
 } | null>(null);
+const roleConfirmationInput = ref('');
 
 const currentAlliance = computed(() => props.alliances.current);
 const filteredAlliances = computed(() => props.alliances.available);
@@ -106,6 +111,43 @@ const canSubmitUpdate = computed(() => {
 
     return descriptionChanged || visibilityChanged;
 });
+const hasAllianceSettings = computed(() => {
+    const alliance = currentAlliance.value;
+
+    return (
+        alliance !== null &&
+        (alliance.canUpdate ||
+            alliance.canUpdateVisibility ||
+            alliance.canLeave ||
+            alliance.canDisband)
+    );
+});
+const canShowApplicationsSection = computed(() => {
+    const alliance = currentAlliance.value;
+
+    return (
+        alliance !== null &&
+        !alliance.isOpen &&
+        alliance.canUpdateVisibility
+    );
+});
+const allianceSections = computed(() => {
+    const sections: Array<{ key: AllianceSection; label: string }> = [
+        { key: 'current', label: 'Current alliance' },
+    ];
+
+    if (canShowApplicationsSection.value) {
+        sections.push({ key: 'applications', label: 'Applications' });
+    }
+
+    if (hasAllianceSettings.value) {
+        sections.push({ key: 'settings', label: 'Settings' });
+    }
+
+    sections.push({ key: 'search', label: 'Alliance search' });
+
+    return sections;
+});
 
 const roleStyles = {
     leader: {
@@ -130,6 +172,13 @@ watch(
     (alliance) => {
         updateForm.description = alliance?.description ?? '';
         updateForm.is_open = alliance?.isOpen ?? true;
+
+        if (
+            activeAllianceSection.value === 'applications' &&
+            !canShowApplicationsSection.value
+        ) {
+            activeAllianceSection.value = 'current';
+        }
     },
     { immediate: true },
 );
@@ -225,6 +274,60 @@ function selectAlliance(alliance: AllianceSummary): void {
         selectedAllianceId.value === alliance.id ? null : alliance.id;
 }
 
+function setAllianceSection(section: AllianceSection): void {
+    activeAllianceSection.value = section;
+    isEditingMembers.value = false;
+    resetConfirmations();
+}
+
+function resetConfirmations(): void {
+    isLeaveConfirmationOpen.value = false;
+    isDisbandConfirmationOpen.value = false;
+    kickConfirmationMemberId.value = null;
+    kickConfirmationInput.value = '';
+    roleChangeConfirmation.value = null;
+    roleConfirmationInput.value = '';
+}
+
+function memberCanTransferLeadership(member: AllianceMember): boolean {
+    return member.canTransferLeadership && member.role === 'officer';
+}
+
+function roleConfirmationPhrase(
+    action: 'promote' | 'demote' | 'transferLeadership',
+): string {
+    if (action === 'transferLeadership') {
+        return 'confirm transfer';
+    }
+
+    return action === 'promote' ? 'confirm promotion' : 'confirm demotion';
+}
+
+function roleChangeActionLabel(
+    action: 'promote' | 'demote' | 'transferLeadership',
+): string {
+    if (action === 'transferLeadership') {
+        return 'Confirm transfer';
+    }
+
+    return action === 'promote' ? 'Confirm promotion' : 'Confirm demotion';
+}
+
+function canConfirmRoleChange(): boolean {
+    if (roleChangeConfirmation.value === null) {
+        return false;
+    }
+
+    return (
+        roleConfirmationInput.value.trim().toLowerCase() ===
+        roleConfirmationPhrase(roleChangeConfirmation.value.action)
+    );
+}
+
+function canConfirmKick(): boolean {
+    return kickConfirmationInput.value.trim().toLowerCase() === 'confirm kick';
+}
+
 function updateAlliance(): void {
     const alliance = currentAlliance.value;
 
@@ -259,7 +362,9 @@ function requestLeave(): void {
     isLeaveConfirmationOpen.value = true;
     isDisbandConfirmationOpen.value = false;
     kickConfirmationMemberId.value = null;
+    kickConfirmationInput.value = '';
     roleChangeConfirmation.value = null;
+    roleConfirmationInput.value = '';
 }
 
 function cancelLeave(): void {
@@ -283,7 +388,9 @@ function requestDisband(): void {
     isDisbandConfirmationOpen.value = true;
     isLeaveConfirmationOpen.value = false;
     kickConfirmationMemberId.value = null;
+    kickConfirmationInput.value = '';
     roleChangeConfirmation.value = null;
+    roleConfirmationInput.value = '';
 }
 
 function cancelDisband(): void {
@@ -305,7 +412,9 @@ function requestKick(member: AllianceMember): void {
     }
 
     kickConfirmationMemberId.value = member.id;
+    kickConfirmationInput.value = '';
     roleChangeConfirmation.value = null;
+    roleConfirmationInput.value = '';
     isLeaveConfirmationOpen.value = false;
     isDisbandConfirmationOpen.value = false;
 }
@@ -319,6 +428,7 @@ function requestPromote(member: AllianceMember): void {
         memberId: member.id,
         action: 'promote',
     };
+    roleConfirmationInput.value = '';
     kickConfirmationMemberId.value = null;
     isLeaveConfirmationOpen.value = false;
     isDisbandConfirmationOpen.value = false;
@@ -333,13 +443,14 @@ function requestDemote(member: AllianceMember): void {
         memberId: member.id,
         action: 'demote',
     };
+    roleConfirmationInput.value = '';
     kickConfirmationMemberId.value = null;
     isLeaveConfirmationOpen.value = false;
     isDisbandConfirmationOpen.value = false;
 }
 
 function requestTransferLeadership(member: AllianceMember): void {
-    if (!member.canTransferLeadership || props.isSubmitting) {
+    if (!memberCanTransferLeadership(member) || props.isSubmitting) {
         return;
     }
 
@@ -347,6 +458,7 @@ function requestTransferLeadership(member: AllianceMember): void {
         memberId: member.id,
         action: 'transferLeadership',
     };
+    roleConfirmationInput.value = '';
     kickConfirmationMemberId.value = null;
     isLeaveConfirmationOpen.value = false;
     isDisbandConfirmationOpen.value = false;
@@ -354,6 +466,7 @@ function requestTransferLeadership(member: AllianceMember): void {
 
 function cancelRoleChange(): void {
     roleChangeConfirmation.value = null;
+    roleConfirmationInput.value = '';
 }
 
 function confirmRoleChange(member: AllianceMember): void {
@@ -363,7 +476,8 @@ function confirmRoleChange(member: AllianceMember): void {
 
     if (
         roleChangeConfirmation.value.memberId !== member.id ||
-        props.isSubmitting
+        props.isSubmitting ||
+        !canConfirmRoleChange()
     ) {
         return;
     }
@@ -410,7 +524,7 @@ function demoteMember(member: AllianceMember): void {
 function transferLeadership(member: AllianceMember): void {
     if (
         !currentAlliance.value ||
-        !member.canTransferLeadership ||
+        !memberCanTransferLeadership(member) ||
         props.isSubmitting
     ) {
         return;
@@ -425,10 +539,16 @@ function transferLeadership(member: AllianceMember): void {
 
 function cancelKick(): void {
     kickConfirmationMemberId.value = null;
+    kickConfirmationInput.value = '';
 }
 
 function confirmKick(member: AllianceMember): void {
-    if (!currentAlliance.value || !member.canKick || props.isSubmitting) {
+    if (
+        !currentAlliance.value ||
+        !member.canKick ||
+        props.isSubmitting ||
+        !canConfirmKick()
+    ) {
         return;
     }
 
@@ -437,6 +557,7 @@ function confirmKick(member: AllianceMember): void {
         membershipId: member.id,
     });
     kickConfirmationMemberId.value = null;
+    kickConfirmationInput.value = '';
 }
 </script>
 
@@ -463,7 +584,7 @@ function confirmKick(member: AllianceMember): void {
             </button>
         </header>
 
-        <div v-if="currentAlliance" class="mt-5 grid gap-5 lg:grid-cols-3">
+        <div v-if="currentAlliance" class="mt-5 grid gap-5 lg:grid-cols-[16rem_1fr]">
             <div
                 class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
             >
@@ -519,115 +640,66 @@ function confirmKick(member: AllianceMember): void {
                     </div>
                 </div>
 
-                <div
-                    v-if="currentAlliance.canLeave"
-                    class="mt-5 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                <nav
+                    class="mt-5 grid gap-2 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
                 >
                     <button
+                        v-for="section in allianceSections"
+                        :key="section.key"
                         type="button"
-                        class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#b64b3f] px-4 py-2.5 text-sm font-semibold text-[#b64b3f] transition hover:bg-[#b64b3f] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#ff8f7f] dark:text-[#ffb0a5] dark:hover:bg-[#803227] dark:hover:text-white"
-                        :disabled="isSubmitting"
-                        @click="requestLeave"
+                        class="rounded-md border px-3 py-2 text-left text-sm font-semibold transition"
+                        :class="
+                            activeAllianceSection === section.key
+                                ? 'border-[#243627] bg-[#243627] text-white dark:border-[#caa66c] dark:bg-[#caa66c] dark:text-[#11150f]'
+                                : 'border-[#d7cbb8] text-[#4f574b] hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]'
+                        "
+                        @click="setAllianceSection(section.key)"
                     >
-                        <LogOut class="h-4 w-4" />
-                        Leave alliance
+                        {{ section.label }}
                     </button>
-
-                    <div
-                        v-if="isLeaveConfirmationOpen"
-                        class="mt-3 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
-                    >
-                        <p
-                            class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
-                        >
-                            Leave
-                            <span
-                                class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
-                            >
-                                {{ currentAlliance.name }}
-                            </span>
-                            ?
-                        </p>
-                        <div class="mt-3 flex gap-2">
-                            <button
-                                type="button"
-                                class="flex-1 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                                @click="cancelLeave"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                class="flex-1 rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="isSubmitting"
-                                @click="confirmLeave"
-                            >
-                                Confirm leave
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    v-if="currentAlliance.canDisband"
-                    class="mt-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
-                >
-                    <button
-                        type="button"
-                        class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#b64b3f] px-4 py-2.5 text-sm font-semibold text-[#b64b3f] transition hover:bg-[#b64b3f] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#ff8f7f] dark:text-[#ffb0a5] dark:hover:bg-[#803227] dark:hover:text-white"
-                        :disabled="isSubmitting"
-                        @click="requestDisband"
-                    >
-                        <Trash2 class="h-4 w-4" />
-                        Disband alliance
-                    </button>
-
-                    <div
-                        v-if="isDisbandConfirmationOpen"
-                        class="mt-3 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
-                    >
-                        <p
-                            class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
-                        >
-                            Disband
-                            <span
-                                class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
-                            >
-                                {{ currentAlliance.name }}
-                            </span>
-                            ? Can't disband if other members remain.
-                        </p>
-                        <div class="mt-3 flex gap-2">
-                            <button
-                                type="button"
-                                class="flex-1 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                                @click="cancelDisband"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                class="flex-1 rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="isSubmitting"
-                                @click="confirmDisband"
-                            >
-                                Confirm disband
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                </nav>
             </div>
 
             <div
-                class="overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c] lg:col-span-2"
+                v-if="activeAllianceSection === 'current'"
+                class="overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c]"
             >
                 <div
-                    class="grid grid-cols-[1fr_6.5rem_8rem_9rem] gap-3 border-b border-[#e4dac7] bg-[#f6f0e5] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:bg-[#151910] dark:text-[#b6ae9d]"
+                    class="flex flex-col gap-3 border-b border-[#e4dac7] bg-[#f6f0e5] px-4 py-3 dark:border-[#35332c] dark:bg-[#151910] sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div>
+                        <h3 class="text-lg font-bold">Alliance members</h3>
+                        <p
+                            class="mt-1 text-sm text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            View members and contribution totals.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-md border border-[#caa66c] px-3 py-2 text-sm font-semibold text-[#7b633d] transition hover:bg-[#7b633d] hover:text-white dark:text-[#caa66c] dark:hover:bg-[#5b4729]"
+                        @click="
+                            isEditingMembers = !isEditingMembers;
+                            resetConfirmations();
+                        "
+                    >
+                        {{ isEditingMembers ? 'Done editing' : 'Edit members' }}
+                    </button>
+                </div>
+                <div
+                    class="grid gap-3 border-b border-[#e4dac7] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:text-[#b6ae9d]"
+                    :class="
+                        isEditingMembers
+                            ? 'grid-cols-[1fr_6.5rem_8rem_9rem]'
+                            : 'grid-cols-[1fr_6.5rem_8rem]'
+                    "
                 >
                     <span>Member</span>
                     <span>Role</span>
                     <span class="text-right">Contribution</span>
-                    <span class="text-right">Action</span>
+                    <span v-if="isEditingMembers" class="text-right"
+                        >Action</span
+                    >
                 </div>
 
                 <div
@@ -636,12 +708,15 @@ function confirmKick(member: AllianceMember): void {
                     <div
                         v-for="member in currentAlliance.members"
                         :key="member.id"
-                        class="grid grid-cols-[1fr_6.5rem_8rem_9rem] items-center gap-3 px-4 py-3 text-sm"
-                        :class="
+                        class="grid items-center gap-3 px-4 py-3 text-sm"
+                        :class="[
+                            isEditingMembers
+                                ? 'grid-cols-[1fr_6.5rem_8rem_9rem]'
+                                : 'grid-cols-[1fr_6.5rem_8rem]',
                             member.isCurrentUser
                                 ? 'bg-[#edf6e8] text-[#243627] dark:bg-[#1d2a17] dark:text-[#d7edc5]'
-                                : ''
-                        "
+                                : '',
+                        ]"
                     >
                         <div class="min-w-0">
                             <p class="truncate font-semibold">
@@ -678,9 +753,12 @@ function confirmKick(member: AllianceMember): void {
                             }}
                         </span>
 
-                        <div class="flex justify-end gap-1.5">
+                        <div
+                            v-if="isEditingMembers"
+                            class="flex justify-end gap-1.5"
+                        >
                             <button
-                                v-if="member.canTransferLeadership"
+                                v-if="memberCanTransferLeadership(member)"
                                 type="button"
                                 class="inline-flex items-center justify-center rounded-md border border-[#caa66c] px-2.5 py-2 text-[#7b633d] transition hover:bg-[#7b633d] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#caa66c] dark:text-[#caa66c] dark:hover:bg-[#5b4729] dark:hover:text-white"
                                 :disabled="isSubmitting"
@@ -725,38 +803,43 @@ function confirmKick(member: AllianceMember): void {
                             v-if="kickConfirmationMemberId === member.id"
                             class="col-span-4 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
                         >
-                            <div
-                                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                            <p
+                                class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
                             >
-                                <p
-                                    class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
+                                Kick
+                                <span
+                                    class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
                                 >
-                                    Kick
-                                    <span
-                                        class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
-                                    >
-                                        {{ member.name }}
-                                    </span>
-                                    from the alliance?
-                                </p>
+                                    {{ member.name }}
+                                </span>
+                                from the alliance?
+                            </p>
 
-                                <div class="flex gap-2">
-                                    <button
-                                        type="button"
-                                        class="rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                                        @click="cancelKick"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
-                                        :disabled="isSubmitting"
-                                        @click="confirmKick(member)"
-                                    >
-                                        Confirm kick
-                                    </button>
-                                </div>
+                            <label class="mt-3 grid gap-1 text-sm font-semibold">
+                                Type "confirm kick" to continue
+                                <input
+                                    v-model="kickConfirmationInput"
+                                    type="text"
+                                    class="rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#11150f] dark:text-[#f3efe4]"
+                                />
+                            </label>
+
+                            <div class="mt-3 flex gap-2">
+                                <button
+                                    type="button"
+                                    class="rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                                    @click="cancelKick"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
+                                    :disabled="isSubmitting || !canConfirmKick()"
+                                    @click="confirmKick(member)"
+                                >
+                                    Confirm kick
+                                </button>
                             </div>
                         </div>
 
@@ -766,70 +849,81 @@ function confirmKick(member: AllianceMember): void {
                             "
                             class="col-span-4 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
                         >
-                            <div
-                                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                            <p
+                                class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
                             >
-                                <p
-                                    class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
+                                {{
+                                    roleChangeConfirmation.action ===
+                                    'transferLeadership'
+                                        ? 'Transfer leadership to'
+                                        : roleChangeConfirmation.action ===
+                                            'promote'
+                                          ? 'Promote'
+                                          : 'Demote'
+                                }}
+                                <span
+                                    class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
+                                >
+                                    {{ member.name }}
+                                </span>
+                                {{
+                                    roleChangeConfirmation.action ===
+                                    'transferLeadership'
+                                        ? ''
+                                        : roleChangeConfirmation.action ===
+                                            'promote'
+                                          ? 'to officer'
+                                          : 'to member'
+                                }}?
+                            </p>
+
+                            <label class="mt-3 grid gap-1 text-sm font-semibold">
+                                Type "{{
+                                    roleConfirmationPhrase(
+                                        roleChangeConfirmation.action,
+                                    )
+                                }}" to continue
+                                <input
+                                    v-model="roleConfirmationInput"
+                                    type="text"
+                                    class="rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-[#1f241c] dark:border-[#4a4438] dark:bg-[#11150f] dark:text-[#f3efe4]"
+                                />
+                            </label>
+
+                            <div class="mt-3 flex gap-2">
+                                <button
+                                    type="button"
+                                    class="rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                                    @click="cancelRoleChange"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-md bg-[#243627] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                                    :disabled="
+                                        isSubmitting || !canConfirmRoleChange()
+                                    "
+                                    @click="confirmRoleChange(member)"
                                 >
                                     {{
-                                        roleChangeConfirmation.action ===
-                                        'transferLeadership'
-                                            ? 'Transfer leadership to'
-                                            : roleChangeConfirmation.action ===
-                                                'promote'
-                                              ? 'Promote'
-                                              : 'Demote'
+                                        roleChangeActionLabel(
+                                            roleChangeConfirmation.action,
+                                        )
                                     }}
-                                    <span
-                                        class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
-                                    >
-                                        {{ member.name }}
-                                    </span>
-                                    {{
-                                        roleChangeConfirmation.action ===
-                                        'transferLeadership'
-                                            ? ''
-                                            : roleChangeConfirmation.action ===
-                                                'promote'
-                                              ? 'to officer'
-                                              : 'to member'
-                                    }}?
-                                </p>
-
-                                <div class="flex gap-2">
-                                    <button
-                                        type="button"
-                                        class="rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
-                                        @click="cancelRoleChange"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="rounded-md bg-[#243627] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                                        :disabled="isSubmitting"
-                                        @click="confirmRoleChange(member)"
-                                    >
-                                        {{
-                                            roleChangeConfirmation.action ===
-                                            'transferLeadership'
-                                                ? 'Confirm transfer'
-                                                : roleChangeConfirmation.action ===
-                                                    'promote'
-                                                  ? 'Confirm promote'
-                                                  : 'Confirm demote'
-                                        }}
-                                    </button>
-                                </div>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
                 <div
-                    v-if="currentAlliance.canUpdateVisibility"
-                    class="mt-5 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                v-else-if="
+                    activeAllianceSection === 'applications' &&
+                    canShowApplicationsSection
+                "
+                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
                 >
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-sm font-bold">Join applications</p>
@@ -890,14 +984,11 @@ function confirmKick(member: AllianceMember): void {
                 </div>
 
                 <form
-                    v-if="
-                        currentAlliance.canUpdate ||
-                        currentAlliance.canUpdateVisibility
-                    "
-                    class="mt-5 grid gap-3 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                v-else-if="activeAllianceSection === 'settings'"
+                class="grid gap-3 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
                     @submit.prevent="updateAlliance"
                 >
-                    <p class="text-sm font-bold">Alliance settings</p>
+                    <h3 class="text-lg font-bold">Alliance settings</h3>
 
                     <label
                         v-if="currentAlliance.canUpdate"
@@ -925,19 +1016,120 @@ function confirmKick(member: AllianceMember): void {
                     </label>
 
                     <button
+                        v-if="
+                            currentAlliance.canUpdate ||
+                            currentAlliance.canUpdateVisibility
+                        "
                         type="submit"
                         class="inline-flex w-full items-center justify-center rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
                         :disabled="!canSubmitUpdate"
                     >
                         {{ isSubmitting ? 'Saving...' : 'Save changes' }}
                     </button>
-                </form>
-            </div>
-        </div>
 
+                    <div
+                        v-if="
+                            currentAlliance.canLeave ||
+                            currentAlliance.canDisband
+                        "
+                        class="mt-2 grid gap-4 border-t border-[#e4dac7] pt-4 dark:border-[#35332c]"
+                    >
+                        <div v-if="currentAlliance.canLeave">
+                            <button
+                                type="button"
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#b64b3f] px-4 py-2.5 text-sm font-semibold text-[#b64b3f] transition hover:bg-[#b64b3f] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#ff8f7f] dark:text-[#ffb0a5] dark:hover:bg-[#803227] dark:hover:text-white"
+                                :disabled="isSubmitting"
+                                @click="requestLeave"
+                            >
+                                <LogOut class="h-4 w-4" />
+                                Leave alliance
+                            </button>
+
+                            <div
+                                v-if="isLeaveConfirmationOpen"
+                                class="mt-3 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
+                            >
+                                <p
+                                    class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    Leave
+                                    <span
+                                        class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
+                                    >
+                                        {{ currentAlliance.name }}
+                                    </span>
+                                    ?
+                                </p>
+                                <div class="mt-3 flex gap-2">
+                                    <button
+                                        type="button"
+                                        class="flex-1 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                                        @click="cancelLeave"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="flex-1 rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
+                                        :disabled="isSubmitting"
+                                        @click="confirmLeave"
+                                    >
+                                        Confirm leave
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="currentAlliance.canDisband">
+                            <button
+                                type="button"
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#b64b3f] px-4 py-2.5 text-sm font-semibold text-[#b64b3f] transition hover:bg-[#b64b3f] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#ff8f7f] dark:text-[#ffb0a5] dark:hover:bg-[#803227] dark:hover:text-white"
+                                :disabled="isSubmitting"
+                                @click="requestDisband"
+                            >
+                                <Trash2 class="h-4 w-4" />
+                                Disband alliance
+                            </button>
+
+                            <div
+                                v-if="isDisbandConfirmationOpen"
+                                class="mt-3 rounded-md border border-[#e4dac7] bg-[#fff8eb] p-3 dark:border-[#35332c] dark:bg-[#11150f]"
+                            >
+                                <p
+                                    class="text-sm font-medium text-[#5d6356] dark:text-[#c6c0b3]"
+                                >
+                                    Disband
+                                    <span
+                                        class="font-bold text-[#1f241c] dark:text-[#f3efe4]"
+                                    >
+                                        {{ currentAlliance.name }}
+                                    </span>
+                                    ? Can't disband if other members remain.
+                                </p>
+                                <div class="mt-3 flex gap-2">
+                                    <button
+                                        type="button"
+                                        class="flex-1 rounded-md border border-[#d7cbb8] px-3 py-2 text-sm font-semibold text-[#4f574b] transition hover:bg-[#ebe4d7] dark:border-[#4a4438] dark:text-[#c6c0b3] dark:hover:bg-[#24281d]"
+                                        @click="cancelDisband"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="flex-1 rounded-md bg-[#b64b3f] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#8f382f] disabled:cursor-not-allowed disabled:opacity-60"
+                                        :disabled="isSubmitting"
+                                        @click="confirmDisband"
+                                    >
+                                        Confirm disband
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
         <section
-            v-if="currentAlliance"
-            class="mt-5 rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+            v-else-if="activeAllianceSection === 'search'"
+            class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
         >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -1085,6 +1277,7 @@ function confirmKick(member: AllianceMember): void {
                 </div>
             </div>
         </section>
+        </div>
 
         <div v-else class="mt-5 grid gap-5 lg:grid-cols-[1fr_1.3fr]">
             <form

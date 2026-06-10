@@ -188,7 +188,7 @@ test('alliance policies enforce leader and officer permissions', function () {
         ->and($leader->can('promote', [$alliance, $member->allianceMembership]))->toBeTrue()
         ->and($leader->can('demote', [$alliance, $officer->allianceMembership]))->toBeTrue()
         ->and($leader->can('transferLeadership', [$alliance, $officer->allianceMembership]))->toBeTrue()
-        ->and($leader->can('transferLeadership', [$alliance, $member->allianceMembership]))->toBeTrue()
+        ->and($leader->can('transferLeadership', [$alliance, $member->allianceMembership]))->toBeFalse()
         ->and($officer->can('promote', [$alliance, $member->allianceMembership]))->toBeFalse()
         ->and($member->can('demote', [$alliance, $officer->allianceMembership]))->toBeFalse()
         ->and($officer->can('transferLeadership', [$alliance, $member->allianceMembership]))->toBeFalse()
@@ -584,7 +584,7 @@ test('leader can promote and demote alliance members', function () {
     expect($officerMembership->fresh()->role)->toBe('member');
 });
 
-test('leader can transfer alliance leadership to another member', function () {
+test('leader can transfer alliance leadership to another officer', function () {
     $leader = User::factory()->create();
     $member = User::factory()->create();
     $outsideUser = User::factory()->create();
@@ -608,7 +608,7 @@ test('leader can transfer alliance leadership to another member', function () {
     $memberMembership = AllianceMembership::create([
         'alliance_id' => $alliance->id,
         'user_id' => $member->id,
-        'role' => 'member',
+        'role' => 'officer',
         'joined_at' => now(),
     ]);
 

@@ -99,7 +99,8 @@ class AlliancePolicy
     {
         return (int) $alliance->leader_id === (int) $user->id
             && (int) $targetMembership->alliance_id === (int) $alliance->id
-            && (int) $targetMembership->user_id !== (int) $user->id;
+            && (int) $targetMembership->user_id !== (int) $user->id
+            && $targetMembership->role === 'officer';
     }
 
     public function delete(User $user, Alliance $alliance): bool
