@@ -72,6 +72,14 @@ export type Minigame = {
     rewardLabel: string;
     completions: number;
     resourcesGained: number;
+    stamina: {
+        current: number;
+        max: number;
+        used: number;
+        isAvailable: boolean;
+        availableInSeconds: number;
+        label: string;
+    };
 };
 
 export type LeaderboardEntry = {
@@ -293,6 +301,41 @@ export function formatHoursDuration(totalHours: number): string {
     }
 
     return parts.join(', ');
+}
+
+export function formatSecondsDuration(totalSeconds: number): string {
+    const seconds = Math.max(0, Math.ceil(totalSeconds));
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (minutes <= 0) {
+        return `${remainingSeconds} ${remainingSeconds === 1 ? 'second' : 'seconds'}`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    if (hours <= 0) {
+        return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}${remainingSeconds > 0 ? ` ${remainingSeconds} seconds` : ''}`;
+    }
+
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'}${remainingMinutes > 0 ? ` ${remainingMinutes} minutes` : ''}`;
+}
+
+export function minigameStaminaHoverLabel(minigame: Minigame): string {
+    if (!minigame.stamina.isAvailable) {
+        return `Stamina empty. Refreshes in ${formatSecondsDuration(
+            minigame.stamina.availableInSeconds,
+        )}`;
+    }
+
+    if (minigame.stamina.current >= minigame.stamina.max) {
+        return `Stamina full ${minigame.stamina.label}`;
+    }
+
+    return `Stamina ${minigame.stamina.label}. Next refresh in ${formatSecondsDuration(
+        minigame.stamina.availableInSeconds,
+    )}`;
 }
 
 export function upgradeAvailabilityFor(

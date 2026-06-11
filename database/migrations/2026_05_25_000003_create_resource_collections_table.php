@@ -22,8 +22,7 @@ return new class extends Migration
             $table->timestamp('collected_at');
             $table->timestamps();
 
-            $table->index(['user_id', 'collected_at']);
-            $table->index('source');
+            $table->index(['user_id', 'source', 'collected_at']);
         });
     }
 

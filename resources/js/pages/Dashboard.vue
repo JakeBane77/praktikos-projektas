@@ -35,6 +35,7 @@ import {
     formatGameNumber,
     formatHoursDuration,
     formatRate,
+    minigameStaminaHoverLabel,
     getTotalResources,
     upgradeAvailabilityFor,
 } from '@/lib/game';
@@ -835,7 +836,7 @@ function completeMinigame(minigame: Minigame) {
 }
 
 function openMinigame(minigame: Minigame) {
-    if (activeMinigameResource.value !== null) {
+    if (activeMinigameResource.value !== null || !minigame.stamina.isAvailable) {
         return;
     }
 
@@ -1638,6 +1639,18 @@ function upgradeBuilding(building: Building) {
                                 <span
                                     class="text-[#696250] dark:text-[#b6ae9d]"
                                 >
+                                    Stamina
+                                </span>
+                                <span class="font-semibold">
+                                    {{ minigame.stamina.label }}
+                                </span>
+                            </div>
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <span
+                                    class="text-[#696250] dark:text-[#b6ae9d]"
+                                >
                                     Reward
                                 </span>
                                 <span class="font-semibold">
@@ -1680,14 +1693,19 @@ function upgradeBuilding(building: Building) {
                             :data-resource="minigame.resource"
                             class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#243627] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="
-                                activeMinigameResource === minigame.resource
+                                activeMinigameResource === minigame.resource ||
+                                !minigame.stamina.isAvailable
                             "
+                            :aria-label="`Play ${minigame.label}. ${minigameStaminaHoverLabel(minigame)}`"
+                            :title="minigameStaminaHoverLabel(minigame)"
                             @click="openMinigame(minigame)"
                         >
                             <Gamepad2 class="h-4 w-4" />
                             {{
                                 activeMinigameResource === minigame.resource
                                     ? 'Completing...'
+                                    : !minigame.stamina.isAvailable
+                                      ? 'Stamina empty'
                                     : 'Play'
                             }}
                         </button>

@@ -14,6 +14,7 @@ use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
 use App\Services\AllianceGoalService;
+use App\Support\MinigameStamina;
 use App\Support\Weather;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -1058,7 +1059,63 @@ test('minigame completion awards resources from current production and tracks co
             ->where('minigames.0.currentProduction', 250)
             ->where('minigames.0.reward', 6)
             ->where('minigames.0.completions', 1)
-            ->where('minigames.0.resourcesGained', 6));
+            ->where('minigames.0.resourcesGained', 6)
+            ->where('minigames.0.stamina.current', MinigameStamina::MAX_COMPLETIONS_PER_HOUR - 1)
+            ->where('minigames.0.stamina.used', 1)
+            ->where('minigames.0.stamina.isAvailable', true)
+            ->where('minigames.3.resource', 'gold')
+            ->where('minigames.3.stamina.current', MinigameStamina::MAX_COMPLETIONS_PER_HOUR - 1)
+            ->where('minigames.3.stamina.used', 1)
+            ->where('minigames.3.stamina.isAvailable', true));
+});
+
+test('minigame stamina is shared across minigames from recent resource collection history', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $resources = UserResource::factory()
+        ->for($user)
+        ->withResources(gold: 0)
+        ->create();
+
+    foreach (range(1, MinigameStamina::MAX_COMPLETIONS_PER_HOUR) as $index) {
+        ResourceCollection::factory()
+            ->for($user)
+            ->create([
+                'wood' => 1,
+                'source' => MinigameStamina::sourceFor('wood'),
+                'collected_at' => now()->subMinutes(30),
+            ]);
+    }
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('minigames.0.resource', 'wood')
+            ->where('minigames.0.stamina.current', 0)
+            ->where('minigames.0.stamina.used', MinigameStamina::MAX_COMPLETIONS_PER_HOUR)
+            ->where('minigames.0.stamina.isAvailable', false)
+            ->where('minigames.3.resource', 'gold')
+            ->where('minigames.3.stamina.current', 0)
+            ->where('minigames.3.stamina.used', MinigameStamina::MAX_COMPLETIONS_PER_HOUR)
+            ->where('minigames.3.stamina.isAvailable', false)
+        );
+
+    $this->post(route('dashboard.minigames.complete', ['resource' => 'gold']))
+        ->assertRedirect(route('dashboard'))
+        ->assertSessionHasErrors('minigame');
+
+    $this->assertDatabaseHas('user_resources', [
+        'id' => $resources->id,
+        'gold' => 0,
+    ]);
+
+    $this->assertDatabaseHas('minigames', [
+        'user_id' => $user->id,
+        'resource' => 'gold',
+        'completions' => 0,
+        'resources_gained' => 0,
+    ]);
 });
 
 test('minigame completion returns to immersive mode when submitted from immersive mode', function () {

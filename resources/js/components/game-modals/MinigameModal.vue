@@ -22,6 +22,21 @@ const emit = defineEmits<{
     'open-leaderboard': [];
     'toggle-resource-number': [key: string];
 }>();
+
+function formatStaminaCooldown(seconds: number): string {
+    if (seconds <= 0) {
+        return 'Ready';
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (minutes <= 0) {
+        return `${remainingSeconds}s`;
+    }
+
+    return `${minutes}m ${remainingSeconds.toString().padStart(2, '0')}s`;
+}
 </script>
 
 <template>
@@ -79,7 +94,28 @@ const emit = defineEmits<{
             ></button>
         </div>
 
-        <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div
+                class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
+            >
+                <p
+                    class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                >
+                    Stamina
+                </p>
+                <p class="mt-2 text-xl font-bold">
+                    {{ minigame.stamina.label }}
+                </p>
+                <p class="mt-1 text-xs text-[#696250] dark:text-[#b6ae9d]">
+                    {{
+                        minigame.stamina.isAvailable
+                            ? `${minigame.stamina.current} completions ready`
+                            : `Ready in ${formatStaminaCooldown(
+                                  minigame.stamina.availableInSeconds,
+                              )}`
+                    }}
+                </p>
+            </div>
             <div
                 class="rounded-md border border-[#e4dac7] p-4 dark:border-[#35332c]"
             >

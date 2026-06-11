@@ -17,6 +17,7 @@ use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
 use App\Services\AllianceGoalService;
+use App\Support\MinigameStamina;
 use App\Support\Weather;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
@@ -135,7 +136,7 @@ class DashboardController extends Controller
             'alliances' => $this->allianceCardsFor($user, $allianceSearch),
             'achievementBonuses' => $this->achievementBonusCardsFor($productionBonuses),
             'achievementUnlocks' => $this->achievementUnlockCardsFor($achievements),
-            'minigames' => $this->minigameCardsFor($minigames, $productionRates),
+            'minigames' => $this->minigameCardsFor($user, $minigames, $productionRates),
             'buildings' => $buildings->map(fn (UserBuilding $building): array => [
                 'id' => $building->id,
                 'name' => $building->buildingType->name,
@@ -269,6 +270,16 @@ class DashboardController extends Controller
         $minigame = $this->minigameFor($user, $resource);
         Gate::authorize('complete', $minigame);
 
+        $stamina = $this->minigameStaminaCardFor($user);
+
+        if (! $stamina['isAvailable']) {
+            return redirect()
+                ->to(url()->previous(route('dashboard')))
+                ->withErrors([
+                    'minigame' => 'Minigame stamina is empty. Please wait before playing again.',
+                ]);
+        }
+
         $productionRates = $this->productionRatesFor($buildings, $productionBonuses);
         $reward = $this->minigameRewardFor((int) $productionRates[$resource]);
         $lifetimeColumn = 'lifetime_'.$resource;
@@ -288,7 +299,7 @@ class DashboardController extends Controller
                 'wood' => $resource === 'wood' ? $reward : 0,
                 'stone' => $resource === 'stone' ? $reward : 0,
                 'food' => $resource === 'food' ? $reward : 0,
-                'source' => 'minigame_'.$resource,
+                'source' => MinigameStamina::sourceFor($resource),
                 'collected_at' => now(),
             ]);
         });
@@ -1215,14 +1226,15 @@ class DashboardController extends Controller
     /**
      * @param  Collection<int, Minigame>  $minigames
      * @param  array{gold: int, wood: int, stone: int, food: int}  $productionRates
-     * @return array<int, array{resource: string, label: string, currentProduction: int, reward: int, rewardLabel: string, completions: int, resourcesGained: int}>
+     * @return array<int, array{resource: string, label: string, currentProduction: int, reward: int, rewardLabel: string, completions: int, resourcesGained: int, stamina: array{current: int, max: int, used: int, isAvailable: bool, availableInSeconds: int, label: string}}>
      */
-    private function minigameCardsFor(Collection $minigames, array $productionRates): array
+    private function minigameCardsFor(User $user, Collection $minigames, array $productionRates): array
     {
         $minigamesByResource = $minigames->keyBy('resource');
+        $stamina = $this->minigameStaminaCardFor($user);
 
         return collect(self::RESOURCE_DISPLAY_ORDER)
-            ->map(function (string $resource) use ($minigamesByResource, $productionRates): array {
+            ->map(function (string $resource) use ($minigamesByResource, $productionRates, $stamina): array {
                 $currentProduction = (int) $productionRates[$resource];
                 $reward = $this->minigameRewardFor($currentProduction);
                 $minigame = $minigamesByResource->get($resource);
@@ -1235,10 +1247,54 @@ class DashboardController extends Controller
                     'rewardLabel' => '+'.number_format($reward).' '.$resource,
                     'completions' => $minigame instanceof Minigame ? (int) $minigame->completions : 0,
                     'resourcesGained' => $minigame instanceof Minigame ? (int) $minigame->resources_gained : 0,
+                    'stamina' => $stamina,
                 ];
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{current: int, max: int, used: int, isAvailable: bool, availableInSeconds: int, label: string}
+     */
+    private function minigameStaminaCardFor(User $user): array
+    {
+        $windowStartsAt = now()->subSeconds(MinigameStamina::WINDOW_SECONDS);
+        $used = ResourceCollection::query()
+            ->where('user_id', $user->id)
+            ->where('source', 'like', MinigameStamina::sourcePattern())
+            ->where('collected_at', '>', $windowStartsAt)
+            ->count();
+        $current = max(0, MinigameStamina::MAX_COMPLETIONS_PER_HOUR - $used);
+        $availableInSeconds = 0;
+
+        if ($used > 0) {
+            $oldestCollectionTime = ResourceCollection::query()
+                ->where('user_id', $user->id)
+                ->where('source', 'like', MinigameStamina::sourcePattern())
+                ->where('collected_at', '>', $windowStartsAt)
+                ->orderBy('collected_at')
+                ->value('collected_at');
+
+            if ($oldestCollectionTime !== null) {
+                $availableInSeconds = max(
+                    1,
+                    (int) now()->diffInSeconds(
+                        CarbonImmutable::parse($oldestCollectionTime)->addSeconds(MinigameStamina::WINDOW_SECONDS),
+                        false,
+                    ),
+                );
+            }
+        }
+
+        return [
+            'current' => $current,
+            'max' => MinigameStamina::MAX_COMPLETIONS_PER_HOUR,
+            'used' => $used,
+            'isAvailable' => $current > 0,
+            'availableInSeconds' => $availableInSeconds,
+            'label' => number_format($current).' / '.number_format(MinigameStamina::MAX_COMPLETIONS_PER_HOUR),
+        ];
     }
 
     private function minigameRewardFor(int $currentProduction): int

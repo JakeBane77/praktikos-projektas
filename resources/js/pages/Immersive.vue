@@ -37,6 +37,7 @@ import {
     formatExactNumber,
     formatGameNumber,
     formatHoursDuration,
+    minigameStaminaHoverLabel,
     upgradeAvailabilityFor,
 } from '@/lib/game';
 import type {
@@ -1792,7 +1793,7 @@ function completeMinigame(minigame: Minigame): void {
 }
 
 function openMinigame(minigame: Minigame): void {
-    if (activeMinigameResource.value !== null) {
+    if (activeMinigameResource.value !== null || !minigame.stamina.isAvailable) {
         return;
     }
 
@@ -2128,9 +2129,12 @@ function timeFromInputValue(value: string): Date {
                 class="immersive-icon-button absolute z-20 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
                 :class="minigameButtonClass()"
                 :style="minigame.style"
-                :disabled="activeMinigameResource !== null"
-                :aria-label="`Play ${minigame.label}`"
-                :title="`Play ${minigame.label}`"
+                :disabled="
+                    activeMinigameResource !== null ||
+                    !minigame.stamina.isAvailable
+                "
+                :aria-label="`Play ${minigame.label}. ${minigameStaminaHoverLabel(minigame)}`"
+                :title="minigameStaminaHoverLabel(minigame)"
                 @click="openMinigame(minigame)"
             >
                 <component :is="minigame.icon" class="h-5 w-5" />
