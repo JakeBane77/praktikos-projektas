@@ -324,6 +324,10 @@ export function formatSecondsDuration(totalSeconds: number): string {
 
 export function minigameStaminaHoverLabel(minigame: Minigame): string {
     if (!minigame.stamina.isAvailable) {
+        if (minigame.stamina.availableInSeconds <= 0) {
+            return 'Stamina refreshing...';
+        }
+
         return `Stamina empty. Refreshes in ${formatSecondsDuration(
             minigame.stamina.availableInSeconds,
         )}`;
@@ -336,6 +340,29 @@ export function minigameStaminaHoverLabel(minigame: Minigame): string {
     return `Stamina ${minigame.stamina.label}. Next refresh in ${formatSecondsDuration(
         minigame.stamina.availableInSeconds,
     )}`;
+}
+
+export function minigameWithLiveStamina(
+    minigame: Minigame,
+    elapsedSeconds: number,
+): Minigame {
+    const availableInSeconds = Math.max(
+        0,
+        minigame.stamina.availableInSeconds -
+            Math.max(0, Math.floor(elapsedSeconds)),
+    );
+
+    if (availableInSeconds === minigame.stamina.availableInSeconds) {
+        return minigame;
+    }
+
+    return {
+        ...minigame,
+        stamina: {
+            ...minigame.stamina,
+            availableInSeconds,
+        },
+    };
 }
 
 export function upgradeAvailabilityFor(

@@ -38,6 +38,7 @@ import {
     formatGameNumber,
     formatHoursDuration,
     minigameStaminaHoverLabel,
+    minigameWithLiveStamina,
     upgradeAvailabilityFor,
 } from '@/lib/game';
 import type {
@@ -389,8 +390,12 @@ const timeLoopSpeedMs = ref(500);
 const expandedResourceNumberKeys = ref<Set<string>>(new Set());
 const isOfflineProgressDismissed = ref(false);
 const predictionBaseMilliseconds = Date.now();
+const staminaClockMilliseconds = ref(Date.now());
+const staminaClockStartedAtMilliseconds = ref(Date.now());
 let userTimeInterval: number | undefined;
 let timeLoopInterval: number | undefined;
+let staminaClockInterval: number | undefined;
+let staminaRefreshReloadTimeout: number | undefined;
 const { isImmersiveTestingPanelOpen } = useImmersiveTestingPanel();
 
 const displayedWeatherCode = computed(() => {
@@ -477,7 +482,18 @@ const visibleUpgradeBuildings = computed(() =>
         : props.buildings.filter((building) => !building.isMaxLevel),
 );
 
-const minigames = computed<Minigame[]>(() => props.minigames);
+const staminaElapsedSeconds = computed(() =>
+    Math.floor(
+        (staminaClockMilliseconds.value -
+            staminaClockStartedAtMilliseconds.value) /
+            1000,
+    ),
+);
+const minigames = computed<Minigame[]>(() =>
+    props.minigames.map((minigame) =>
+        minigameWithLiveStamina(minigame, staminaElapsedSeconds.value),
+    ),
+);
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
 const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
@@ -1000,6 +1016,10 @@ onMounted(() => {
     userTimeInterval = window.setInterval(() => {
         userTime.value = getUserSystemTime();
     }, 30_000);
+
+    staminaClockInterval = window.setInterval(() => {
+        staminaClockMilliseconds.value = Date.now();
+    }, 1000);
 });
 
 onBeforeUnmount(() => {
@@ -1007,12 +1027,60 @@ onBeforeUnmount(() => {
         window.clearInterval(userTimeInterval);
     }
 
+    if (staminaClockInterval !== undefined) {
+        window.clearInterval(staminaClockInterval);
+    }
+
+    clearStaminaRefreshReloadTimeout();
     stopTimeLoop();
 
     if (allianceSearchReloadTimeout !== null) {
         clearTimeout(allianceSearchReloadTimeout);
     }
 });
+
+function resetStaminaClock(): void {
+    const now = Date.now();
+
+    staminaClockStartedAtMilliseconds.value = now;
+    staminaClockMilliseconds.value = now;
+}
+
+function clearStaminaRefreshReloadTimeout(): void {
+    if (staminaRefreshReloadTimeout !== undefined) {
+        window.clearTimeout(staminaRefreshReloadTimeout);
+        staminaRefreshReloadTimeout = undefined;
+    }
+}
+
+function scheduleStaminaRefreshReload(): void {
+    clearStaminaRefreshReloadTimeout();
+
+    const nextRefreshSeconds = Math.min(
+        ...props.minigames
+            .map((minigame) => minigame.stamina.availableInSeconds)
+            .filter((seconds) => seconds > 0),
+    );
+
+    if (!Number.isFinite(nextRefreshSeconds)) {
+        return;
+    }
+
+    staminaRefreshReloadTimeout = window.setTimeout(() => {
+        router.reload({
+            only: ['minigames'],
+        });
+    }, (nextRefreshSeconds + 1) * 1000);
+}
+
+watch(
+    () => props.minigames,
+    () => {
+        resetStaminaClock();
+        scheduleStaminaRefreshReload();
+    },
+    { immediate: true },
+);
 
 watch(timeLoopSpeedMs, () => {
     if (isTimeLooping.value) {

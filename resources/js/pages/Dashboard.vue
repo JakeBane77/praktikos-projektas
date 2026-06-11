@@ -36,6 +36,7 @@ import {
     formatHoursDuration,
     formatRate,
     minigameStaminaHoverLabel,
+    minigameWithLiveStamina,
     getTotalResources,
     upgradeAvailabilityFor,
 } from '@/lib/game';
@@ -84,13 +85,26 @@ const hideCompletedAchievements = ref(true);
 const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
 const activeAchievementUnlockIndex = ref(0);
 const serverTimeMilliseconds = ref(Date.now());
+const staminaClockMilliseconds = ref(Date.now());
+const staminaClockStartedAtMilliseconds = ref(Date.now());
 const isUpdatingWeatherLocation = ref(false);
 const weatherLocationStatus = ref<string | null>(null);
 const expandedResourceNumberKeys = ref<Set<string>>(new Set());
 const isOfflineProgressDismissed = ref(false);
 const predictionBaseMilliseconds = ref(Date.now());
 const buildings = computed<Building[]>(() => props.buildings);
-const minigames = computed<Minigame[]>(() => props.minigames);
+const staminaElapsedSeconds = computed(() =>
+    Math.floor(
+        (staminaClockMilliseconds.value -
+            staminaClockStartedAtMilliseconds.value) /
+            1000,
+    ),
+);
+const minigames = computed<Minigame[]>(() =>
+    props.minigames.map((minigame) =>
+        minigameWithLiveStamina(minigame, staminaElapsedSeconds.value),
+    ),
+);
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
 const selectedMinigame = computed<Minigame | null>(() =>
     selectedMinigameResource.value
@@ -319,6 +333,8 @@ type OpenMeteoCurrentWeatherResponse = {
 let serverTimeBaseMilliseconds = Date.now();
 let serverTimeClientStartedAt = Date.now();
 let serverTimeInterval: number | undefined;
+let staminaClockInterval: number | undefined;
+let staminaRefreshReloadTimeout: number | undefined;
 let clientWeatherRefreshTimeout: number | undefined;
 let lastRequestedWeatherRefreshSlotMilliseconds: number | undefined;
 
@@ -334,6 +350,40 @@ function syncServerTime() {
     predictionBaseMilliseconds.value = serverTimeBaseMilliseconds;
     serverTimeClientStartedAt = Date.now();
     serverTimeMilliseconds.value = serverTimeBaseMilliseconds;
+}
+
+function resetStaminaClock(): void {
+    const now = Date.now();
+
+    staminaClockStartedAtMilliseconds.value = now;
+    staminaClockMilliseconds.value = now;
+}
+
+function clearStaminaRefreshReloadTimeout(): void {
+    if (staminaRefreshReloadTimeout !== undefined) {
+        window.clearTimeout(staminaRefreshReloadTimeout);
+        staminaRefreshReloadTimeout = undefined;
+    }
+}
+
+function scheduleStaminaRefreshReload(): void {
+    clearStaminaRefreshReloadTimeout();
+
+    const nextRefreshSeconds = Math.min(
+        ...props.minigames
+            .map((minigame) => minigame.stamina.availableInSeconds)
+            .filter((seconds) => seconds > 0),
+    );
+
+    if (!Number.isFinite(nextRefreshSeconds)) {
+        return;
+    }
+
+    staminaRefreshReloadTimeout = window.setTimeout(() => {
+        router.reload({
+            only: ['minigames'],
+        });
+    }, (nextRefreshSeconds + 1) * 1000);
 }
 
 function formatServerDateTime(milliseconds: number): string {
@@ -474,6 +524,15 @@ watch(
 watch(() => props.serverTime.iso, syncServerTime, { immediate: true });
 
 watch(
+    () => props.minigames,
+    () => {
+        resetStaminaClock();
+        scheduleStaminaRefreshReload();
+    },
+    { immediate: true },
+);
+
+watch(
     () => [
         props.weather.isUsingGeolocation,
         props.weather.latitude,
@@ -493,6 +552,10 @@ onMounted(() => {
             (Date.now() - serverTimeClientStartedAt);
     }, 1000);
 
+    staminaClockInterval = window.setInterval(() => {
+        staminaClockMilliseconds.value = Date.now();
+    }, 1000);
+
     scheduleNextClientWeatherRefresh();
 });
 
@@ -501,6 +564,11 @@ onBeforeUnmount(() => {
         window.clearInterval(serverTimeInterval);
     }
 
+    if (staminaClockInterval !== undefined) {
+        window.clearInterval(staminaClockInterval);
+    }
+
+    clearStaminaRefreshReloadTimeout();
     clearClientWeatherRefreshTimeout();
 
     if (allianceSearchReloadTimeout !== null) {

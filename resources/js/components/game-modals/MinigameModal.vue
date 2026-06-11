@@ -25,7 +25,7 @@ const emit = defineEmits<{
 
 function formatStaminaCooldown(seconds: number): string {
     if (seconds <= 0) {
-        return 'Ready';
+        return 'refreshing';
     }
 
     const minutes = Math.floor(seconds / 60);
