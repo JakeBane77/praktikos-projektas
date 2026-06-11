@@ -41,6 +41,8 @@ const SPEED_PENALTY_RECOVERY_PER_SECOND = 7;
 const ANIMATION_FPS = 60;
 const ANIMATION_TICK_MILLISECONDS = 1000 / ANIMATION_FPS;
 const MAX_ELAPSED_SECONDS = 0.1;
+const MIN_OBSTACLE_SPAWN_GAP_Y = 38;
+const OBSTACLE_SPAWN_RETRY_DELAY_MS = 150;
 
 const activeTheme = ref<GoldRunTheme>(goldRunThemes[0]);
 const playerLane = ref<Lane>(STARTING_LANE);
@@ -184,7 +186,20 @@ function scheduleNextObstacle(timestamp: number) {
         );
 }
 
+function hasObstacleSpawnClearance(): boolean {
+    return obstacles.value.every(
+        (obstacle) =>
+            obstacle.y - OBSTACLE_START_Y >= MIN_OBSTACLE_SPAWN_GAP_Y,
+    );
+}
+
 function spawnObstacle(timestamp: number) {
+    if (!hasObstacleSpawnClearance()) {
+        nextSpawnAt = timestamp + OBSTACLE_SPAWN_RETRY_DELAY_MS;
+
+        return;
+    }
+
     obstacles.value.push({
         id: nextObstacleId,
         lane: randomLane(),

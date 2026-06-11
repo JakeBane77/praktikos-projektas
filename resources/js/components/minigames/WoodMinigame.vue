@@ -242,7 +242,7 @@ function hit() {
                 class="absolute top-5 left-1/2 h-[calc(100%-2.5rem)] w-[6%] -translate-x-1/2 rounded-full bg-[#eddd93]/70 dark:bg-[#b49344]/55"
             ></div>
             <div
-                class="absolute top-5 bottom-4 w-1 -translate-x-1/2 rounded-full bg-[#f9faf4] shadow-[0_0_18px_rgba(249,250,244,0.9)] dark:bg-[#f7f1d6]"
+                class="pointer-events-none absolute top-5 bottom-4 z-20 w-1 -translate-x-1/2 rounded-full bg-[#f9faf4] shadow-[0_0_18px_rgba(249,250,244,0.9)] dark:bg-[#f7f1d6]"
                 :style="{
                     left: `${linePercent}%`,
                 }"
