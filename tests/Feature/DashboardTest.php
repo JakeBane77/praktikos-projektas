@@ -3,6 +3,7 @@
 use App\Models\Achievement;
 use App\Models\Alliance;
 use App\Models\AllianceGoal;
+use App\Models\AllianceGoalContribution;
 use App\Models\AllianceMembership;
 use App\Models\BuildingType;
 use App\Models\Minigame;
@@ -12,6 +13,7 @@ use App\Models\UserAchievement;
 use App\Models\UserBuilding;
 use App\Models\UserResource;
 use App\Models\WeatherSnapshot;
+use App\Services\AllianceGoalService;
 use App\Support\Weather;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -285,6 +287,76 @@ test('members can contribute any resource to weekly alliance goals', function ()
     ]);
 });
 
+test('members cannot contribute more than twenty percent of an alliance goal', function () {
+    $user = User::factory()->create();
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Cap Guild',
+        'slug' => 'cap-guild',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $user->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'gold' => 0,
+        'wood' => 500,
+        'stone' => 0,
+        'food' => 0,
+        'last_produced_at' => now(),
+    ]);
+
+    $weekStartsAt = now()->startOfWeek();
+    $goal = AllianceGoal::create([
+        'alliance_id' => $alliance->id,
+        'name' => 'Small Stockpile',
+        'resource_type' => null,
+        'target_amount' => 1_000,
+        'current_amount' => 150,
+        'production_bonus_percent' => 5,
+        'bonus_duration_hours' => 168,
+        'stage_percentages' => [50, 100],
+        'stage_donor_requirements' => [1, 2],
+        'week_starts_at' => $weekStartsAt,
+        'week_ends_at' => $weekStartsAt->copy()->addWeek()->subSecond(),
+        'status' => 'active',
+    ]);
+
+    AllianceGoalContribution::create([
+        'alliance_goal_id' => $goal->id,
+        'user_id' => $user->id,
+        'resource_type' => 'wood',
+        'amount' => 150,
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('alliance-goals.contribute', $goal), [
+            'resource_type' => 'wood',
+            'amount' => 60,
+        ])
+        ->assertSessionHasErrors('alliance_goal');
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'wood' => 500,
+    ]);
+
+    $this->assertDatabaseHas('alliance_goals', [
+        'id' => $goal->id,
+        'current_amount' => 150,
+    ]);
+});
+
 test('previous week alliance goal stages add production bonus this week', function () {
     $user = User::factory()->create();
     $leader = User::factory()->create();
@@ -306,7 +378,7 @@ test('previous week alliance goal stages add production bonus this week', functi
 
     $previousWeekStartsAt = now()->startOfWeek()->subWeek();
 
-    AllianceGoal::create([
+    $previousGoal = AllianceGoal::create([
         'alliance_id' => $alliance->id,
         'name' => 'Previous Stockpile',
         'resource_type' => null,
@@ -315,9 +387,26 @@ test('previous week alliance goal stages add production bonus this week', functi
         'production_bonus_percent' => 5,
         'bonus_duration_hours' => 168,
         'stage_percentages' => [10, 30, 60, 100],
+        'stage_donor_requirements' => [1, 2, 3, 4],
         'week_starts_at' => $previousWeekStartsAt,
         'week_ends_at' => $previousWeekStartsAt->copy()->addWeek()->subSecond(),
         'status' => 'expired',
+    ]);
+
+    AllianceGoalContribution::create([
+        'alliance_goal_id' => $previousGoal->id,
+        'user_id' => $user->id,
+        'resource_type' => 'wood',
+        'amount' => 150,
+        'created_at' => $previousWeekStartsAt,
+    ]);
+
+    AllianceGoalContribution::create([
+        'alliance_goal_id' => $previousGoal->id,
+        'user_id' => $leader->id,
+        'resource_type' => 'food',
+        'amount' => 150,
+        'created_at' => $previousWeekStartsAt,
     ]);
 
     $mine = BuildingType::create([
@@ -345,6 +434,161 @@ test('previous week alliance goal stages add production bonus this week', functi
             ->where('resourceRates.gold', 111)
             ->where('buildings.0.production', '+111 gold/hour')
         );
+});
+
+test('alliance goal stages require enough unique donors for production bonus', function () {
+    $user = User::factory()->create();
+    $leader = User::factory()->create();
+    $secondDonor = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Donor Guild',
+        'slug' => 'donor-guild',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $user->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $previousWeekStartsAt = now()->startOfWeek()->subWeek();
+
+    $previousGoal = AllianceGoal::create([
+        'alliance_id' => $alliance->id,
+        'name' => 'Donor Stockpile',
+        'resource_type' => null,
+        'target_amount' => 1_000,
+        'current_amount' => 1_000,
+        'production_bonus_percent' => 5,
+        'bonus_duration_hours' => 168,
+        'stage_percentages' => [10, 100],
+        'stage_donor_requirements' => [1, 8],
+        'week_starts_at' => $previousWeekStartsAt,
+        'week_ends_at' => $previousWeekStartsAt->copy()->addWeek()->subSecond(),
+        'status' => 'expired',
+    ]);
+
+    AllianceGoalContribution::create([
+        'alliance_goal_id' => $previousGoal->id,
+        'user_id' => $user->id,
+        'resource_type' => 'wood',
+        'amount' => 500,
+        'created_at' => $previousWeekStartsAt,
+    ]);
+
+    AllianceGoalContribution::create([
+        'alliance_goal_id' => $previousGoal->id,
+        'user_id' => $secondDonor->id,
+        'resource_type' => 'food',
+        'amount' => 500,
+        'created_at' => $previousWeekStartsAt,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.current.activeGoalBonus.bonusPercent', 5)
+            ->where('alliances.current.activeGoalBonus.stageCount', 1)
+        );
+});
+
+test('alliance goal stays active at target amount until donor segments are reached', function () {
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Target Guild',
+        'slug' => 'target-guild',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    $weekStartsAt = now()->startOfWeek();
+    $goal = AllianceGoal::create([
+        'alliance_id' => $alliance->id,
+        'name' => 'Target Stockpile',
+        'resource_type' => null,
+        'target_amount' => 1_000,
+        'current_amount' => 1_000,
+        'production_bonus_percent' => 5,
+        'bonus_duration_hours' => 168,
+        'stage_percentages' => [100],
+        'stage_donor_requirements' => [8],
+        'week_starts_at' => $weekStartsAt,
+        'week_ends_at' => $weekStartsAt->copy()->addWeek()->subSecond(),
+        'status' => 'active',
+    ]);
+
+    foreach (User::factory()->count(5)->create() as $donor) {
+        AllianceGoalContribution::create([
+            'alliance_goal_id' => $goal->id,
+            'user_id' => $donor->id,
+            'resource_type' => 'wood',
+            'amount' => 200,
+            'created_at' => now(),
+        ]);
+    }
+
+    app(AllianceGoalService::class)->refreshGoalStatus($goal);
+
+    $this->assertDatabaseHas('alliance_goals', [
+        'id' => $goal->id,
+        'status' => 'active',
+        'completed_at' => null,
+    ]);
+});
+
+test('alliance goal completes when target amount and donor segments are reached', function () {
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Complete Guild',
+        'slug' => 'complete-guild',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    $weekStartsAt = now()->startOfWeek();
+    $goal = AllianceGoal::create([
+        'alliance_id' => $alliance->id,
+        'name' => 'Complete Stockpile',
+        'resource_type' => null,
+        'target_amount' => 1_000,
+        'current_amount' => 1_000,
+        'production_bonus_percent' => 5,
+        'bonus_duration_hours' => 168,
+        'stage_percentages' => [100],
+        'stage_donor_requirements' => [8],
+        'week_starts_at' => $weekStartsAt,
+        'week_ends_at' => $weekStartsAt->copy()->addWeek()->subSecond(),
+        'status' => 'active',
+    ]);
+
+    foreach (User::factory()->count(8)->create() as $donor) {
+        AllianceGoalContribution::create([
+            'alliance_goal_id' => $goal->id,
+            'user_id' => $donor->id,
+            'resource_type' => 'wood',
+            'amount' => 125,
+            'created_at' => now(),
+        ]);
+    }
+
+    app(AllianceGoalService::class)->refreshGoalStatus($goal);
+
+    $this->assertDatabaseHas('alliance_goals', [
+        'id' => $goal->id,
+        'status' => 'completed',
+    ]);
+
+    expect($goal->fresh()?->completed_at)->not->toBeNull();
 });
 
 test('dashboard reads weather code from the database', function () {

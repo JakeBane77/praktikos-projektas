@@ -460,6 +460,17 @@ class AllianceController extends Controller
                 ]);
             }
 
+            $contributionCap = $this->allianceGoalService->contributionCapFor($lockedGoal);
+            $alreadyContributed = (int) $lockedGoal->contributions()
+                ->where('user_id', $user->id)
+                ->sum('amount');
+
+            if ($alreadyContributed + $amount > $contributionCap) {
+                throw ValidationException::withMessages([
+                    'alliance_goal' => 'You can contribute at most '.number_format($contributionCap).' resources to this goal.',
+                ]);
+            }
+
             $resources->{$resourceType} -= $amount;
             $resources->save();
 

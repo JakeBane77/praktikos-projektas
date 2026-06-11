@@ -119,6 +119,10 @@ export type AllianceGoalStage = {
     percentageLabel: string;
     amount: number;
     amountLabel: string;
+    requiredDonors: number;
+    requiredDonorsLabel: string;
+    hasAmount: boolean;
+    hasDonors: boolean;
     isReached: boolean;
 };
 
@@ -132,6 +136,11 @@ export type AllianceGoal = {
     currentAmount: number;
     currentAmountLabel: string;
     progressPercent: number;
+    uniqueDonorCount: number;
+    uniqueDonorCountLabel: string;
+    contributionCap: number;
+    contributionCapLabel: string;
+    contributionCapPercent: number;
     stageCount: number;
     reachedStageCount: number;
     bonusPerStagePercent: number;

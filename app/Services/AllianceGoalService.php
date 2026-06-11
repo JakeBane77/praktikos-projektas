@@ -14,6 +14,11 @@ class AllianceGoalService
     /** @var list<float|int> */
     public const DEFAULT_STAGE_PERCENTAGES = [0.01, 1, 10, 30, 60, 100];
 
+    /** @var list<int> */
+    public const DEFAULT_STAGE_DONOR_REQUIREMENTS = [1, 2, 3, 4, 6, 8];
+
+    public const CONTRIBUTION_CAP_PERCENT = 20;
+
     public const DEFAULT_TARGET_AMOUNT = 10_000_000;
 
     public const DEFAULT_PRODUCTION_BONUS_PERCENT = 2;
@@ -50,6 +55,7 @@ class AllianceGoalService
                 'production_bonus_percent' => self::DEFAULT_PRODUCTION_BONUS_PERCENT,
                 'bonus_duration_hours' => self::BONUS_DURATION_HOURS,
                 'stage_percentages' => self::DEFAULT_STAGE_PERCENTAGES,
+                'stage_donor_requirements' => self::DEFAULT_STAGE_DONOR_REQUIREMENTS,
                 'week_starts_at' => $weekStartsAt,
                 'week_ends_at' => $weekEndsAt,
                 'status' => 'active',
@@ -114,16 +120,26 @@ class AllianceGoalService
     {
         $target = max(1, (int) $goal->target_amount);
         $current = (int) $goal->current_amount;
+        $uniqueDonorCount = $this->uniqueDonorCountFor($goal);
+        $stageDonorRequirements = $this->stageDonorRequirementsFor($goal);
+        $contributionCap = $this->contributionCapFor($goal);
         $stageCards = collect($this->stagePercentagesFor($goal))
-            ->map(function (float $percentage) use ($current, $goal): array {
+            ->map(function (float $percentage, int $index) use ($current, $goal, $stageDonorRequirements, $uniqueDonorCount): array {
                 $amount = $this->stageAmountFor($goal, $percentage);
+                $requiredDonors = $this->stageDonorRequirementAt($stageDonorRequirements, $index);
+                $hasAmount = $current >= $amount;
+                $hasDonors = $uniqueDonorCount >= $requiredDonors;
 
                 return [
                     'percentage' => $percentage,
                     'percentageLabel' => $this->formatStagePercentage($percentage),
                     'amount' => $amount,
                     'amountLabel' => number_format($amount),
-                    'isReached' => $current >= $amount,
+                    'requiredDonors' => $requiredDonors,
+                    'requiredDonorsLabel' => number_format($requiredDonors),
+                    'hasAmount' => $hasAmount,
+                    'hasDonors' => $hasDonors,
+                    'isReached' => $hasAmount && $hasDonors,
                 ];
             })
             ->values()
@@ -141,6 +157,11 @@ class AllianceGoalService
             'currentAmount' => $current,
             'currentAmountLabel' => number_format($current),
             'progressPercent' => min(100, (int) floor(($current / $target) * 100)),
+            'uniqueDonorCount' => $uniqueDonorCount,
+            'uniqueDonorCountLabel' => number_format($uniqueDonorCount),
+            'contributionCap' => $contributionCap,
+            'contributionCapLabel' => number_format($contributionCap),
+            'contributionCapPercent' => self::CONTRIBUTION_CAP_PERCENT,
             'stageCount' => count($stageCards),
             'reachedStageCount' => $reachedStageCount,
             'bonusPerStagePercent' => (int) $goal->production_bonus_percent,
@@ -155,13 +176,25 @@ class AllianceGoalService
 
     public function refreshGoalStatus(AllianceGoal $goal): AllianceGoal
     {
-        if ($goal->current_amount >= $goal->target_amount && $goal->status === 'active') {
+        if ($goal->status === 'active' && $this->allStagesReachedFor($goal)) {
             $goal->status = 'completed';
             $goal->completed_at = now();
             $goal->save();
         }
 
         return $goal;
+    }
+
+    public function contributionCapFor(AllianceGoal $goal): int
+    {
+        return max(1, (int) floor(((int) $goal->target_amount * self::CONTRIBUTION_CAP_PERCENT) / 100));
+    }
+
+    public function uniqueDonorCountFor(AllianceGoal $goal): int
+    {
+        return (int) $goal->contributions()
+            ->distinct('user_id')
+            ->count('user_id');
     }
 
     public function currentAllianceFor(User $user): ?Alliance
@@ -190,10 +223,22 @@ class AllianceGoalService
     private function reachedStageCountFor(AllianceGoal $goal): int
     {
         $current = (int) $goal->current_amount;
+        $uniqueDonorCount = $this->uniqueDonorCountFor($goal);
+        $stageDonorRequirements = $this->stageDonorRequirementsFor($goal);
 
         return collect($this->stagePercentagesFor($goal))
-            ->filter(fn (float $percentage): bool => $current >= $this->stageAmountFor($goal, $percentage))
+            ->filter(function (float $percentage, int $index) use ($current, $goal, $stageDonorRequirements, $uniqueDonorCount): bool {
+                $requiredDonors = $this->stageDonorRequirementAt($stageDonorRequirements, $index);
+
+                return $current >= $this->stageAmountFor($goal, $percentage)
+                    && $uniqueDonorCount >= $requiredDonors;
+            })
             ->count();
+    }
+
+    private function allStagesReachedFor(AllianceGoal $goal): bool
+    {
+        return $this->reachedStageCountFor($goal) === count($this->stagePercentagesFor($goal));
     }
 
     /**
@@ -219,6 +264,34 @@ class AllianceGoalService
     private function stageAmountFor(AllianceGoal $goal, float $percentage): int
     {
         return max(1, (int) ceil(((int) $goal->target_amount * $percentage) / 100));
+    }
+
+    /**
+     * @param  list<int>  $requirements
+     */
+    private function stageDonorRequirementAt(array $requirements, int $index): int
+    {
+        return $requirements[$index] ?? $requirements[count($requirements) - 1];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function stageDonorRequirementsFor(AllianceGoal $goal): array
+    {
+        $requirements = $goal->stage_donor_requirements;
+
+        if (! is_array($requirements) || $requirements === []) {
+            return self::DEFAULT_STAGE_DONOR_REQUIREMENTS;
+        }
+
+        $cleanRequirements = collect($requirements)
+            ->map(fn (mixed $requirement): int => (int) $requirement)
+            ->filter(fn (int $requirement): bool => $requirement > 0)
+            ->values()
+            ->all();
+
+        return $cleanRequirements === [] ? self::DEFAULT_STAGE_DONOR_REQUIREMENTS : $cleanRequirements;
     }
 
     private function formatStagePercentage(float $percentage): string

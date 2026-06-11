@@ -1000,6 +1000,19 @@ function confirmKick(member: AllianceMember): void {
                                 {{ currentAlliance.goal.currentAmountLabel }} /
                                 {{ currentAlliance.goal.targetAmountLabel }}
                             </p>
+                            <p
+                                class="mt-1 text-xs text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                {{ currentAlliance.goal.uniqueDonorCountLabel }}
+                                unique donors - personal cap
+                                {{ currentAlliance.goal.contributionCapLabel }}
+                                ({{
+                                    formatExactNumber(
+                                        currentAlliance.goal
+                                            .contributionCapPercent,
+                                    )
+                                }}% of goal)
+                            </p>
                         </div>
                         <span class="text-sm font-semibold">
                             Ends {{ currentAlliance.goal.weekEndsAt }}
@@ -1038,6 +1051,21 @@ function confirmKick(member: AllianceMember): void {
                             </div>
                             <p class="mt-1 text-xs">
                                 {{ stage.amountLabel }} donated
+                            </p>
+                            <p class="mt-1 text-xs">
+                                {{ stage.requiredDonorsLabel }} unique donors
+                            </p>
+                            <p
+                                v-if="!stage.isReached"
+                                class="mt-2 text-xs text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                {{
+                                    !stage.hasAmount
+                                        ? 'Needs resources'
+                                        : !stage.hasDonors
+                                          ? 'Needs donors'
+                                          : 'Ready'
+                                }}
                             </p>
                         </div>
                     </div>
