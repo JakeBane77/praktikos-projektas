@@ -335,6 +335,69 @@ test('members can contribute any resource to weekly alliance goals', function ()
     ]);
 });
 
+test('dashboard exposes current alliance contribution history', function () {
+    $user = User::factory()->create(['name' => 'Current Player']);
+    $otherUser = User::factory()->create(['name' => 'Donor Player']);
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::factory()
+        ->for($leader, 'leader')
+        ->create([
+            'name' => 'History Guild',
+            'slug' => 'history-guild',
+        ]);
+
+    AllianceMembership::factory()
+        ->for($alliance)
+        ->for($user)
+        ->create();
+
+    AllianceMembership::factory()
+        ->for($alliance)
+        ->for($otherUser)
+        ->contributed(500)
+        ->create();
+
+    $goal = AllianceGoal::factory()
+        ->for($alliance)
+        ->forResource('wood')
+        ->create([
+            'name' => 'Wood Reserve',
+        ]);
+
+    AllianceGoalContribution::factory()
+        ->for($goal, 'goal')
+        ->for($user)
+        ->forResource('wood')
+        ->amount(100)
+        ->create([
+            'created_at' => now()->subHour(),
+        ]);
+
+    AllianceGoalContribution::factory()
+        ->for($goal, 'goal')
+        ->for($otherUser)
+        ->forResource('food')
+        ->amount(250)
+        ->create([
+            'created_at' => now(),
+        ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.current.contributions.0.userName', 'Donor Player')
+            ->where('alliances.current.contributions.0.goalName', 'Wood Reserve')
+            ->where('alliances.current.contributions.0.resourceType', 'food')
+            ->where('alliances.current.contributions.0.amount', 250)
+            ->where('alliances.current.contributions.0.amountLabel', '250')
+            ->where('alliances.current.contributions.1.userName', 'Current Player')
+            ->where('alliances.current.contributions.1.resourceType', 'wood')
+            ->where('alliances.current.contributions.1.amount', 100)
+        );
+});
+
 test('members cannot contribute more than twenty percent of an alliance goal', function () {
     $user = User::factory()->create();
     $leader = User::factory()->create();

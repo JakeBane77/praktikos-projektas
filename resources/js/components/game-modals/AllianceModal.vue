@@ -83,7 +83,13 @@ const kickConfirmationMemberId = ref<number | null>(null);
 const kickConfirmationInput = ref('');
 const allianceSearchQuery = ref('');
 const selectedAllianceId = ref<number | null>(null);
-type AllianceSection = 'current' | 'goals' | 'applications' | 'settings' | 'search';
+type AllianceSection =
+    | 'current'
+    | 'goals'
+    | 'contributions'
+    | 'applications'
+    | 'settings'
+    | 'search';
 const activeAllianceSection = ref<AllianceSection>('current');
 const isEditingMembers = ref(false);
 const roleChangeConfirmation = ref<{
@@ -150,6 +156,7 @@ const allianceSections = computed(() => {
     const sections: Array<{ key: AllianceSection; label: string }> = [
         { key: 'current', label: 'Current alliance' },
         { key: 'goals', label: 'Goals' },
+        { key: 'contributions', label: 'Contribution history' },
     ];
 
     if (canShowApplicationsSection.value) {
@@ -1214,6 +1221,88 @@ function confirmKick(member: AllianceMember): void {
                         </button>
                     </form>
                 </div>
+            </section>
+
+            <section
+                v-else-if="activeAllianceSection === 'contributions'"
+                class="overflow-hidden rounded-md border border-[#e4dac7] dark:border-[#35332c]"
+            >
+                <div
+                    class="flex flex-col gap-3 border-b border-[#e4dac7] bg-[#f6f0e5] px-4 py-3 dark:border-[#35332c] dark:bg-[#151910] sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div>
+                        <h3 class="text-lg font-bold">Contribution history</h3>
+                        <p
+                            class="mt-1 text-sm text-[#696250] dark:text-[#b6ae9d]"
+                        >
+                            Recent donations to alliance goals.
+                        </p>
+                    </div>
+                    <span class="text-sm font-semibold">
+                        {{
+                            formatExactNumber(
+                                currentAlliance.contributions.length,
+                            )
+                        }}
+                        recent
+                    </span>
+                </div>
+
+                <div
+                    v-if="currentAlliance.contributions.length === 0"
+                    class="p-4 text-sm text-[#696250] dark:text-[#b6ae9d]"
+                >
+                    No contributions recorded yet.
+                </div>
+
+                <template v-else>
+                    <div
+                        class="hidden grid-cols-[1fr_9rem_8rem_9rem] gap-3 border-b border-[#e4dac7] px-4 py-3 text-xs font-semibold tracking-wider text-[#696250] uppercase dark:border-[#35332c] dark:text-[#b6ae9d] md:grid"
+                    >
+                        <span>Player</span>
+                        <span>Goal</span>
+                        <span class="text-right">Amount</span>
+                        <span class="text-right">Time</span>
+                    </div>
+
+                    <div
+                        class="divide-y divide-[#e4dac7] dark:divide-[#35332c]"
+                    >
+                        <div
+                            v-for="contribution in currentAlliance.contributions"
+                            :key="contribution.id"
+                            class="grid gap-2 px-4 py-4 text-sm md:grid-cols-[1fr_9rem_8rem_9rem] md:items-center md:gap-3 md:py-3"
+                        >
+                            <div class="min-w-0">
+                                <p class="font-semibold md:truncate">
+                                    {{ contribution.userName }}
+                                </p>
+                                <p
+                                    class="mt-1 text-xs text-[#696250] dark:text-[#b6ae9d] md:hidden"
+                                >
+                                    {{ contribution.goalName }}
+                                </p>
+                            </div>
+
+                            <span
+                                class="hidden truncate text-[#696250] dark:text-[#b6ae9d] md:block"
+                            >
+                                {{ contribution.goalName }}
+                            </span>
+
+                            <span class="font-bold md:text-right">
+                                +{{ contribution.amountLabel }}
+                                {{ contribution.resourceLabel.toLowerCase() }}
+                            </span>
+
+                            <span
+                                class="text-xs text-[#696250] dark:text-[#b6ae9d] md:text-right"
+                            >
+                                {{ contribution.contributedAt ?? 'Unknown' }}
+                            </span>
+                        </div>
+                    </div>
+                </template>
             </section>
 
             <div

@@ -114,6 +114,18 @@ export type AllianceApplication = {
     appliedAt: string | null;
 };
 
+export type AllianceContribution = {
+    id: number;
+    userId: number;
+    userName: string;
+    goalName: string;
+    resourceType: ResourceKey;
+    resourceLabel: string;
+    amount: number;
+    amountLabel: string;
+    contributedAt: string | null;
+};
+
 export type AllianceGoalStage = {
     percentage: number;
     percentageLabel: string;
@@ -182,6 +194,7 @@ export type CurrentAlliance = AllianceSummary & {
     canDisband: boolean;
     members: AllianceMember[];
     applications: AllianceApplication[];
+    contributions: AllianceContribution[];
     goal: AllianceGoal;
     activeGoalBonus: AllianceGoalBonus;
 };

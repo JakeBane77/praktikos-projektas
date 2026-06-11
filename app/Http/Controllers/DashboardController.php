@@ -6,6 +6,7 @@ use App\Models\Achievement;
 use App\Models\Alliance;
 use App\Models\AllianceApplication;
 use App\Models\AllianceCreationLog;
+use App\Models\AllianceGoalContribution;
 use App\Models\AllianceMembership;
 use App\Models\BuildingType;
 use App\Models\Minigame;
@@ -815,12 +816,40 @@ class DashboardController extends Controller
             'canLeave' => Gate::forUser($user)->allows('leave', $alliance),
             'canDisband' => Gate::forUser($user)->allows('delete', $alliance),
             'members' => $this->allianceMemberCardsFor($user, $alliance, true),
+            'contributions' => $this->allianceContributionCardsFor($alliance),
             'applications' => Gate::forUser($user)->allows('updateVisibility', $alliance)
                 ? $this->allianceApplicationCardsFor($alliance)
                 : [],
             'goal' => $this->allianceGoalService->currentGoalCardFor($alliance),
             'activeGoalBonus' => $this->allianceGoalService->previousBonusCardFor($alliance),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, userId: int, userName: string, goalName: string, resourceType: string, resourceLabel: string, amount: int, amountLabel: string, contributedAt: string|null}>
+     */
+    private function allianceContributionCardsFor(Alliance $alliance): array
+    {
+        return AllianceGoalContribution::query()
+            ->with(['goal', 'user'])
+            ->whereHas('goal', fn ($query) => $query->where('alliance_id', $alliance->id))
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get()
+            ->map(fn (AllianceGoalContribution $contribution): array => [
+                'id' => $contribution->id,
+                'userId' => $contribution->user_id,
+                'userName' => $contribution->user instanceof User ? $contribution->user->name : 'Unknown player',
+                'goalName' => $contribution->goal->name,
+                'resourceType' => $contribution->resource_type,
+                'resourceLabel' => ucfirst($contribution->resource_type),
+                'amount' => (int) $contribution->amount,
+                'amountLabel' => number_format((int) $contribution->amount),
+                'contributedAt' => $contribution->created_at?->format('Y-m-d H:i'),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
