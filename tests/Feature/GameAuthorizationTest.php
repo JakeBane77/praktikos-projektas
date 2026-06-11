@@ -167,7 +167,6 @@ test('alliance policies enforce leader and officer permissions', function () {
         'target_amount' => 1_000,
         'current_amount' => 0,
         'production_bonus_percent' => 5,
-        'bonus_duration_hours' => 24,
         'stage_percentages' => [50, 100],
         'stage_donor_requirements' => [1, 2],
         'week_starts_at' => now()->startOfWeek(),

@@ -19,8 +19,8 @@ return new class extends Migration
             $table->unsignedBigInteger('target_amount');
             $table->unsignedBigInteger('current_amount')->default(0);
             $table->unsignedInteger('production_bonus_percent')->default(0);
-            $table->unsignedInteger('bonus_duration_hours')->default(168);
             $table->json('stage_percentages');
+            $table->json('stage_donor_requirements');
             $table->timestamp('week_starts_at');
             $table->timestamp('week_ends_at');
             $table->enum('status', ['active', 'completed', 'expired'])->default('active');

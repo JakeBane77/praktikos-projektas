@@ -23,8 +23,6 @@ class AllianceGoalService
 
     public const DEFAULT_PRODUCTION_BONUS_PERCENT = 2;
 
-    public const BONUS_DURATION_HOURS = 168;
-
     public function ensureCurrentGoalFor(Alliance $alliance): AllianceGoal
     {
         $weekStartsAt = $this->currentWeekStartsAt();
@@ -43,7 +41,7 @@ class AllianceGoalService
                 ->first();
 
             if ($goal instanceof AllianceGoal) {
-                return $goal;
+                return $this->syncDefaultGoalSettings($goal);
             }
 
             return AllianceGoal::create([
@@ -53,7 +51,6 @@ class AllianceGoalService
                 'target_amount' => self::DEFAULT_TARGET_AMOUNT,
                 'current_amount' => 0,
                 'production_bonus_percent' => self::DEFAULT_PRODUCTION_BONUS_PERCENT,
-                'bonus_duration_hours' => self::BONUS_DURATION_HOURS,
                 'stage_percentages' => self::DEFAULT_STAGE_PERCENTAGES,
                 'stage_donor_requirements' => self::DEFAULT_STAGE_DONOR_REQUIREMENTS,
                 'week_starts_at' => $weekStartsAt,
@@ -195,6 +192,22 @@ class AllianceGoalService
         return (int) $goal->contributions()
             ->distinct('user_id')
             ->count('user_id');
+    }
+
+    private function syncDefaultGoalSettings(AllianceGoal $goal): AllianceGoal
+    {
+        if ($goal->name !== 'Weekly stockpile' || $goal->resource_type !== null || $goal->status !== 'active') {
+            return $goal;
+        }
+
+        if ((int) $goal->production_bonus_percent === self::DEFAULT_PRODUCTION_BONUS_PERCENT) {
+            return $goal;
+        }
+
+        $goal->production_bonus_percent = self::DEFAULT_PRODUCTION_BONUS_PERCENT;
+        $goal->save();
+
+        return $goal;
     }
 
     public function currentAllianceFor(User $user): ?Alliance

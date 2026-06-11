@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $target_amount
  * @property int $current_amount
  * @property int $production_bonus_percent
- * @property int $bonus_duration_hours
  * @property array<int, float|int> $stage_percentages
  * @property array<int, int>|null $stage_donor_requirements
  * @property CarbonInterface $week_starts_at
@@ -37,7 +36,6 @@ class AllianceGoal extends Model
         'target_amount',
         'current_amount',
         'production_bonus_percent',
-        'bonus_duration_hours',
         'stage_percentages',
         'stage_donor_requirements',
         'week_starts_at',
@@ -52,7 +50,6 @@ class AllianceGoal extends Model
             'target_amount' => 'integer',
             'current_amount' => 'integer',
             'production_bonus_percent' => 'integer',
-            'bonus_duration_hours' => 'integer',
             'stage_percentages' => 'array',
             'stage_donor_requirements' => 'array',
             'week_starts_at' => 'datetime',

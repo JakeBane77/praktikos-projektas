@@ -183,6 +183,37 @@ const roleStyles = {
     },
 };
 
+const goalProgressSegments = computed(() => {
+    const goal = currentAlliance.value?.goal;
+
+    if (!goal) {
+        return [];
+    }
+
+    let previousAmount = 0;
+
+    return goal.stages.map((stage) => {
+        const segmentSize = Math.max(1, stage.amount - previousAmount);
+        const fillPercent = Math.max(
+            0,
+            Math.min(
+                100,
+                ((goal.currentAmount - previousAmount) / segmentSize) * 100,
+            ),
+        );
+        previousAmount = stage.amount;
+
+        return {
+            key: stage.percentageLabel,
+            label: stage.percentageLabel,
+            fillPercent,
+            isReached: stage.isReached,
+            hasAmount: stage.hasAmount,
+            hasDonors: stage.hasDonors,
+        };
+    });
+});
+
 watch(
     currentAlliance,
     (alliance) => {
@@ -1013,6 +1044,21 @@ function confirmKick(member: AllianceMember): void {
                                     )
                                 }}% of goal)
                             </p>
+                            <p
+                                class="mt-1 text-xs font-semibold text-[#7b633d] dark:text-[#caa66c]"
+                            >
+                                +{{
+                                    formatExactNumber(
+                                        currentAlliance.goal.bonusPerStagePercent,
+                                    )
+                                }}% production bonus per stage -
+                                +{{
+                                    formatExactNumber(
+                                        currentAlliance.goal
+                                            .earnedNextWeekBonusPercent,
+                                    )
+                                }}% production bonus earned for next week
+                            </p>
                         </div>
                         <span class="text-sm font-semibold">
                             Ends {{ currentAlliance.goal.weekEndsAt }}
@@ -1020,14 +1066,57 @@ function confirmKick(member: AllianceMember): void {
                     </div>
 
                     <div
-                        class="mt-4 h-3 overflow-hidden rounded-full bg-[#e4dac7] dark:bg-[#35332c]"
+                        v-if="goalProgressSegments.length > 0"
+                        class="mt-4"
+                        role="progressbar"
+                        :aria-valuenow="currentAlliance.goal.progressPercent"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
                     >
                         <div
-                            class="h-full rounded-full bg-[#243627] dark:bg-[#caa66c]"
+                            class="flex h-4 gap-1 rounded-full bg-[#e4dac7] p-0.5 dark:bg-[#35332c]"
+                        >
+                            <div
+                                v-for="segment in goalProgressSegments"
+                                :key="segment.key"
+                                class="min-w-0 flex-1 overflow-hidden rounded-full bg-[#d6c9b5] dark:bg-[#282b22]"
+                                :aria-label="`${segment.label} segment`"
+                            >
+                                <div
+                                    class="h-full rounded-full transition-[width] duration-300"
+                                    :class="
+                                        segment.isReached
+                                            ? 'bg-[#4f7d46] dark:bg-[#9dcc84]'
+                                            : segment.hasAmount &&
+                                                !segment.hasDonors
+                                              ? 'bg-[#caa66c]'
+                                              : 'bg-[#243627] dark:bg-[#243627]'    
+                                    "
+                                    :style="{
+                                        width: `${segment.fillPercent}%`,
+                                    }"
+                                ></div>
+                            </div>
+                        </div>
+                        <div
+                            class="mt-2 grid gap-1 text-center text-[10px] font-semibold text-[#696250] dark:text-[#b6ae9d]"
                             :style="{
-                                width: `${currentAlliance.goal.progressPercent}%`,
+                                gridTemplateColumns: `repeat(${goalProgressSegments.length}, minmax(0, 1fr))`,
                             }"
-                        ></div>
+                        >
+                            <span
+                                v-for="segment in goalProgressSegments"
+                                :key="`${segment.key}-label`"
+                                class="truncate"
+                                :class="
+                                    segment.isReached
+                                        ? 'text-[#315b30] dark:text-[#d7edc5]'
+                                        : ''
+                                "
+                            >
+                                {{ segment.label }}
+                            </span>
+                        </div>
                     </div>
 
                     <div class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">

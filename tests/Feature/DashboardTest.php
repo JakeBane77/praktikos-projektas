@@ -222,6 +222,54 @@ test('dashboard creates and exposes current weekly alliance goal', function () {
     ]);
 });
 
+test('dashboard syncs current generated alliance goal bonus percent from defaults', function () {
+    $user = User::factory()->create();
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::create([
+        'name' => 'Sync Guild',
+        'slug' => 'sync-guild',
+        'leader_id' => $leader->id,
+        'member_limit' => 20,
+        'is_open' => true,
+    ]);
+
+    AllianceMembership::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $user->id,
+        'role' => 'member',
+        'joined_at' => now(),
+    ]);
+
+    $weekStartsAt = now()->startOfWeek();
+    $goal = AllianceGoal::create([
+        'alliance_id' => $alliance->id,
+        'name' => 'Weekly stockpile',
+        'resource_type' => null,
+        'target_amount' => 10_000_000,
+        'current_amount' => 0,
+        'production_bonus_percent' => 1,
+        'stage_percentages' => [0.01, 1, 10, 30, 60, 100],
+        'stage_donor_requirements' => [1, 2, 3, 4, 6, 8],
+        'week_starts_at' => $weekStartsAt,
+        'week_ends_at' => $weekStartsAt->copy()->addWeek()->subSecond(),
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.current.goal.bonusPerStagePercent', AllianceGoalService::DEFAULT_PRODUCTION_BONUS_PERCENT)
+            ->where('alliances.current.goal.potentialBonusPercent', AllianceGoalService::DEFAULT_PRODUCTION_BONUS_PERCENT * 6)
+        );
+
+    $this->assertDatabaseHas('alliance_goals', [
+        'id' => $goal->id,
+        'production_bonus_percent' => AllianceGoalService::DEFAULT_PRODUCTION_BONUS_PERCENT,
+    ]);
+});
+
 test('members can contribute any resource to weekly alliance goals', function () {
     $user = User::factory()->create();
     $leader = User::factory()->create();
@@ -323,7 +371,6 @@ test('members cannot contribute more than twenty percent of an alliance goal', f
         'target_amount' => 1_000,
         'current_amount' => 150,
         'production_bonus_percent' => 5,
-        'bonus_duration_hours' => 168,
         'stage_percentages' => [50, 100],
         'stage_donor_requirements' => [1, 2],
         'week_starts_at' => $weekStartsAt,
@@ -385,7 +432,6 @@ test('previous week alliance goal stages add production bonus this week', functi
         'target_amount' => 1_000,
         'current_amount' => 300,
         'production_bonus_percent' => 5,
-        'bonus_duration_hours' => 168,
         'stage_percentages' => [10, 30, 60, 100],
         'stage_donor_requirements' => [1, 2, 3, 4],
         'week_starts_at' => $previousWeekStartsAt,
@@ -465,7 +511,6 @@ test('alliance goal stages require enough unique donors for production bonus', f
         'target_amount' => 1_000,
         'current_amount' => 1_000,
         'production_bonus_percent' => 5,
-        'bonus_duration_hours' => 168,
         'stage_percentages' => [10, 100],
         'stage_donor_requirements' => [1, 8],
         'week_starts_at' => $previousWeekStartsAt,
@@ -517,7 +562,6 @@ test('alliance goal stays active at target amount until donor segments are reach
         'target_amount' => 1_000,
         'current_amount' => 1_000,
         'production_bonus_percent' => 5,
-        'bonus_duration_hours' => 168,
         'stage_percentages' => [100],
         'stage_donor_requirements' => [8],
         'week_starts_at' => $weekStartsAt,
@@ -563,7 +607,6 @@ test('alliance goal completes when target amount and donor segments are reached'
         'target_amount' => 1_000,
         'current_amount' => 1_000,
         'production_bonus_percent' => 5,
-        'bonus_duration_hours' => 168,
         'stage_percentages' => [100],
         'stage_donor_requirements' => [8],
         'week_starts_at' => $weekStartsAt,
