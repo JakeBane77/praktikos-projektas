@@ -1090,7 +1090,7 @@ function confirmKick(member: AllianceMember): void {
                                             : segment.hasAmount &&
                                                 !segment.hasDonors
                                               ? 'bg-[#caa66c]'
-                                              : 'bg-[#243627] dark:bg-[#243627]'    
+                                              : 'bg-[#caa66c] dark:bg-[#caa66c]'    
                                     "
                                     :style="{
                                         width: `${segment.fillPercent}%`,
