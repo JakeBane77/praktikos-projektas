@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\AllianceApplicationFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -17,6 +19,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class AllianceApplication extends Model
 {
+    /** @use HasFactory<AllianceApplicationFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'alliance_id',
         'user_id',

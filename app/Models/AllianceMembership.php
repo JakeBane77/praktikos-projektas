@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\AllianceMembershipFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -18,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class AllianceMembership extends Model
 {
+    /** @use HasFactory<AllianceMembershipFactory> */
+    use HasFactory;
+
     protected $table = 'alliance_user';
 
     public $timestamps = false;

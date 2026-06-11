@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\AllianceCreationLogFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class AllianceCreationLog extends Model
 {
+    /** @use HasFactory<AllianceCreationLogFactory> */
+    use HasFactory;
+
     public const UPDATED_AT = null;
 
     protected $fillable = [
