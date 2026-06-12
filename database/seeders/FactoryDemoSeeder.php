@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Achievement;
 use App\Models\Alliance;
 use App\Models\AllianceApplication;
+use App\Models\AllianceChatMessage;
 use App\Models\AllianceCreationLog;
 use App\Models\AllianceGoal;
 use App\Models\AllianceGoalContribution;
@@ -178,7 +179,7 @@ class FactoryDemoSeeder extends Seeder
 
             $currentGoal = AllianceGoal::factory()
                 ->for($alliance)
-                ->withProgress(fake()->numberBetween(0, 6_000_000))
+                ->withProgress(0)
                 ->create();
 
             $previousGoal = AllianceGoal::factory()
@@ -187,7 +188,21 @@ class FactoryDemoSeeder extends Seeder
                 ->withProgress(fake()->numberBetween(0, 10_000_000))
                 ->create();
 
-            $donors = $members->prepend($leader)->take(fake()->numberBetween(1, min(8, max(1, $members->count() + 1))));
+            $allianceUsers = collect([$leader])->merge($members)->values();
+            $donors = $allianceUsers->take(fake()->numberBetween(1, min(8, max(1, $allianceUsers->count()))));
+            $chatUsers = $allianceUsers;
+
+            for ($messageIndex = 0; $messageIndex < fake()->numberBetween(2, 10); $messageIndex++) {
+                /** @var User $chatUser */
+                $chatUser = $chatUsers->random();
+
+                AllianceChatMessage::factory()
+                    ->for($alliance)
+                    ->for($chatUser)
+                    ->create([
+                        'created_at' => now()->subMinutes(fake()->numberBetween(1, 1_440)),
+                    ]);
+            }
 
             foreach ([$currentGoal, $previousGoal] as $goal) {
                 $donors->each(function (User $donor) use ($goal): void {

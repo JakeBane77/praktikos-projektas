@@ -196,6 +196,12 @@ test('alliance policies enforce leader and officer permissions', function () {
         ->and($member->can('demote', [$alliance, $officer->allianceMembership]))->toBeFalse()
         ->and($officer->can('transferLeadership', [$alliance, $member->allianceMembership]))->toBeFalse()
         ->and($member->can('transferLeadership', [$alliance, $officer->allianceMembership]))->toBeFalse()
+        ->and($leader->can('viewChat', $alliance))->toBeTrue()
+        ->and($officer->can('viewChat', $alliance))->toBeTrue()
+        ->and($member->can('viewChat', $alliance))->toBeTrue()
+        ->and($outsideUser->can('viewChat', $alliance))->toBeFalse()
+        ->and($member->can('sendChatMessage', $alliance))->toBeTrue()
+        ->and($outsideUser->can('sendChatMessage', $alliance))->toBeFalse()
         ->and($member->can('contribute', $goal))->toBeTrue()
         ->and($outsideUser->can('contribute', $goal))->toBeFalse();
 });

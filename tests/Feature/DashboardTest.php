@@ -2,6 +2,7 @@
 
 use App\Models\Achievement;
 use App\Models\Alliance;
+use App\Models\AllianceChatMessage;
 use App\Models\AllianceGoal;
 use App\Models\AllianceGoalContribution;
 use App\Models\AllianceMembership;
@@ -397,6 +398,91 @@ test('dashboard exposes current alliance contribution history', function () {
             ->where('alliances.current.contributions.1.resourceType', 'wood')
             ->where('alliances.current.contributions.1.amount', 100)
         );
+});
+
+test('dashboard exposes current alliance chat messages to alliance members', function () {
+    $user = User::factory()->create(['name' => 'Current Player']);
+    $member = User::factory()->create(['name' => 'Chat Member']);
+    $alliance = Alliance::factory()
+        ->for($user, 'leader')
+        ->create([
+            'name' => 'Chat Alliance',
+            'slug' => 'chat-alliance',
+        ]);
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($user)
+        ->create();
+    AllianceMembership::factory()
+        ->for($alliance)
+        ->for($member)
+        ->create();
+
+    AllianceChatMessage::factory()
+        ->for($alliance)
+        ->for($member)
+        ->create([
+            'message' => 'First message',
+            'created_at' => now()->subMinutes(2),
+        ]);
+    AllianceChatMessage::factory()
+        ->for($alliance)
+        ->for($user)
+        ->create([
+            'message' => 'Second message',
+            'created_at' => now()->subMinute(),
+        ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.current.chatMessages.0.userName', 'Chat Member')
+            ->where('alliances.current.chatMessages.0.message', 'First message')
+            ->where('alliances.current.chatMessages.0.isCurrentUser', false)
+            ->where('alliances.current.chatMessages.1.userName', 'Current Player')
+            ->where('alliances.current.chatMessages.1.message', 'Second message')
+            ->where('alliances.current.chatMessages.1.isCurrentUser', true)
+        );
+});
+
+test('alliance members can post chat messages and outsiders cannot', function () {
+    $member = User::factory()->create();
+    $outsideUser = User::factory()->create();
+    $alliance = Alliance::factory()
+        ->for($member, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($member)
+        ->create();
+
+    $this->actingAs($member)
+        ->post(route('alliances.chat-messages.store', $alliance), [
+            'message' => '  Hello alliance.  ',
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('alliance_chat_messages', [
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'message' => 'Hello alliance.',
+    ]);
+
+    $this->actingAs($outsideUser)
+        ->post(route('alliances.chat-messages.store', $alliance), [
+            'message' => 'I should not be here.',
+        ])
+        ->assertForbidden();
+
+    $this->assertDatabaseMissing('alliance_chat_messages', [
+        'alliance_id' => $alliance->id,
+        'user_id' => $outsideUser->id,
+    ]);
 });
 
 test('members cannot contribute more than twenty percent of an alliance goal', function () {
