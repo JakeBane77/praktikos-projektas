@@ -143,7 +143,7 @@ watch(
                 <textarea
                     id="alliance-chat-message"
                     v-model="message"
-                    maxlength="500"
+                    maxlength="100"
                     rows="2"
                     class="min-h-12 flex-1 resize-none rounded-md border border-[#d7cbb8] bg-white px-3 py-2 text-sm text-[#1f241c] outline-none transition focus:border-[#9f8655] dark:border-[#4a4438] dark:bg-[#10140f] dark:text-[#f3efe4]"
                     placeholder="Write a message..."
@@ -160,7 +160,7 @@ watch(
                 </button>
             </div>
             <p class="mt-2 text-right text-xs text-[#696250] dark:text-[#b6ae9d]">
-                {{ message.length }} / 500
+                {{ message.length }} / 100
             </p>
         </form>
     </section>

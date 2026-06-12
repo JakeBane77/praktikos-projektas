@@ -20,7 +20,7 @@ class AllianceChatController extends Controller
         Gate::authorize('sendChatMessage', $alliance);
 
         $validated = $request->validate([
-            'message' => ['required', 'string', 'max:500'],
+            'message' => ['required', 'string', 'max:100'],
         ]);
 
         $message = trim($validated['message']);

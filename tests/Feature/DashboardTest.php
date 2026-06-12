@@ -485,6 +485,30 @@ test('alliance members can post chat messages and outsiders cannot', function ()
     ]);
 });
 
+test('alliance chat messages cannot exceed one hundred characters', function () {
+    $member = User::factory()->create();
+    $alliance = Alliance::factory()
+        ->for($member, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($member)
+        ->create();
+
+    $this->actingAs($member)
+        ->post(route('alliances.chat-messages.store', $alliance), [
+            'message' => str_repeat('a', 101),
+        ])
+        ->assertSessionHasErrors('message');
+
+    $this->assertDatabaseMissing('alliance_chat_messages', [
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+    ]);
+});
+
 test('members cannot contribute more than twenty percent of an alliance goal', function () {
     $user = User::factory()->create();
     $leader = User::factory()->create();
