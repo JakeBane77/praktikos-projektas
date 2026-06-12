@@ -108,8 +108,26 @@ class AlliancePolicy
         return (int) $alliance->leader_id === (int) $user->id;
     }
 
+    public function viewChat(User $user, Alliance $alliance): bool
+    {
+        return $this->isMemberOf($user, $alliance);
+    }
+
+    public function sendChatMessage(User $user, Alliance $alliance): bool
+    {
+        return $this->isMemberOf($user, $alliance);
+    }
+
     private function hasAlliance(User $user): bool
     {
         return $user->allianceMembership()->exists() || $user->ledAlliance()->exists();
+    }
+
+    private function isMemberOf(User $user, Alliance $alliance): bool
+    {
+        $membership = $user->allianceMembership;
+
+        return $membership !== null
+            && (int) $membership->alliance_id === (int) $alliance->id;
     }
 }

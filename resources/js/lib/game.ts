@@ -134,6 +134,15 @@ export type AllianceContribution = {
     contributedAt: string | null;
 };
 
+export type AllianceChatMessage = {
+    id: number;
+    userId: number;
+    userName: string;
+    message: string;
+    sentAt: string | null;
+    isCurrentUser: boolean;
+};
+
 export type AllianceGoalStage = {
     percentage: number;
     percentageLabel: string;
@@ -203,6 +212,7 @@ export type CurrentAlliance = AllianceSummary & {
     members: AllianceMember[];
     applications: AllianceApplication[];
     contributions: AllianceContribution[];
+    chatMessages: AllianceChatMessage[];
     goal: AllianceGoal;
     activeGoalBonus: AllianceGoalBonus;
 };

@@ -31,6 +31,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property-read Collection<int, AllianceApplication> $allianceApplications
  * @property-read Collection<int, AllianceCreationLog> $allianceCreationLogs
  * @property-read Collection<int, AllianceGoalContribution> $allianceGoalContributions
+ * @property-read Collection<int, AllianceChatMessage> $allianceChatMessages
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -138,5 +139,13 @@ class User extends Authenticatable implements PasskeyUser
     public function allianceGoalContributions(): HasMany
     {
         return $this->hasMany(AllianceGoalContribution::class);
+    }
+
+    /**
+     * @return HasMany<AllianceChatMessage, $this>
+     */
+    public function allianceChatMessages(): HasMany
+    {
+        return $this->hasMany(AllianceChatMessage::class);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Achievement;
 use App\Models\Alliance;
 use App\Models\AllianceApplication;
+use App\Models\AllianceChatMessage;
 use App\Models\AllianceCreationLog;
 use App\Models\AllianceGoalContribution;
 use App\Models\AllianceMembership;
@@ -828,12 +829,40 @@ class DashboardController extends Controller
             'canDisband' => Gate::forUser($user)->allows('delete', $alliance),
             'members' => $this->allianceMemberCardsFor($user, $alliance, true),
             'contributions' => $this->allianceContributionCardsFor($alliance),
+            'chatMessages' => Gate::forUser($user)->allows('viewChat', $alliance)
+                ? $this->allianceChatMessageCardsFor($user, $alliance)
+                : [],
             'applications' => Gate::forUser($user)->allows('updateVisibility', $alliance)
                 ? $this->allianceApplicationCardsFor($alliance)
                 : [],
             'goal' => $this->allianceGoalService->currentGoalCardFor($alliance),
             'activeGoalBonus' => $this->allianceGoalService->previousBonusCardFor($alliance),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, userId: int, userName: string, message: string, sentAt: string|null, isCurrentUser: bool}>
+     */
+    private function allianceChatMessageCardsFor(User $user, Alliance $alliance): array
+    {
+        return AllianceChatMessage::query()
+            ->with('user')
+            ->where('alliance_id', $alliance->id)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->reverse()
+            ->map(fn (AllianceChatMessage $message): array => [
+                'id' => $message->id,
+                'userId' => $message->user_id,
+                'userName' => $message->user instanceof User ? $message->user->name : 'Unknown player',
+                'message' => $message->message,
+                'sentAt' => $message->created_at?->format('Y-m-d H:i'),
+                'isCurrentUser' => (int) $message->user_id === (int) $user->id,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

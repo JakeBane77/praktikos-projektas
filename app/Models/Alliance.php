@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property-read Collection<int, AllianceApplication> $applications
  * @property-read Collection<int, User> $members
  * @property-read Collection<int, AllianceGoal> $goals
+ * @property-read Collection<int, AllianceChatMessage> $chatMessages
  */
 class Alliance extends Model
 {
@@ -94,5 +95,13 @@ class Alliance extends Model
     public function goals(): HasMany
     {
         return $this->hasMany(AllianceGoal::class);
+    }
+
+    /**
+     * @return HasMany<AllianceChatMessage, $this>
+     */
+    public function chatMessages(): HasMany
+    {
+        return $this->hasMany(AllianceChatMessage::class);
     }
 }
