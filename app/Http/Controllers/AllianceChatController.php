@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AllianceChatUpdateEvent;
 use App\Models\Alliance;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -30,10 +31,12 @@ class AllianceChatController extends Controller
             ]);
         }
 
-        $alliance->chatMessages()->create([
+        $chatMessage = $alliance->chatMessages()->create([
             'user_id' => $user->id,
             'message' => $message,
         ]);
+
+        broadcast(new AllianceChatUpdateEvent($chatMessage))->toOthers();
 
         return redirect()->to(url()->previous(route('dashboard')));
     }

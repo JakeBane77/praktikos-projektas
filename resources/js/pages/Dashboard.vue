@@ -31,6 +31,7 @@ import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
 import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
+import { useAllianceChatEcho } from '@/composables/useAllianceChatEcho';
 import {
     affordableRoadAmount,
     formatExactNumber,
@@ -113,6 +114,7 @@ const minigames = computed<Minigame[]>(() =>
     ),
 );
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
+const currentAllianceId = computed(() => props.alliances.current?.id ?? null);
 const selectedMinigame = computed<Minigame | null>(() =>
     selectedMinigameResource.value
         ? (minigames.value.find(
@@ -536,6 +538,12 @@ watch(
 );
 
 watch(() => props.serverTime.iso, syncServerTime, { immediate: true });
+
+useAllianceChatEcho(currentAllianceId, () => {
+    router.reload({
+        only: ['alliances'],
+    });
+});
 
 watch(
     () => props.minigames,
