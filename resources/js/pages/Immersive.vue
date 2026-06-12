@@ -6,6 +6,7 @@ import {
     CheckCircle2,
     Coins,
     Hammer,
+    MessageCircle,
     Mountain,
     Pause,
     Play,
@@ -21,6 +22,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import AchievementsModal from '@/components/game-modals/AchievementsModal.vue';
 import AchievementUnlockModal from '@/components/game-modals/AchievementUnlockModal.vue';
+import AllianceChatModal from '@/components/game-modals/AllianceChatModal.vue';
 import AllianceModal from '@/components/game-modals/AllianceModal.vue';
 import BuildingsModal from '@/components/game-modals/BuildingsModal.vue';
 import LeaderboardModal from '@/components/game-modals/LeaderboardModal.vue';
@@ -133,6 +135,11 @@ const achievementsButtonPosition = {
 const allianceButtonPosition = {
     right: 1,
     bottom: 13,
+};
+
+const allianceChatButtonPosition = {
+    right: 1,
+    bottom: 17,
 };
 
 const actionButtonPosition = {
@@ -365,6 +372,7 @@ const isPrestigeMenuOpen = ref(false);
 type GameModal =
     | 'achievements'
     | 'alliance'
+    | 'alliance-chat'
     | 'buildings'
     | 'leaderboard'
     | 'minigame'
@@ -593,6 +601,11 @@ const isAchievementsModalOpen = computed(
     () => activeGameModal.value === 'achievements',
 );
 const isAllianceModalOpen = computed(() => activeGameModal.value === 'alliance');
+const isAllianceChatModalOpen = computed(
+    () =>
+        activeGameModal.value === 'alliance-chat' &&
+        props.alliances.current !== null,
+);
 const isPrestigeConfirmModalOpen = computed(
     () => activeGameModal.value === 'prestige-confirm',
 );
@@ -603,6 +616,7 @@ const isOfflineProgressModalOpen = computed(
         !isBuildingsModalOpen.value &&
         !isAchievementsModalOpen.value &&
         !isAllianceModalOpen.value &&
+        !isAllianceChatModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value &&
         !isPrestigeConfirmModalOpen.value,
@@ -614,6 +628,7 @@ const isAchievementUnlockModalOpen = computed(
         !isBuildingsModalOpen.value &&
         !isAchievementsModalOpen.value &&
         !isAllianceModalOpen.value &&
+        !isAllianceChatModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value &&
         !isPrestigeConfirmModalOpen.value,
@@ -741,6 +756,11 @@ const allianceButtonStyle = computed(() => ({
     bottom: `${allianceButtonPosition.bottom}rem`,
 }));
 
+const allianceChatButtonStyle = computed(() => ({
+    right: `${allianceChatButtonPosition.right}rem`,
+    bottom: `${allianceChatButtonPosition.bottom}rem`,
+}));
+
 const actionButtonStyle = computed(() => ({
     right: `${actionButtonPosition.right}rem`,
     bottom: `${actionButtonPosition.bottom}rem`,
@@ -770,6 +790,7 @@ const prestigeButtonClass = computed(() => {
 const leaderboardButtonClass = iconButtonMenuClass;
 const achievementsButtonClass = iconButtonMenuClass;
 const allianceButtonClass = iconButtonMenuClass;
+const allianceChatButtonClass = iconButtonMenuClass;
 
 const achievementsButtonLabel = computed(
     () =>
@@ -779,6 +800,11 @@ const allianceButtonLabel = computed(() =>
     props.alliances.current
         ? `${props.alliances.current.name} alliance`
         : 'Alliances',
+);
+const allianceChatButtonLabel = computed(() =>
+    props.alliances.current
+        ? `${props.alliances.current.name} chat`
+        : 'Alliance chat unavailable',
 );
 const offlineProgressDurationLabel = computed(() =>
     formatOfflineProgressDuration(props.offlineProgress?.elapsedHours ?? 0),
@@ -1422,6 +1448,23 @@ function openAlliance(): void {
     scheduleAllianceReload('');
 }
 
+function openAllianceChat(): void {
+    if (
+        activeMinigameResource.value !== null ||
+        props.alliances.current === null
+    ) {
+        return;
+    }
+
+    isActionMenuOpen.value = false;
+    isResourcesMenuOpen.value = false;
+    isPrestigeMenuOpen.value = false;
+    closeOfflineProgress();
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'alliance-chat';
+}
+
 function closeBuildings(): void {
     if (activeGameModal.value === 'buildings') {
         activeGameModal.value = null;
@@ -1442,6 +1485,12 @@ function closeAchievements(): void {
 
 function closeAlliance(): void {
     if (activeGameModal.value === 'alliance') {
+        activeGameModal.value = null;
+    }
+}
+
+function closeAllianceChat(): void {
+    if (activeGameModal.value === 'alliance-chat') {
         activeGameModal.value = null;
     }
 }
@@ -1506,6 +1555,12 @@ function closeActiveGameModal(): void {
 
     if (activeGameModal.value === 'alliance') {
         closeAlliance();
+
+        return;
+    }
+
+    if (activeGameModal.value === 'alliance-chat') {
+        closeAllianceChat();
 
         return;
     }
@@ -1827,6 +1882,33 @@ function contributeAllianceGoal(payload: {
             onError: (errors) => {
                 if (errors.alliance_goal) {
                     toast.error(errors.alliance_goal);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
+function sendAllianceChatMessage(payload: {
+    allianceId: number;
+    message: string;
+}): void {
+    router.post(
+        `/alliances/${payload.allianceId}/chat-messages`,
+        {
+            message: payload.message,
+        },
+        {
+            preserveScroll: true,
+            only: ['alliances'],
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance_chat) {
+                    toast.error(errors.alliance_chat);
                 }
             },
             onFinish: () => {
@@ -2343,6 +2425,19 @@ function timeFromInputValue(value: string): Date {
             </div>
 
             <button
+                v-if="props.alliances.current"
+                type="button"
+                class="immersive-icon-button absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
+                :class="allianceChatButtonClass"
+                :style="allianceChatButtonStyle"
+                :aria-label="allianceChatButtonLabel"
+                :title="allianceChatButtonLabel"
+                @click="openAllianceChat"
+            >
+                <MessageCircle class="h-5 w-5" />
+            </button>
+
+            <button
                 type="button"
                 class="immersive-icon-button absolute z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border transition hover:scale-105"
                 :class="allianceButtonClass"
@@ -2705,6 +2800,7 @@ function timeFromInputValue(value: string): Date {
                 isBuildingsModalOpen ||
                 isAchievementsModalOpen ||
                 isAllianceModalOpen ||
+                isAllianceChatModalOpen ||
                 isLeaderboardModalOpen ||
                 isMinigameOpen ||
                 isPrestigeConfirmModalOpen ||
@@ -2766,6 +2862,13 @@ function timeFromInputValue(value: string): Date {
                 @demote="demoteAllianceMember"
                 @transfer-leadership="transferAllianceLeadership"
                 @contribute-goal="contributeAllianceGoal"
+            />
+            <AllianceChatModal
+                v-else-if="isAllianceChatModalOpen && props.alliances.current"
+                :alliance="props.alliances.current"
+                :is-submitting="isSubmittingAlliance"
+                @close="closeAllianceChat"
+                @send="sendAllianceChatMessage"
             />
             <LeaderboardModal
                 v-else-if="isLeaderboardModalOpen && selectedLeaderboard"

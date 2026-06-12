@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AllianceController;
+use App\Http\Controllers\AllianceChatController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('alliances/{alliance}/members/{membership}/transfer-leadership', [AllianceController::class, 'transferLeadership'])->name('alliances.members.transfer-leadership');
     Route::delete('alliances/{alliance}/members/{membership}', [AllianceController::class, 'kick'])->name('alliances.members.kick');
     Route::delete('alliances/{alliance}', [AllianceController::class, 'destroy'])->name('alliances.destroy');
+    Route::post('alliances/{alliance}/chat-messages', [AllianceChatController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('alliances.chat-messages.store');
     Route::post('alliance-goals/{goal}/contribute', [AllianceController::class, 'contribute'])
         ->name('alliance-goals.contribute');
 });

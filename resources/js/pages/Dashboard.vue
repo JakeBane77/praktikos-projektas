@@ -8,6 +8,7 @@ import {
     Gamepad2,
     LocateFixed,
     Lock,
+    MessageCircle,
     Mountain,
     PackagePlus,
     RotateCcw,
@@ -19,6 +20,7 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import AchievementUnlockModal from '@/components/game-modals/AchievementUnlockModal.vue';
+import AllianceChatModal from '@/components/game-modals/AllianceChatModal.vue';
 import AllianceModal from '@/components/game-modals/AllianceModal.vue';
 import BuildingsModal from '@/components/game-modals/BuildingsModal.vue';
 import LeaderboardModal from '@/components/game-modals/LeaderboardModal.vue';
@@ -73,7 +75,12 @@ const isPrestiging = ref(false);
 const isSubmittingAlliance = ref(false);
 let allianceSearchReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 const activeGameModal = ref<
-    'alliance' | 'leaderboard' | 'minigame' | 'prestige-confirm' | null
+    | 'alliance'
+    | 'alliance-chat'
+    | 'leaderboard'
+    | 'minigame'
+    | 'prestige-confirm'
+    | null
 >(null);
 const upgradingBuildingId = ref<number | null>(null);
 const activeMinigameResource = ref<ResourceKey | null>(null);
@@ -233,6 +240,11 @@ const isLeaderboardModalOpen = computed(
         selectedLeaderboard.value !== null,
 );
 const isAllianceModalOpen = computed(() => activeGameModal.value === 'alliance');
+const isAllianceChatModalOpen = computed(
+    () =>
+        activeGameModal.value === 'alliance-chat' &&
+        props.alliances.current !== null,
+);
 const isPrestigeConfirmModalOpen = computed(
     () => activeGameModal.value === 'prestige-confirm',
 );
@@ -242,6 +254,7 @@ const isOfflineProgressModalOpen = computed(
         !isOfflineProgressDismissed.value &&
         !isBuildingsOpen.value &&
         !isAllianceModalOpen.value &&
+        !isAllianceChatModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value &&
         !isPrestigeConfirmModalOpen.value,
@@ -252,6 +265,7 @@ const isAchievementUnlockModalOpen = computed(
         !isOfflineProgressModalOpen.value &&
         !isBuildingsOpen.value &&
         !isAllianceModalOpen.value &&
+        !isAllianceChatModalOpen.value &&
         !isLeaderboardModalOpen.value &&
         !isMinigameOpen.value &&
         !isPrestigeConfirmModalOpen.value,
@@ -998,6 +1012,27 @@ function closeAlliance() {
     }
 }
 
+function openAllianceChat() {
+    if (
+        activeMinigameResource.value !== null ||
+        props.alliances.current === null
+    ) {
+        return;
+    }
+
+    isBuildingsOpen.value = false;
+    closeOfflineProgress();
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+    activeGameModal.value = 'alliance-chat';
+}
+
+function closeAllianceChat() {
+    if (activeGameModal.value === 'alliance-chat') {
+        activeGameModal.value = null;
+    }
+}
+
 function searchAlliances(query: string) {
     scheduleAllianceReload(query);
 }
@@ -1079,6 +1114,12 @@ function closeActiveGameModal() {
 
     if (activeGameModal.value === 'alliance') {
         closeAlliance();
+
+        return;
+    }
+
+    if (activeGameModal.value === 'alliance-chat') {
+        closeAllianceChat();
 
         return;
     }
@@ -1401,6 +1442,33 @@ function contributeAllianceGoal(payload: {
             onError: (errors) => {
                 if (errors.alliance_goal) {
                     toast.error(errors.alliance_goal);
+                }
+            },
+            onFinish: () => {
+                isSubmittingAlliance.value = false;
+            },
+        },
+    );
+}
+
+function sendAllianceChatMessage(payload: {
+    allianceId: number;
+    message: string;
+}) {
+    router.post(
+        `/alliances/${payload.allianceId}/chat-messages`,
+        {
+            message: payload.message,
+        },
+        {
+            preserveScroll: true,
+            only: ['alliances'],
+            onStart: () => {
+                isSubmittingAlliance.value = true;
+            },
+            onError: (errors) => {
+                if (errors.alliance_chat) {
+                    toast.error(errors.alliance_chat);
                 }
             },
             onFinish: () => {
@@ -1856,6 +1924,58 @@ function upgradeBuilding(building: Building) {
                         </div>
                     </div>
                 </div>
+            </section>
+
+            <section v-if="props.alliances.current">
+                <button
+                    type="button"
+                    data-game-modal-launcher="alliance-chat"
+                    class="w-full rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#c9b995] hover:shadow-md dark:border-[#38362f] dark:bg-[#1a1d15] dark:hover:border-[#5a523f]"
+                    @click="openAllianceChat"
+                >
+                    <div
+                        class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div class="rounded-md bg-[#12313d] p-2 text-[#d9f5ff]">
+                                <MessageCircle class="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p
+                                    class="text-sm font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                                >
+                                    Alliance chat
+                                </p>
+                                <h2 class="mt-1 text-lg font-semibold">
+                                    {{ props.alliances.current.name }}
+                                </h2>
+                                <p
+                                    class="mt-1 text-sm leading-6 text-[#696250] dark:text-[#b6ae9d]"
+                                >
+                                    Send messages to alliance members.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-md border border-[#e4dac7] p-4 lg:min-w-52 dark:border-[#35332c]"
+                        >
+                            <p
+                                class="text-sm font-semibold text-[#696250] dark:text-[#b6ae9d]"
+                            >
+                                Recent messages
+                            </p>
+                            <p class="mt-2 text-xl font-bold">
+                                {{
+                                    formatExactNumber(
+                                        props.alliances.current.chatMessages
+                                            .length,
+                                    )
+                                }}
+                            </p>
+                        </div>
+                    </div>
+                </button>
             </section>
 
             <section>
@@ -2338,6 +2458,7 @@ function upgradeBuilding(building: Building) {
             v-if="
                 isBuildingsOpen ||
                 isAllianceModalOpen ||
+                isAllianceChatModalOpen ||
                 isLeaderboardModalOpen ||
                 isMinigameOpen ||
                 isPrestigeConfirmModalOpen ||
@@ -2379,6 +2500,13 @@ function upgradeBuilding(building: Building) {
                 @demote="demoteAllianceMember"
                 @transfer-leadership="transferAllianceLeadership"
                 @contribute-goal="contributeAllianceGoal"
+            />
+            <AllianceChatModal
+                v-else-if="isAllianceChatModalOpen && props.alliances.current"
+                :alliance="props.alliances.current"
+                :is-submitting="isSubmittingAlliance"
+                @close="closeAllianceChat"
+                @send="sendAllianceChatMessage"
             />
             <LeaderboardModal
                 v-else-if="isLeaderboardModalOpen && selectedLeaderboard"
