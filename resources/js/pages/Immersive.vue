@@ -387,6 +387,7 @@ const activeAchievementUnlockIndex = ref(0);
 const isCollecting = ref(false);
 const isPrestiging = ref(false);
 const isSubmittingAlliance = ref(false);
+const hasUnreadAllianceChatMessage = ref(false);
 let allianceSearchReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
@@ -792,7 +793,11 @@ const prestigeButtonClass = computed(() => {
 const leaderboardButtonClass = iconButtonMenuClass;
 const achievementsButtonClass = iconButtonMenuClass;
 const allianceButtonClass = iconButtonMenuClass;
-const allianceChatButtonClass = iconButtonMenuClass;
+const allianceChatButtonClass = computed(() =>
+    hasUnreadAllianceChatMessage.value
+        ? iconButtonReadyClass
+        : iconButtonMenuClass,
+);
 
 const achievementsButtonLabel = computed(
     () =>
@@ -805,7 +810,9 @@ const allianceButtonLabel = computed(() =>
 );
 const allianceChatButtonLabel = computed(() =>
     props.alliances.current
-        ? `${props.alliances.current.name} chat`
+        ? hasUnreadAllianceChatMessage.value
+            ? `New ${props.alliances.current.name} chat message`
+            : `${props.alliances.current.name} chat`
         : 'Alliance chat unavailable',
 );
 const offlineProgressDurationLabel = computed(() =>
@@ -1041,9 +1048,17 @@ watch(
 );
 
 useAllianceChatEcho(currentAllianceId, () => {
+    if (!isAllianceChatModalOpen.value) {
+        hasUnreadAllianceChatMessage.value = true;
+    }
+
     router.reload({
         only: ['alliances'],
     });
+});
+
+watch(currentAllianceId, () => {
+    hasUnreadAllianceChatMessage.value = false;
 });
 
 onMounted(() => {
@@ -1470,6 +1485,7 @@ function openAllianceChat(): void {
     closeOfflineProgress();
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
+    hasUnreadAllianceChatMessage.value = false;
     activeGameModal.value = 'alliance-chat';
 }
 
