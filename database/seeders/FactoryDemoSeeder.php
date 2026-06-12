@@ -179,7 +179,7 @@ class FactoryDemoSeeder extends Seeder
 
             $currentGoal = AllianceGoal::factory()
                 ->for($alliance)
-                ->withProgress(0)
+                ->withProgress(fake()->numberBetween(0, 6_000_000))
                 ->create();
 
             $previousGoal = AllianceGoal::factory()
