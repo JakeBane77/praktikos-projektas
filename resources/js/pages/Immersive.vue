@@ -2988,9 +2988,10 @@ function timeFromInputValue(value: string): Date {
     --immersive-shell-height: calc(100svh - 4rem);
     --immersive-scene-width-from-height: calc(177.7svh - 7.11rem);
     width: 100%;
-    height: var(--immersive-shell-height);
-    overflow: auto;
-    overscroll-behavior: contain;
+    min-height: var(--immersive-shell-height);
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -2998,7 +2999,7 @@ function timeFromInputValue(value: string): Date {
     width: max(100%, var(--immersive-scene-width-from-height));
     height: max(var(--immersive-shell-height), 56.25vw);
     min-height: max(var(--immersive-shell-height), 56.25vw);
-    touch-action: manipulation;
+    touch-action: pan-x pan-y pinch-zoom;
 }
 
 .immersive-background {
