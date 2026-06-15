@@ -23,6 +23,7 @@ import type {
 const props = defineProps<{
     alliances: AllianceState;
     isSubmitting: boolean;
+    onlineUserIds: ReadonlySet<number>;
 }>();
 
 const emit = defineEmits<{
@@ -346,6 +347,10 @@ function resetConfirmations(): void {
 
 function memberCanTransferLeadership(member: AllianceMember): boolean {
     return member.canTransferLeadership && member.role === 'officer';
+}
+
+function memberIsOnline(member: AllianceMember): boolean {
+    return props.onlineUserIds.has(member.userId);
 }
 
 function roleConfirmationPhrase(
@@ -795,6 +800,15 @@ function confirmKick(member: AllianceMember): void {
                                     class="ml-2 rounded-sm bg-[#243627] px-2 py-0.5 text-xs text-white"
                                 >
                                     You
+                                </span>
+                                <span
+                                    v-if="memberIsOnline(member)"
+                                    class="ml-2 inline-flex items-center gap-1 rounded-sm bg-[#dcedd2] px-2 py-0.5 text-xs text-[#2f5f28] dark:bg-[#25371f] dark:text-[#a8de8f]"
+                                >
+                                    <span
+                                        class="h-1.5 w-1.5 rounded-full bg-[#6aa84f]"
+                                    ></span>
+                                    Online
                                 </span>
                             </p>
                             <p

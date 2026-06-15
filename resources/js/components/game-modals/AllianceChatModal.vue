@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { MessageCircle, Send, X } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
+import type { AllianceOnlineUser } from '@/composables/useAlliancePresence';
 import type { CurrentAlliance } from '@/lib/game';
 
 const props = defineProps<{
     alliance: CurrentAlliance;
     isSubmitting: boolean;
+    onlineUsers: readonly Readonly<AllianceOnlineUser>[];
 }>();
 
 const emit = defineEmits<{
@@ -19,6 +21,12 @@ const messagesContainer = ref<HTMLElement | null>(null);
 const canSend = computed(
     () => message.value.trim().length > 0 && !props.isSubmitting,
 );
+
+const onlineUsersLabel = computed(() => {
+    const onlineCount = props.onlineUsers.length;
+
+    return `${onlineCount} ${onlineCount === 1 ? 'member' : 'members'} online`;
+});
 
 function sendMessage(): void {
     const trimmedMessage = message.value.trim();
@@ -73,6 +81,24 @@ watch(
                     <h2 class="mt-1 text-2xl font-bold">
                         {{ alliance.name }}
                     </h2>
+                    <p class="mt-1 text-sm text-[#696250] dark:text-[#b6ae9d]">
+                        {{ onlineUsersLabel }}
+                    </p>
+                    <div
+                        v-if="onlineUsers.length > 0"
+                        class="mt-3 flex max-w-xl flex-wrap gap-1.5"
+                    >
+                        <span
+                            v-for="onlineUser in onlineUsers"
+                            :key="onlineUser.id"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-[#d7cbb8] bg-[#f7f0e2] px-2 py-1 text-xs font-semibold text-[#44513b] dark:border-[#35332c] dark:bg-[#202419] dark:text-[#d7e7cf]"
+                        >
+                            <span
+                                class="h-1.5 w-1.5 rounded-full bg-[#6aa84f]"
+                            ></span>
+                            {{ onlineUser.name }}
+                        </span>
+                    </div>
                 </div>
             </div>
             <button

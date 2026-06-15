@@ -32,6 +32,7 @@ import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import { useAllianceChatEcho } from '@/composables/useAllianceChatEcho';
+import { useAlliancePresence } from '@/composables/useAlliancePresence';
 import {
     affordableRoadAmount,
     formatExactNumber,
@@ -115,6 +116,10 @@ const minigames = computed<Minigame[]>(() =>
 );
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
 const currentAllianceId = computed(() => props.alliances.current?.id ?? null);
+const {
+    onlineUsers: allianceOnlineUsers,
+    onlineUserIds: allianceOnlineUserIds,
+} = useAlliancePresence(currentAllianceId);
 const selectedMinigame = computed<Minigame | null>(() =>
     selectedMinigameResource.value
         ? (minigames.value.find(
@@ -2493,6 +2498,7 @@ function upgradeBuilding(building: Building) {
                 v-else-if="isAllianceModalOpen"
                 :alliances="props.alliances"
                 :is-submitting="isSubmittingAlliance"
+                :online-user-ids="allianceOnlineUserIds"
                 @close="closeAlliance"
                 @search="searchAlliances"
                 @create="createAlliance"
@@ -2513,6 +2519,7 @@ function upgradeBuilding(building: Building) {
                 v-else-if="isAllianceChatModalOpen && props.alliances.current"
                 :alliance="props.alliances.current"
                 :is-submitting="isSubmittingAlliance"
+                :online-users="allianceOnlineUsers"
                 @close="closeAllianceChat"
                 @send="sendAllianceChatMessage"
             />

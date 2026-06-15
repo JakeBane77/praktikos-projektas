@@ -17,10 +17,13 @@ use App\Models\WeatherSnapshot;
 use App\Services\AllianceGoalService;
 use App\Support\MinigameStamina;
 use App\Support\Weather;
+use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Testing\AssertableInertia as Assert;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 uses(RefreshDatabase::class);
 
@@ -483,6 +486,50 @@ test('alliance members can post chat messages and outsiders cannot', function ()
         'alliance_id' => $alliance->id,
         'user_id' => $outsideUser->id,
     ]);
+});
+
+test('alliance presence channel exposes online users only to alliance members', function () {
+    config()->set('broadcasting.default', 'reverb');
+    config()->set('broadcasting.connections.reverb.key', 'test-key');
+    config()->set('broadcasting.connections.reverb.secret', 'test-secret');
+    config()->set('broadcasting.connections.reverb.app_id', 'test-app');
+
+    require base_path('routes/channels.php');
+
+    $member = User::factory()->create(['name' => 'Online Member']);
+    $outsideUser = User::factory()->create(['name' => 'Outside User']);
+    $alliance = Alliance::factory()
+        ->for($member, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($member)
+        ->create();
+
+    $makePresenceRequest = function (User $user) use ($alliance): Request {
+        $request = Request::create('/broadcasting/auth', 'POST', [
+            'channel_name' => 'presence-alliance.'.$alliance->id.'.presence',
+            'socket_id' => '123.456',
+        ]);
+
+        $request->setUserResolver(fn (?string $guard = null): User => $user);
+
+        return $request;
+    };
+
+    /** @var BroadcasterContract $broadcaster */
+    $broadcaster = app(BroadcasterContract::class);
+    $response = $broadcaster->auth($makePresenceRequest($member));
+
+    expect($response)
+        ->toHaveKey('auth')
+        ->and($response['channel_data'])
+        ->toContain('Online Member');
+
+    expect(fn () => $broadcaster->auth($makePresenceRequest($outsideUser)))
+        ->toThrow(AccessDeniedHttpException::class);
 });
 
 test('alliance chat messages cannot exceed one hundred characters', function () {

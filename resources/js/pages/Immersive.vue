@@ -34,6 +34,7 @@ import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import { useAllianceChatEcho } from '@/composables/useAllianceChatEcho';
+import { useAlliancePresence } from '@/composables/useAlliancePresence';
 import { useImmersiveTestingPanel } from '@/composables/useImmersiveTestingPanel';
 import {
     affordableRoadAmount,
@@ -506,6 +507,10 @@ const minigames = computed<Minigame[]>(() =>
 );
 const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
 const currentAllianceId = computed(() => props.alliances.current?.id ?? null);
+const {
+    onlineUsers: allianceOnlineUsers,
+    onlineUserIds: allianceOnlineUserIds,
+} = useAlliancePresence(currentAllianceId);
 const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
 const currentAchievementUnlock = computed(
@@ -2871,6 +2876,7 @@ function timeFromInputValue(value: string): Date {
                 v-else-if="isAllianceModalOpen"
                 :alliances="props.alliances"
                 :is-submitting="isSubmittingAlliance"
+                :online-user-ids="allianceOnlineUserIds"
                 @close="closeAlliance"
                 @search="searchAlliances"
                 @create="createAlliance"
@@ -2891,6 +2897,7 @@ function timeFromInputValue(value: string): Date {
                 v-else-if="isAllianceChatModalOpen && props.alliances.current"
                 :alliance="props.alliances.current"
                 :is-submitting="isSubmittingAlliance"
+                :online-users="allianceOnlineUsers"
                 @close="closeAllianceChat"
                 @send="sendAllianceChatMessage"
             />

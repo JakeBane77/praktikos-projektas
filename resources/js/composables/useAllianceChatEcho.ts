@@ -1,4 +1,4 @@
-import { echo } from '@laravel/echo-vue';
+import { echo, echoIsConfigured } from '@laravel/echo-vue';
 import { onBeforeUnmount, watch } from 'vue';
 import type { Ref } from 'vue';
 
@@ -15,7 +15,10 @@ export function useAllianceChatEcho(
             return;
         }
 
-        echo().leave(currentChannelName);
+        if (echoIsConfigured()) {
+            echo().leave(currentChannelName);
+        }
+
         currentChannelName = null;
     }
 
@@ -33,7 +36,7 @@ export function useAllianceChatEcho(
 
             leaveCurrentChannel();
 
-            if (nextChannelName === null) {
+            if (nextChannelName === null || !echoIsConfigured()) {
                 return;
             }
 

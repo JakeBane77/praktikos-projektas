@@ -6,9 +6,17 @@ import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 
-configureEcho({
-    broadcaster: 'reverb',
-});
+const reverbAppKey = import.meta.env.VITE_REVERB_APP_KEY;
+
+if (typeof reverbAppKey === 'string' && reverbAppKey.trim() !== '') {
+    configureEcho({
+        broadcaster: 'reverb',
+    });
+} else if (import.meta.env.DEV) {
+    console.warn(
+        'Reverb Echo was not configured because VITE_REVERB_APP_KEY is missing.',
+    );
+}
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 

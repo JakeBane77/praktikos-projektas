@@ -9,3 +9,22 @@ Broadcast::channel('alliance.{alliance}.chat', function (User $user, Alliance $a
         ->where('alliance_id', $alliance->id)
         ->exists();
 });
+
+Broadcast::channel(
+    'alliance.{alliance}.presence',
+    function (User $user, Alliance $alliance): array|bool {
+        $isMember = $user->allianceMembership()
+            ->where('alliance_id', $alliance->id)
+            ->exists();
+
+        if (! $isMember) {
+            return false;
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+        ];
+    },
+    ['guards' => ['web']],
+);
