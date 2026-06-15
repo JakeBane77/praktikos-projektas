@@ -221,6 +221,15 @@ const goalProgressSegments = computed(() => {
         };
     });
 });
+const canEditMembers = computed(() =>
+    currentAlliance.value?.members.some(
+        (member) =>
+            member.canKick ||
+            member.canPromote ||
+            member.canDemote ||
+            memberCanTransferLeadership(member),
+    ) ?? false,
+);
 
 watch(
     currentAlliance,
@@ -234,6 +243,11 @@ watch(
             !canShowApplicationsSection.value
         ) {
             activeAllianceSection.value = 'current';
+        }
+
+        if (!canEditMembers.value) {
+            isEditingMembers.value = false;
+            resetConfirmations();
         }
     },
     { immediate: true },
@@ -750,6 +764,7 @@ function confirmKick(member: AllianceMember): void {
                         </p>
                     </div>
                     <button
+                        v-if="canEditMembers"
                         type="button"
                         class="rounded-md border border-[#caa66c] px-3 py-2 text-sm font-semibold text-[#7b633d] transition hover:bg-[#7b633d] hover:text-white dark:text-[#caa66c] dark:hover:bg-[#5b4729]"
                         @click="
