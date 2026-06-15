@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\AllianceChatUpdateEvent;
 use App\Models\Achievement;
 use App\Models\Alliance;
 use App\Models\AllianceChatMessage;
@@ -17,10 +18,13 @@ use App\Models\WeatherSnapshot;
 use App\Services\AllianceGoalService;
 use App\Support\MinigameStamina;
 use App\Support\Weather;
+use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
+use Illuminate\Contracts\Events\Dispatcher as EventsDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -275,6 +279,51 @@ test('dashboard syncs current generated alliance goal bonus percent from default
     ]);
 });
 
+test('dashboard expires stale active alliance goals and creates the current weekly goal', function () {
+    $user = User::factory()->create();
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::factory()
+        ->for($leader, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->for($alliance)
+        ->for($user)
+        ->create();
+
+    $staleWeekStartsAt = now()->startOfWeek()->startOfDay()->subWeeks(2);
+    $staleGoal = AllianceGoal::factory()
+        ->for($alliance)
+        ->create([
+            'name' => 'Old stockpile',
+            'week_starts_at' => $staleWeekStartsAt,
+            'week_ends_at' => $staleWeekStartsAt->copy()->addWeek()->subSecond(),
+            'status' => 'active',
+        ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('alliances.current.goal.name', 'Weekly stockpile')
+            ->where('alliances.current.goal.status', 'active')
+            ->where('alliances.current.goal.currentAmount', 0)
+        );
+
+    $this->assertDatabaseHas('alliance_goals', [
+        'id' => $staleGoal->id,
+        'status' => 'expired',
+    ]);
+
+    $this->assertDatabaseHas('alliance_goals', [
+        'alliance_id' => $alliance->id,
+        'name' => 'Weekly stockpile',
+        'week_starts_at' => now()->startOfWeek()->startOfDay()->format('Y-m-d H:i:s'),
+        'status' => 'active',
+    ]);
+});
+
 test('members can contribute any resource to weekly alliance goals', function () {
     $user = User::factory()->create();
     $leader = User::factory()->create();
@@ -338,6 +387,53 @@ test('members can contribute any resource to weekly alliance goals', function ()
         'user_id' => $user->id,
         'total_contributed' => 40,
     ]);
+});
+
+test('resource specific alliance goals reject the wrong resource without deducting resources', function () {
+    $user = User::factory()->create();
+    $leader = User::factory()->create();
+
+    $alliance = Alliance::factory()
+        ->for($leader, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->for($alliance)
+        ->for($user)
+        ->create();
+
+    UserResource::factory()
+        ->for($user)
+        ->withResources(0, 100, 100, 0)
+        ->create();
+
+    $goal = AllianceGoal::factory()
+        ->for($alliance)
+        ->forResource('stone')
+        ->create([
+            'target_amount' => 1_000,
+        ]);
+
+    $this->actingAs($user)
+        ->post(route('alliance-goals.contribute', $goal), [
+            'resource_type' => 'wood',
+            'amount' => 25,
+        ])
+        ->assertRedirect(route('dashboard'))
+        ->assertSessionHasErrors('alliance_goal');
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'wood' => 100,
+        'stone' => 100,
+    ]);
+
+    $this->assertDatabaseHas('alliance_goals', [
+        'id' => $goal->id,
+        'current_amount' => 0,
+    ]);
+
+    expect(AllianceGoalContribution::query()->where('alliance_goal_id', $goal->id)->exists())->toBeFalse();
 });
 
 test('dashboard exposes current alliance contribution history', function () {
@@ -488,6 +584,96 @@ test('alliance members can post chat messages and outsiders cannot', function ()
     ]);
 });
 
+test('alliance chat send still succeeds when realtime broadcast fails', function () {
+    Log::spy();
+
+    $member = User::factory()->create();
+    $alliance = Alliance::factory()
+        ->for($member, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($member)
+        ->create();
+
+    $events = app(EventsDispatcher::class);
+
+    app()->instance('events', new class($events) implements EventsDispatcher
+    {
+        public function __construct(private readonly EventsDispatcher $events) {}
+
+        public function listen($events, $listener = null): void
+        {
+            $this->events->listen($events, $listener);
+        }
+
+        public function hasListeners($eventName): bool
+        {
+            return $this->events->hasListeners($eventName);
+        }
+
+        public function subscribe($subscriber): void
+        {
+            $this->events->subscribe($subscriber);
+        }
+
+        public function until($event, $payload = []): mixed
+        {
+            return $this->events->until($event, $payload);
+        }
+
+        public function dispatch($event, $payload = [], $halt = false): ?array
+        {
+            if ($event instanceof AllianceChatUpdateEvent) {
+                throw new BroadcastException('Reverb unavailable.');
+            }
+
+            return $this->events->dispatch($event, $payload, $halt);
+        }
+
+        public function push($event, $payload = []): void
+        {
+            $this->events->push($event, $payload);
+        }
+
+        public function flush($event): void
+        {
+            $this->events->flush($event);
+        }
+
+        public function forget($event): void
+        {
+            $this->events->forget($event);
+        }
+
+        public function forgetPushed(): void
+        {
+            $this->events->forgetPushed();
+        }
+    });
+
+    $this->actingAs($member)
+        ->post(route('alliances.chat-messages.store', $alliance), [
+            'message' => 'Still saved.',
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('alliance_chat_messages', [
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+        'message' => 'Still saved.',
+    ]);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->with('Alliance chat broadcast failed.', Mockery::on(
+            fn (array $context): bool => $context['alliance_id'] === $alliance->id
+                && $context['exception'] === 'Reverb unavailable.'
+        ));
+});
+
 test('alliance presence channel exposes online users only to alliance members', function () {
     config()->set('broadcasting.default', 'reverb');
     config()->set('broadcasting.connections.reverb.key', 'test-key');
@@ -554,6 +740,62 @@ test('alliance chat messages cannot exceed one hundred characters', function () 
         'alliance_id' => $alliance->id,
         'user_id' => $member->id,
     ]);
+});
+
+test('alliance chat messages cannot be blank or whitespace only', function () {
+    $member = User::factory()->create();
+    $alliance = Alliance::factory()
+        ->for($member, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($member)
+        ->create();
+
+    $this->actingAs($member)
+        ->post(route('alliances.chat-messages.store', $alliance), [
+            'message' => '     ',
+        ])
+        ->assertSessionHasErrors('message');
+
+    $this->assertDatabaseMissing('alliance_chat_messages', [
+        'alliance_id' => $alliance->id,
+        'user_id' => $member->id,
+    ]);
+});
+
+test('dashboard only exposes the latest one hundred alliance chat messages', function () {
+    $user = User::factory()->create(['name' => 'Current Player']);
+    $alliance = Alliance::factory()
+        ->for($user, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($user)
+        ->create();
+
+    foreach (range(1, 105) as $messageNumber) {
+        AllianceChatMessage::factory()
+            ->for($alliance)
+            ->for($user)
+            ->create([
+                'message' => 'Message '.$messageNumber,
+                'created_at' => now()->addSeconds($messageNumber),
+            ]);
+    }
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('alliances.current.chatMessages', 100)
+            ->where('alliances.current.chatMessages.0.message', 'Message 6')
+            ->where('alliances.current.chatMessages.99.message', 'Message 105')
+        );
 });
 
 test('members cannot contribute more than twenty percent of an alliance goal', function () {
@@ -1273,6 +1515,46 @@ test('minigame stamina is shared across minigames from recent resource collectio
         'completions' => 0,
         'resources_gained' => 0,
     ]);
+});
+
+test('minigame stamina ignores minigame completions outside the rolling window', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    UserResource::factory()
+        ->for($user)
+        ->create();
+
+    foreach (range(1, MinigameStamina::MAX_COMPLETIONS_PER_HOUR) as $index) {
+        ResourceCollection::factory()
+            ->for($user)
+            ->create([
+                'wood' => 1,
+                'source' => MinigameStamina::sourceFor('wood'),
+                'collected_at' => now()->subSeconds(MinigameStamina::WINDOW_SECONDS)->subSecond(),
+            ]);
+    }
+
+    ResourceCollection::factory()
+        ->for($user)
+        ->create([
+            'gold' => 1,
+            'source' => MinigameStamina::sourceFor('gold'),
+            'collected_at' => now()->subMinute(),
+        ]);
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('minigames.0.resource', 'wood')
+            ->where('minigames.0.stamina.current', MinigameStamina::MAX_COMPLETIONS_PER_HOUR - 1)
+            ->where('minigames.0.stamina.used', 1)
+            ->where('minigames.0.stamina.isAvailable', true)
+            ->where('minigames.3.resource', 'gold')
+            ->where('minigames.3.stamina.current', MinigameStamina::MAX_COMPLETIONS_PER_HOUR - 1)
+            ->where('minigames.3.stamina.used', 1)
+            ->where('minigames.3.stamina.isAvailable', true)
+        );
 });
 
 test('minigame completion returns to immersive mode when submitted from immersive mode', function () {

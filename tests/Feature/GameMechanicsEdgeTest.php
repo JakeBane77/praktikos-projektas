@@ -1,6 +1,10 @@
 <?php
 
 use App\Models\Achievement;
+use App\Models\Alliance;
+use App\Models\AllianceGoal;
+use App\Models\AllianceGoalContribution;
+use App\Models\AllianceMembership;
 use App\Models\BuildingType;
 use App\Models\Minigame;
 use App\Models\ResourceCollection;
@@ -288,6 +292,74 @@ test('passive production applies unlocked achievement production bonuses', funct
         'user_id' => $user->id,
         'wood' => 40,
         'lifetime_wood' => 40,
+    ]);
+});
+
+test('passive production applies previous week alliance goal production bonuses', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $alliance = Alliance::factory()
+        ->for($user, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($user)
+        ->create();
+
+    $lumbercamp = BuildingType::create([
+        'name' => 'Lumbercamp',
+        'slug' => 'lumbercamp',
+        'produces_resource' => 'wood',
+        'base_production_per_hour' => 10,
+        'production_multiplier' => 1,
+        'base_costs' => ['food' => 100],
+    ]);
+
+    UserBuilding::create([
+        'user_id' => $user->id,
+        'building_type_id' => $lumbercamp->id,
+        'level' => 1,
+        'built_at' => now(),
+    ]);
+
+    $previousGoal = AllianceGoal::factory()
+        ->for($alliance)
+        ->previousWeek()
+        ->withProgress(100)
+        ->withStages([100], [1])
+        ->create([
+            'target_amount' => 100,
+            'production_bonus_percent' => 50,
+        ]);
+
+    AllianceGoalContribution::factory()
+        ->for($previousGoal, 'goal')
+        ->for($user)
+        ->forResource('wood')
+        ->amount(100)
+        ->create();
+
+    UserResource::create([
+        'user_id' => $user->id,
+        'wood' => 0,
+        'last_produced_at' => now()->subHour(),
+    ]);
+
+    $this->get(route('dashboard'))->assertOk();
+
+    $this->assertDatabaseHas('user_resources', [
+        'user_id' => $user->id,
+        'wood' => 15,
+        'lifetime_wood' => 15,
+    ]);
+
+    $this->assertDatabaseHas('resource_collections', [
+        'user_id' => $user->id,
+        'wood' => 15,
+        'source' => 'passive',
     ]);
 });
 

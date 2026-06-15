@@ -113,3 +113,35 @@ test('minigame leaderboards are ordered independently for each resource', functi
             ->where('leaderboards.boards.3.currentRank', 2)
         );
 });
+
+test('leaderboard current rank is accurate when current user is outside the top fifty', function () {
+    $currentUser = User::factory()->create(['name' => 'Current Player']);
+    $this->actingAs($currentUser);
+
+    UserResource::create([
+        'user_id' => $currentUser->id,
+        'prestiges' => 0,
+        'last_produced_at' => now(),
+    ]);
+
+    foreach (range(1, 60) as $prestigeCount) {
+        $user = User::factory()->create();
+
+        UserResource::create([
+            'user_id' => $user->id,
+            'prestiges' => $prestigeCount,
+            'last_produced_at' => now(),
+        ]);
+    }
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('leaderboards.boards.0.key', 'prestige')
+            ->where('leaderboards.boards.0.currentRank', 61)
+            ->has('leaderboards.boards.0.entries', 50)
+            ->where('leaderboards.boards.0.entries.0.value', 60)
+            ->where('leaderboards.boards.0.entries.49.value', 11)
+            ->where('leaderboards.boards.0.entries.49.isCurrentUser', false)
+        );
+});

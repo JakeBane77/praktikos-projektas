@@ -369,6 +369,122 @@ test('users apply to private alliances and leaders or officers can accept applic
             ->exists())->toBeTrue();
 });
 
+test('duplicate private alliance applications are blocked', function () {
+    $leader = User::factory()->create();
+    $applicant = User::factory()->create();
+
+    $alliance = Alliance::factory()
+        ->closed()
+        ->for($leader, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($leader)
+        ->create();
+
+    $this->actingAs($applicant)
+        ->post(route('alliances.apply', $alliance))
+        ->assertRedirect();
+
+    $this->actingAs($applicant)
+        ->post(route('alliances.apply', $alliance))
+        ->assertRedirect()
+        ->assertSessionHasErrors('alliance');
+
+    expect(AllianceApplication::query()
+        ->where('alliance_id', $alliance->id)
+        ->where('user_id', $applicant->id)
+        ->count())->toBe(1);
+});
+
+test('accepting a private alliance application is blocked when the alliance is full', function () {
+    $leader = User::factory()->create();
+    $applicant = User::factory()->create();
+
+    $alliance = Alliance::factory()
+        ->closed()
+        ->for($leader, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($alliance)
+        ->for($leader)
+        ->create();
+
+    foreach (User::factory()->count(19)->create() as $member) {
+        AllianceMembership::factory()
+            ->for($alliance)
+            ->for($member)
+            ->create();
+    }
+
+    $application = AllianceApplication::create([
+        'alliance_id' => $alliance->id,
+        'user_id' => $applicant->id,
+    ]);
+
+    $this->actingAs($leader)
+        ->patch(route('alliances.applications.accept', [$alliance, $application]))
+        ->assertRedirect()
+        ->assertSessionHasErrors('alliance');
+
+    expect($application->fresh())->not->toBeNull()
+        ->and(AllianceMembership::query()
+            ->where('alliance_id', $alliance->id)
+            ->where('user_id', $applicant->id)
+            ->exists())->toBeFalse();
+});
+
+test('accepting an application removes other pending applications from that player', function () {
+    $firstLeader = User::factory()->create();
+    $secondLeader = User::factory()->create();
+    $applicant = User::factory()->create();
+
+    $firstAlliance = Alliance::factory()
+        ->closed()
+        ->for($firstLeader, 'leader')
+        ->create();
+    $secondAlliance = Alliance::factory()
+        ->closed()
+        ->for($secondLeader, 'leader')
+        ->create();
+
+    AllianceMembership::factory()
+        ->leader()
+        ->for($firstAlliance)
+        ->for($firstLeader)
+        ->create();
+    AllianceMembership::factory()
+        ->leader()
+        ->for($secondAlliance)
+        ->for($secondLeader)
+        ->create();
+
+    $acceptedApplication = AllianceApplication::create([
+        'alliance_id' => $firstAlliance->id,
+        'user_id' => $applicant->id,
+    ]);
+
+    AllianceApplication::create([
+        'alliance_id' => $secondAlliance->id,
+        'user_id' => $applicant->id,
+    ]);
+
+    $this->actingAs($firstLeader)
+        ->patch(route('alliances.applications.accept', [$firstAlliance, $acceptedApplication]))
+        ->assertRedirect();
+
+    expect(AllianceApplication::query()->where('user_id', $applicant->id)->exists())->toBeFalse()
+        ->and(AllianceMembership::query()
+            ->where('alliance_id', $firstAlliance->id)
+            ->where('user_id', $applicant->id)
+            ->where('role', 'member')
+            ->exists())->toBeTrue();
+});
+
 test('leaders and officers can deny private alliance applications', function () {
     $leader = User::factory()->create();
     $applicant = User::factory()->create();
