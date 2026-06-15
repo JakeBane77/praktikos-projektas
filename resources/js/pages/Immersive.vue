@@ -2985,11 +2985,19 @@ function timeFromInputValue(value: string): Date {
 
 <style scoped>
 .immersive-scroll-shell {
+    --immersive-shell-height: calc(100svh - 4rem);
+    --immersive-scene-width-from-height: calc(177.7svh - 7.11rem);
     width: 100%;
+    height: var(--immersive-shell-height);
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .immersive-scene {
-    width: 100%;
+    width: max(100%, var(--immersive-scene-width-from-height));
+    height: max(var(--immersive-shell-height), 56.25vw);
+    min-height: max(var(--immersive-shell-height), 56.25vw);
     touch-action: manipulation;
 }
 
@@ -3221,16 +3229,8 @@ function timeFromInputValue(value: string): Date {
 
 @media (max-width: 640px) {
     .immersive-scroll-shell {
-        height: calc(100svh - 3.5rem);
-        overflow: auto;
-        overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .immersive-scene {
-        width: max(100%, calc(177.7svh - 6.22rem));
-        height: calc(100svh - 3.5rem);
-        min-height: calc(100svh - 3.5rem);
+        --immersive-shell-height: calc(100svh - 3.5rem);
+        --immersive-scene-width-from-height: calc(177.7svh - 6.22rem);
     }
 
     .immersive-celestial {
