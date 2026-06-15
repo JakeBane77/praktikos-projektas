@@ -39,7 +39,7 @@ test('achievement seeder creates milestone achievements with default production 
         'name' => 'Connect the whole planet',
         'description' => 'You have connected the entire planet with roads',
         'type' => 'road_length',
-        'target_value' => 60_000_000,
+        'target_value' => 40_000_000,
         'production_bonus_percent' => 5,
     ]);
 

@@ -126,7 +126,7 @@ class AchievementSeeder extends Seeder
             slug: 'connect-the-whole-planet',
             description: 'You have connected the entire planet with roads',
             type: 'road_length',
-            targetValue: 60_000_000,
+            targetValue: 40_000_000,
             now: $now,
         );
 

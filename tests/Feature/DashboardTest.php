@@ -2558,7 +2558,7 @@ test('prestige returns to immersive mode when submitted from immersive mode', fu
     ]);
 });
 
-test('users cannot prestige before reaching sixty million kilometers of road', function () {
+test('users cannot prestige before reaching the road max level', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -2570,12 +2570,13 @@ test('users cannot prestige before reaching sixty million kilometers of road', f
         'production_multiplier' => null,
         'effect_type' => 'road_length',
         'base_costs' => ['wood' => 10],
+        'max_level' => 40_000_000,
     ]);
 
     UserBuilding::create([
         'user_id' => $user->id,
         'building_type_id' => $road->id,
-        'level' => 59_999_999,
+        'level' => 39_999_999,
         'built_at' => now(),
     ]);
 

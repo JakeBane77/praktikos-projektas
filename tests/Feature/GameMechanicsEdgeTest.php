@@ -540,7 +540,7 @@ test('prestige is blocked when road max level is not configured', function () {
     UserBuilding::create([
         'user_id' => $user->id,
         'building_type_id' => $road->id,
-        'level' => 60_000_000,
+        'level' => 40_000_000,
         'built_at' => now(),
     ]);
 
