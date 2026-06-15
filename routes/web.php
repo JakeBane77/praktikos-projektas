@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\AllianceController;
 use App\Http\Controllers\AllianceChatController;
+use App\Http\Controllers\AllianceController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
