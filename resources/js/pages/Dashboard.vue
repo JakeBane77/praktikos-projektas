@@ -77,6 +77,7 @@ const isCollecting = ref(false);
 const isPrestiging = ref(false);
 const isSubmittingAlliance = ref(false);
 let allianceSearchReloadTimeout: ReturnType<typeof setTimeout> | null = null;
+let leaderboardReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 const activeGameModal = ref<
     | 'alliance'
     | 'alliance-chat'
@@ -604,6 +605,10 @@ onBeforeUnmount(() => {
     if (allianceSearchReloadTimeout !== null) {
         clearTimeout(allianceSearchReloadTimeout);
     }
+
+    if (leaderboardReloadTimeout !== null) {
+        clearTimeout(leaderboardReloadTimeout);
+    }
 });
 
 function collectResources() {
@@ -1107,12 +1112,25 @@ function openLeaderboard(leaderboardKey = defaultLeaderboard.value?.key) {
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'leaderboard';
+    scheduleLeaderboardReload();
 }
 
 function closeLeaderboard() {
     if (activeGameModal.value === 'leaderboard') {
         activeGameModal.value = null;
     }
+}
+
+function scheduleLeaderboardReload() {
+    if (leaderboardReloadTimeout !== null) {
+        clearTimeout(leaderboardReloadTimeout);
+    }
+
+    leaderboardReloadTimeout = setTimeout(() => {
+        router.reload({
+            only: ['leaderboards'],
+        });
+    }, 500);
 }
 
 function closeActiveGameModal() {

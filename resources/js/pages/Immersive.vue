@@ -391,6 +391,7 @@ const isPrestiging = ref(false);
 const isSubmittingAlliance = ref(false);
 const hasUnreadAllianceChatMessage = ref(false);
 let allianceSearchReloadTimeout: ReturnType<typeof setTimeout> | null = null;
+let leaderboardReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 const upgradingBuildingId = ref<number | null>(null);
 const roadBuildAmounts = ref<Record<number, number>>({});
 const activeMinigameResource = ref<ResourceKey | null>(null);
@@ -1094,6 +1095,10 @@ onBeforeUnmount(() => {
     if (allianceSearchReloadTimeout !== null) {
         clearTimeout(allianceSearchReloadTimeout);
     }
+
+    if (leaderboardReloadTimeout !== null) {
+        clearTimeout(leaderboardReloadTimeout);
+    }
 });
 
 function resetStaminaClock(): void {
@@ -1434,6 +1439,7 @@ function openLeaderboard(): void {
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'leaderboard';
+    scheduleLeaderboardReload();
 }
 
 function openBuildings(): void {
@@ -1513,6 +1519,18 @@ function closeLeaderboard(): void {
     if (activeGameModal.value === 'leaderboard') {
         activeGameModal.value = null;
     }
+}
+
+function scheduleLeaderboardReload(): void {
+    if (leaderboardReloadTimeout !== null) {
+        clearTimeout(leaderboardReloadTimeout);
+    }
+
+    leaderboardReloadTimeout = setTimeout(() => {
+        router.reload({
+            only: ['leaderboards'],
+        });
+    }, 500);
 }
 
 function closeAchievements(): void {
