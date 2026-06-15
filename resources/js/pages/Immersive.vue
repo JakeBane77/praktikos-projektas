@@ -35,6 +35,7 @@ import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import { useAllianceChatEcho } from '@/composables/useAllianceChatEcho';
 import { useAlliancePresence } from '@/composables/useAlliancePresence';
+import { useEchoAvailability } from '@/composables/useEchoAvailability';
 import { useImmersiveTestingPanel } from '@/composables/useImmersiveTestingPanel';
 import {
     affordableRoadAmount,
@@ -511,6 +512,8 @@ const {
     onlineUsers: allianceOnlineUsers,
     onlineUserIds: allianceOnlineUserIds,
 } = useAlliancePresence(currentAllianceId);
+const { shouldUseHttpFallback: shouldUseChatHttpFallback } =
+    useEchoAvailability();
 const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
 const currentAchievementUnlock = computed(
@@ -1492,6 +1495,12 @@ function openAllianceChat(): void {
     hasWonMinigame.value = false;
     hasUnreadAllianceChatMessage.value = false;
     activeGameModal.value = 'alliance-chat';
+
+    if (shouldUseChatHttpFallback.value) {
+        router.reload({
+            only: ['alliances'],
+        });
+    }
 }
 
 function closeBuildings(): void {

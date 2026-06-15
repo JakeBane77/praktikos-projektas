@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Events\AllianceChatUpdateEvent;
 use App\Models\Alliance;
 use App\Models\User;
+use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AllianceChatController extends Controller
@@ -36,7 +38,15 @@ class AllianceChatController extends Controller
             'message' => $message,
         ]);
 
-        broadcast(new AllianceChatUpdateEvent($chatMessage))->toOthers();
+        try {
+            broadcast(new AllianceChatUpdateEvent($chatMessage))->toOthers();
+        } catch (BroadcastException $exception) {
+            Log::warning('Alliance chat broadcast failed.', [
+                'alliance_id' => $alliance->id,
+                'chat_message_id' => $chatMessage->id,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
 
         return redirect()->to(url()->previous(route('dashboard')));
     }

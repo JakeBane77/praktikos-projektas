@@ -33,6 +33,7 @@ import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
 import { useAllianceChatEcho } from '@/composables/useAllianceChatEcho';
 import { useAlliancePresence } from '@/composables/useAlliancePresence';
+import { useEchoAvailability } from '@/composables/useEchoAvailability';
 import {
     affordableRoadAmount,
     formatExactNumber,
@@ -120,6 +121,8 @@ const {
     onlineUsers: allianceOnlineUsers,
     onlineUserIds: allianceOnlineUserIds,
 } = useAlliancePresence(currentAllianceId);
+const { shouldUseHttpFallback: shouldUseChatHttpFallback } =
+    useEchoAvailability();
 const selectedMinigame = computed<Minigame | null>(() =>
     selectedMinigameResource.value
         ? (minigames.value.find(
@@ -1038,6 +1041,12 @@ function openAllianceChat() {
     selectedMinigameResource.value = null;
     hasWonMinigame.value = false;
     activeGameModal.value = 'alliance-chat';
+
+    if (shouldUseChatHttpFallback.value) {
+        router.reload({
+            only: ['alliances'],
+        });
+    }
 }
 
 function closeAllianceChat() {
