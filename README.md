@@ -1,26 +1,40 @@
 # Kingdom Idle
 
-A web-based idle kingdom game where users collect resources, upgrade buildings, complete minigames, unlock achievements, prestige through road progress, and compete on leaderboards.
+Kingdom Idle is a Laravel and Vue idle game where players gather resources over time, upgrade buildings, play minigames, unlock achievements, prestige through road progress, and interact through alliances, chat, and leaderboards.
 
 ## Features
 
-- User registration, login, logout, email verification, and account security settings.
-- Dashboard mode with resources, production rates, building upgrades, achievements, prestige, weather, and leaderboards.
-- Immersive mode with a visual kingdom map, weather effects, time-of-day support, and icon-based game actions.
-- Passive hourly production, once-per-day manual collection, and prestige progression.
-- Resource minigames for wood, food, stone, and gold.
-- Achievement bonuses that improve building production.
-- Open-Meteo based weather snapshots with optional browser-provided geolocation.
+- Dashboard mode for resource management, buildings, prestige, achievements, alliances, minigames, weather, and leaderboards.
+- Immersive mode with a large visual kingdom map, animated weather, time-of-day changes, and in-world action buttons.
+- Passive hourly production and daily manual collection.
+- Four resource minigames: wood, food, stone, and gold.
+- Achievement bonuses that improve production.
+- Alliance system with chat, applications, member management, and alliance goals.
+- Weather snapshots powered by Open-Meteo with optional browser geolocation.
+- Reverb-based real-time features for alliance chat and presence.
 
 ## Tech Stack
 
+- Backend: Laravel 13, PHP 8.4, Fortify, Reverb
 - Frontend: Vue 3, Inertia.js, TypeScript, Vite, Tailwind CSS
-- Backend: PHP 8.4, Laravel 13, Fortify
 - Database: MySQL 8.4
-- Testing: Pest, Larastan, Laravel Pint
-- Local Docker: Laravel Sail
+- Tooling: Pest, Pint, Larastan
+- Containerized local environment: Laravel Sail
 
-## Installation
+## Requirements
+
+For local non-Docker setup:
+
+- PHP 8.4
+- Composer
+- Node.js and npm
+- MySQL 8.4 or compatible MySQL server
+
+For Docker setup:
+
+- Docker Desktop or Docker Engine with Compose support
+
+## Project Setup
 
 Clone the repository:
 
@@ -29,109 +43,244 @@ git clone https://github.com/JakeBane77/praktikos-projektas.git
 cd praktikos-projektas
 ```
 
-Install PHP and JavaScript dependencies:
+## Local Setup
+
+1. Install dependencies:
 
 ```bash
 composer install
 npm install
 ```
 
-Create the environment file and application key:
+2. Create the environment file:
+
+```bash
+copy .env.example .env
+```
+
+If you are not on Windows, use:
 
 ```bash
 cp .env.example .env
+```
+
+3. Generate the app key and create the storage symlink:
+
+```bash
 php artisan key:generate
+php artisan storage:link
 ```
 
-Run migrations and seed base game data:
+4. Configure the database in `.env`.
 
-```bash
-php artisan migrate --seed
+If you are running the app outside Docker, change the database host and credentials to match your local database server.
+
+For local MySQL, the most important variables are:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_database_password
 ```
 
-Optional demo data with 200 factory-generated users:
+If you want to use SQLite instead:
 
-```bash
-php artisan db:seed --class=FactoryDemoSeeder
+```env
+DB_CONNECTION=sqlite
+#DB_HOST=mysql
+#DB_PORT=3306
+#DB_DATABASE=laravel
+#DB_USERNAME=sail
+#DB_PASSWORD=password
 ```
 
-## Usage
+Also make sure `APP_URL` matches the local template:
 
-Run the Laravel server, Vite dev server, queue worker, scheduler together:
+```env
+APP_URL=http://localhost:8000
+```
+
+5. Start the local development stack:
 
 ```bash
 composer dev
 ```
 
-Then open:
+This starts:
 
-```web page
+- Laravel web server
+- queue listener
+- scheduler worker
+- Reverb websocket server
+- Vite dev server
+
+Open the app at:
+
+```text
 http://localhost:8000
 ```
 
-With Laravel Sail:
+6. Run migrations and seed base game data:
+
+Run:
 
 ```bash
-./vendor/bin/sail up -d
-./vendor/bin/sail artisan migrate --seed
-./vendor/bin/sail npm run dev
-./vendor/bin/sail php artisan schedule:work
+php artisan migrate --seed
 ```
 
-Then open:
+## Docker Setup With Sail
 
-```web page
+1. Install dependencies on the host first so Sail runtime files exist:
+
+```bash
+composer install
+npm install
+```
+
+2. Create a Docker-oriented environment file:
+
+```bash
+copy .env.docker.example .env
+```
+
+If you are not on Windows, use:
+
+```bash
+cp .env.docker.example .env
+```
+
+3. Generate an application key and place it into `.env`:
+
+```bash
+php artisan key:generate --show
+```
+
+4. Start Sail:
+
+```bash
+vendor/bin/sail up -d
+```
+
+5. Run initial app setup inside the container:
+
+```bash
+vendor/bin/sail artisan migrate --seed
+vendor/bin/sail artisan storage:link
+```
+
+6. Start Vite if you want hot reload during development:
+
+```bash
+vendor/bin/sail npm run dev
+```
+
+Open the app at:
+
+```text
 http://localhost
 ```
 
-Useful commands:
+The Docker stack includes these long-running services:
+
+- `laravel.test`
+- `mysql`
+- `queue`
+- `scheduler`
+- `reverb`
+
+## Environment Notes
+
+### Local `.env`
+
+Use `.env.example` as the base for local development.
+
+Important values:
+
+- `APP_URL=http://localhost:8000`
+- local DB credentials
+- `BROADCAST_CONNECTION=reverb`
+- `REVERB_HOST=127.0.0.1`
+- `REVERB_PORT=8080`
+- `VITE_REVERB_HOST=127.0.0.1` or `localhost`
+
+### Docker `.env`
+
+Use `.env.docker.example` as the base for Docker.
+
+Important difference:
+
+- `APP_URL=http://localhost:80`
+- `REVERB_HOST=reverb` is used inside containers
+- `VITE_REVERB_HOST=localhost` is used by the browser
+
+If those are mixed up, websocket features will fail even though the app page loads.
+
+## Demo Data
+
+Base seed data is included in:
+
+- building types
+- achievements
+
+To seed the project with extra generated data for testing:
 
 ```bash
-#commands `composer dev` runs
-php artisan serve
+php artisan db:seed --class=FactoryDemoSeeder
+```
+
+This creates 200 factory-generated users and related demo game data.
+
+## Useful Commands
+
+Development:
+
+```bash
+composer dev
 npm run dev
-php artisan schedule:work
-
-#database commands
-php	artisan migrate # runs new database migrations
-php	artisan migrate:fresh # delete current database and run new migrations
-php artisan db:seed # run database seeders
-php artisan db:seed --class=FactoryDemoSeeder # seed database with 200 randomised users, default password is 'password'
-
-#scheduler commands
-php artisan schedule:work # launch the service
-php artisan schedule:list # show all active schedules
-php artisan weather:update # manually launch the schedule
-
-#docker (sail) commands
-vendor/bin/sail up -d # start container
-
-vendor/bin/sail artisan migrate --seed
-vendor/bin/sail npm install
-vendor/bin/sail npm run dev
-vendor/bin/sail php artisan schedule:work
-
-vendor/bin/sail down # close container
-
-#docker commands
-docker compose up -d
-
-docker compose exec laravel.test npm install
-docker compose exec laravel.test npm run build
-docker compose exec laravel.test php artisan optimize:clear
-docker compose exec laravel.test php artisan migrate --seed
-
-docker compose down -d
-
-#test commands
-php artisan test # runs pest unit tests
-vendor/bin/pint --test
-./vendor/bin/pint # removes code style issues
-./vendor/bin/phpstan analyse --memory-limit=2G # runs larastan static code analysis
-
-#extra commands
 npm run build
+```
 
+Database:
+
+```bash
+php artisan migrate
+php artisan migrate:fresh --seed
+php artisan db:seed
+php artisan db:seed --class=FactoryDemoSeeder
+```
+
+Queues, scheduler, realtime:
+
+```bash
+php artisan queue:listen --tries=1
+php artisan schedule:work
+php artisan schedule:list
+php artisan reverb:start
+php artisan reverb:restart
+```
+
+Tests and quality checks:
+
+```bash
+php artisan test
+vendor/bin/pint --test
+vendor/bin/pint
+vendor/bin/phpstan analyse --memory-limit=2G
+npm run lint:check
+npm run types:check
+```
+
+Sail:
+
+```bash
+vendor/bin/sail up -d
+vendor/bin/sail down
+vendor/bin/sail artisan migrate --seed
+vendor/bin/sail artisan storage:link
+vendor/bin/sail npm run dev
 ```
 
 ## Project Structure
@@ -139,11 +288,12 @@ npm run build
 ```text
 praktikos-projektas/
 |-- app/
-|   |-- Http/Controllers/
+|   |-- Http/
 |   |-- Models/
 |   |-- Policies/
-|   |-- Services/
-|   `-- Support/
+|   `-- Services/
+|-- bootstrap/
+|-- config/
 |-- database/
 |   |-- factories/
 |   |-- migrations/
@@ -153,52 +303,27 @@ praktikos-projektas/
 |   |-- css/
 |   `-- js/
 |       |-- components/
+|       |-- composables/
 |       |-- lib/
 |       `-- pages/
 |-- routes/
 |-- tests/
 |-- composer.json
-|-- package.json
 |-- docker-compose.yml
+|-- package.json
 `-- README.md
 ```
 
-## Environment Variables
+## Troubleshooting
 
-Create a `.env` file in the project root:
-
-```env
-APP_NAME="Kingdom Idle"
-APP_ENV=local
-APP_KEY=
-APP_DEBUG=true
-APP_URL=http://localhost
-
-APP_PORT=80
-VITE_PORT=5173
-FORWARD_DB_PORT=3306
-
-DB_CONNECTION=mysql
-DB_HOST=mysql
-DB_PORT=3306
-DB_DATABASE=laravel
-DB_USERNAME=sail
-DB_PASSWORD=password
-
-QUEUE_CONNECTION=database
-SESSION_DRIVER=database
-CACHE_STORE=database
-
-VITE_APP_NAME="${APP_NAME}"
-```
-
-For a local XAMPP setup without Sail, adjust `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` to match your MySQL configuration.
-
-To run without a database server use `DB_CONNECTION=SQLITE` and comment out (`#`) other DB variables.
+- If frontend changes do not appear, make sure `npm run dev` is running or rebuild with `npm run build`.
+- If websocket chat/presence does not work, verify Reverb is running and the `REVERB_*` and `VITE_REVERB_*` variables match the environment you are using.
+- If Docker starts but database access fails, check whether `.env` contains valid `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` values.
+- If weather or scheduled progression appears stale, confirm `php artisan schedule:work` is running.
 
 ## Roadmap
-- Add more features:
-    - Add more resources, buildings, minigames, achievements.
-    - Add social features (alliances, alliance chat, alliance tasks for bonuses).
-    - Add research feature (unlocks buildings, bonuses to productions, unlocks alliance feature).
-- Add frontend tests.
+
+- Add more buildings, resources, achievements, and minigames.
+- Expand alliance systems and cooperative progression.
+- Add research and progression unlock trees.
+- Add frontend automated tests.
