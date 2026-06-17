@@ -1,17 +1,39 @@
 # Kingdom Idle
 
-Kingdom Idle is a Laravel and Vue idle game where players gather resources over time, upgrade buildings, play minigames, unlock achievements, prestige through road progress, and interact through alliances, chat, and leaderboards.
+Kingdom Idle is a web-based idle strategy game developed with Laravel and Vue. Players build and manage a medieval kingdom by gathering resources, upgrading buildings, completing minigames, earning achievements, joining alliances and completing alliance goals.
 
-## Features
+As players progress, they can use the prestige system to reset part of their current progress in exchange for permanent bonuses. These bonuses make future progression faster, creating a long-term gameplay loop keeping players engaged.
 
-- Dashboard mode for resource management, buildings, prestige, achievements, alliances, minigames, weather, and leaderboards.
-- Immersive mode with a large visual kingdom map, animated weather, time-of-day changes, and in-world action buttons.
-- Passive hourly production and daily manual collection.
-- Four resource minigames: wood, food, stone, and gold.
-- Achievement bonuses that improve production.
-- Alliance system with chat, applications, member management, and alliance goals.
-- Weather snapshots powered by Open-Meteo with optional browser geolocation.
-- Reverb-based real-time features for alliance chat and presence.
+The project demonstrates the development of a modern full-stack web application with authentication, database-driven game progression, real-time communication, scheduled background tasks, interactive frontend components, and Docker-based local development. It uses Laravel for backend logic, Vue 3 with Inertia.js for the frontend, MySQL for data storage, and Laravel Reverb for real-time alliance features.
+
+## Gameplay Overview
+
+Players start with a small kingdom and gradually expand it by collecting four main resources: wood, food, stone, and gold. These resources are used to upgrade buildings, improve production, unlock achievements, and progress further along the kingdom road.
+
+The game supports both passive progression and active interaction. Resources are generated over time, while players can also complete minigames and daily collection actions to speed up development. As the kingdom grows, players can join alliances, communicate through real-time chat, compete on leaderboards, and prestige resetting part of their progress for permanent bonuses.
+
+## Main Features
+
+### Kingdom Management
+- Collect wood, food, stone, and gold.
+- Upgrade buildings to increase production.
+- Earn achievement bonuses that improve progression.
+
+### Progression System
+- Passive hourly resource production.
+- Daily manual collection.
+- Prestige system where players reset part of their progress, and gain permanent bonuses.
+- Unlockable achievements and long-term bonuses.
+
+### Interactive Gameplay
+- Four resource minigames.
+- Dashboard and immersive visual modes.
+- Animated weather and time-of-day effects.
+
+### Social Features
+- Alliances with applications and member management.
+- Real-time alliance chat using Laravel Reverb.
+- Presence features and leaderboards.
 
 ## Tech Stack
 
@@ -100,7 +122,7 @@ DB_CONNECTION=sqlite
 Also make sure `APP_URL` matches the local template:
 
 ```env
-APP_URL=http://localhost:8000
+APP_URL=http://localhost:80
 ```
 
 5. Start the local development stack:
@@ -120,7 +142,7 @@ This starts:
 Open the app at:
 
 ```text
-http://localhost:8000
+http://localhost:80
 ```
 
 6. Run migrations and seed base game data:
@@ -199,7 +221,7 @@ Use `.env.example` as the base for local development.
 
 Important values:
 
-- `APP_URL=http://localhost:8000`
+- `APP_URL=http://localhost:80`
 - local DB credentials
 - `BROADCAST_CONNECTION=reverb`
 - `REVERB_HOST=127.0.0.1`
@@ -233,14 +255,25 @@ php artisan db:seed --class=FactoryDemoSeeder
 
 This creates 200 factory-generated users and related demo game data.
 
+After running the seeders, you can create a new account through the registration page and start playing immediately or login to one of generated user accounts using default password `password` (all factory-generated users have this password).
+
 ## Useful Commands
 
 Development:
 
 ```bash
 composer dev
-npm run dev
 npm run build
+```
+
+or run the `composer dev` included commands manually:
+
+```bash
+npm run build
+php artisan serve
+npm run dev
+php artisan schedule:work
+php artisan reverb:start
 ```
 
 Database:
@@ -252,7 +285,7 @@ php artisan db:seed
 php artisan db:seed --class=FactoryDemoSeeder
 ```
 
-Queues, scheduler, realtime:
+Queues, scheduler, reverb:
 
 ```bash
 php artisan queue:listen --tries=1
@@ -323,7 +356,13 @@ praktikos-projektas/
 
 ## Roadmap
 
-- Add more buildings, resources, achievements, and minigames.
-- Expand alliance systems and cooperative progression.
-- Add research and progression unlock trees.
-- Add frontend automated tests.
+Planned improvements include:
+
+- Additional building types and resource categories.
+- Expanded achievement and prestige systems.
+- Research trees and progression unlocks.
+- More alliance goals and cooperative activities.
+- Improved leaderboard filtering and ranking categories.
+- More resource minigames.
+- Frontend automated tests.
+- Deployment-ready production configuration.
