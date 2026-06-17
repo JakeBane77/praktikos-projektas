@@ -1201,11 +1201,39 @@ function collectResources(): void {
 }
 
 function togglePrestigeMenu(): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
     isPrestigeMenuOpen.value = !isPrestigeMenuOpen.value;
     activeGameModal.value = null;
     closeOfflineProgress();
     isActionMenuOpen.value = false;
     isResourcesMenuOpen.value = false;
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+}
+
+function toggleResourcesMenu(): void {
+    if (activeMinigameResource.value !== null) {
+        return;
+    }
+
+    isResourcesMenuOpen.value = !isResourcesMenuOpen.value;
+    activeGameModal.value = null;
+    closeOfflineProgress();
+    isActionMenuOpen.value = false;
+    isPrestigeMenuOpen.value = false;
+    selectedMinigameResource.value = null;
+    hasWonMinigame.value = false;
+}
+
+function closeResourcesMenu(): void {
+    isResourcesMenuOpen.value = false;
+}
+
+function closePrestigeMenu(): void {
+    isPrestigeMenuOpen.value = false;
 }
 
 function openBuildings(): void {
@@ -1269,6 +1297,18 @@ function closePrestigeConfirm(): void {
 }
 
 function closeActiveGameModal(): void {
+    if (isResourcesMenuOpen.value) {
+        closeResourcesMenu();
+
+        return;
+    }
+
+    if (isPrestigeMenuOpen.value) {
+        closePrestigeMenu();
+
+        return;
+    }
+
     if (isOfflineProgressModalOpen.value) {
         closeOfflineProgress();
 
@@ -1506,81 +1546,10 @@ function timeFromInputValue(value: string): Date {
                     :class="iconButtonMenuClass"
                     aria-label="Show resources and production"
                     title="Resources and production"
-                    @click="isResourcesMenuOpen = !isResourcesMenuOpen"
+                    @click="toggleResourcesMenu"
                 >
                     <Coins class="h-5 w-5" />
                 </button>
-
-                <div
-                    v-if="isResourcesMenuOpen"
-                    class="immersive-popover absolute bottom-14 left-1/2 w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
-                >
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p
-                                class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                            >
-                                Resources
-                            </p>
-                            <h2 class="mt-1 text-lg font-bold">
-                                Current output
-                            </h2>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
-                            aria-label="Close resources menu"
-                            @click="isResourcesMenuOpen = false"
-                        >
-                            <X class="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    <div class="mt-4 grid gap-2">
-                        <div
-                            v-for="resource in resourceRows"
-                            :key="resource.key"
-                            class="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
-                        >
-                            <div>
-                                <p class="font-semibold">
-                                    {{ resource.label }}
-                                </p>
-                                <p
-                                    class="mt-1 text-xs text-[#696250] dark:text-[#b8c2b0]"
-                                >
-                                    +{{
-                                        formatGameNumber(
-                                            props.resourceRates[resource.key],
-                                        )
-                                    }}/hour
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                class="max-w-full cursor-pointer self-center text-right text-base font-bold break-words"
-                                :aria-label="`${resource.label}: ${formatExactNumber(props.resources[resource.key])}`"
-                                :title="
-                                    resourceNumberTitle(
-                                        `current-${resource.key}`,
-                                    )
-                                "
-                                @click="
-                                    toggleResourceNumber(
-                                        `current-${resource.key}`,
-                                    )
-                                "
-                            >
-                                {{
-                                    resourceNumberLabel(
-                                        `current-${resource.key}`,
-                                        props.resources[resource.key],
-                                    )
-                                }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div
@@ -1631,124 +1600,6 @@ function timeFromInputValue(value: string): Date {
                 >
                     <RotateCcw class="h-5 w-5" />
                 </button>
-
-                <div
-                    v-if="isPrestigeMenuOpen"
-                    class="immersive-popover absolute bottom-14 left-1/2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/92 dark:text-[#f3efe4]"
-                >
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p
-                                class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
-                            >
-                                Prestige
-                            </p>
-                            <h2 class="mt-1 text-lg font-bold">
-                                Reset progress
-                            </h2>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
-                            aria-label="Close prestige menu"
-                            @click="isPrestigeMenuOpen = false"
-                        >
-                            <X class="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    <div class="mt-4 grid gap-3">
-                        <div
-                            class="grid grid-cols-2 gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
-                        >
-                            <div>
-                                <p
-                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
-                                >
-                                    Current roads
-                                </p>
-                                <p class="mt-1 font-bold">
-                                    {{
-                                        formatGameNumber(props.roadStats.length)
-                                    }}
-                                    km
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
-                                >
-                                    Required
-                                </p>
-                                <p class="mt-1 font-bold">
-                                    {{ prestigeRequirementLabel }} km
-                                </p>
-                            </div>
-                        </div>
-
-                        <div
-                            class="overflow-hidden rounded-full border border-[#d7cbb8] bg-[#efe8d9] dark:border-white/15 dark:bg-white/10"
-                        >
-                            <div
-                                class="h-2 rounded-full bg-[#243627] transition-[width] dark:bg-[#caa66c]"
-                                :style="{
-                                    width: `${prestigeProgressPercent}%`,
-                                }"
-                            ></div>
-                        </div>
-
-                        <div
-                            class="grid grid-cols-2 gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
-                        >
-                            <div>
-                                <p
-                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
-                                >
-                                    Prestiges
-                                </p>
-                                <p class="mt-1 font-bold">
-                                    {{
-                                        formatGameNumber(
-                                            props.prestigeStats.count,
-                                        )
-                                    }}
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    class="text-xs text-[#696250] dark:text-[#b8c2b0]"
-                                >
-                                    Rank
-                                </p>
-                                <p class="mt-1 font-bold">
-                                    #{{
-                                        formatExactNumber(
-                                            props.prestigeStats.rank,
-                                        )
-                                    }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-3 py-2 font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="
-                                !props.prestigeStats.canPrestige || isPrestiging
-                            "
-                            @click="openPrestigeConfirm"
-                        >
-                            <RotateCcw class="h-4 w-4" />
-                            {{
-                                isPrestiging
-                                    ? 'Prestiging...'
-                                    : props.prestigeStats.canPrestige
-                                      ? 'Prestige'
-                                      : 'Requirement not met'
-                            }}
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <button
@@ -1978,7 +1829,7 @@ function timeFromInputValue(value: string): Date {
 
             <div
                 v-if="isActionMenuOpen"
-                class="immersive-action-popover immersive-popover absolute z-30 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/90 dark:text-[#f3efe4]"
+                class="immersive-action-popover immersive-popover immersive-popover-action absolute z-30 rounded-lg border border-[#ded2bd] bg-[#fffaf0]/95 p-4 text-sm text-[#1f241c] shadow-2xl backdrop-blur dark:border-white/15 dark:bg-[#10140f]/90 dark:text-[#f3efe4]"
                 :style="actionMenuStyle"
             >
                 <div class="flex items-start justify-between gap-4">
@@ -2124,6 +1975,8 @@ function timeFromInputValue(value: string): Date {
     <Teleport to="body">
         <div
             v-if="
+                isResourcesMenuOpen ||
+                isPrestigeMenuOpen ||
                 isBuildingsModalOpen ||
                 isAchievementsModalOpen ||
                 isAllianceModalOpen ||
@@ -2138,8 +1991,166 @@ function timeFromInputValue(value: string): Date {
             class="fixed inset-0 z-[58] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/50 px-4 py-6"
             @click.self="closeActiveGameModal"
         >
+            <section
+                v-if="isResourcesMenuOpen"
+                class="w-full max-w-md rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Resources
+                        </p>
+                        <h2 class="mt-1 text-lg font-bold">Current output</h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                        aria-label="Close resources menu"
+                        @click="closeResourcesMenu"
+                    >
+                        <X class="h-4 w-4" />
+                    </button>
+                </div>
+
+                <div class="mt-4 grid gap-2">
+                    <div
+                        v-for="resource in resourceRows"
+                        :key="resource.key"
+                        class="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+                    >
+                        <div>
+                            <p class="font-semibold">{{ resource.label }}</p>
+                            <p
+                                class="mt-1 text-xs text-[#696250] dark:text-[#b8c2b0]"
+                            >
+                                +{{
+                                    formatGameNumber(
+                                        props.resourceRates[resource.key],
+                                    )
+                                }}/hour
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            class="max-w-full cursor-pointer self-center text-right text-base font-bold break-words"
+                            :aria-label="`${resource.label}: ${formatExactNumber(props.resources[resource.key])}`"
+                            :title="resourceNumberTitle(`current-${resource.key}`)"
+                            @click="toggleResourceNumber(`current-${resource.key}`)"
+                        >
+                            {{
+                                resourceNumberLabel(
+                                    `current-${resource.key}`,
+                                    props.resources[resource.key],
+                                )
+                            }}
+                        </button>
+                    </div>
+                </div>
+            </section>
+            <section
+                v-else-if="isPrestigeMenuOpen"
+                class="w-full max-w-md rounded-lg border border-[#ded2bd] bg-[#fffaf0] p-5 text-[#1f241c] shadow-xl dark:border-[#38362f] dark:bg-[#1a1d15] dark:text-[#f3efe4]"
+            >
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p
+                            class="text-xs font-semibold tracking-wider text-[#7b633d] uppercase dark:text-[#caa66c]"
+                        >
+                            Prestige
+                        </p>
+                        <h2 class="mt-1 text-lg font-bold">Reset progress</h2>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#b7aa91] text-[#5d6356] transition hover:bg-[#ebe4d7] dark:border-white/15 dark:text-[#f3efe4] dark:hover:bg-white/10"
+                        aria-label="Close prestige menu"
+                        @click="closePrestigeMenu"
+                    >
+                        <X class="h-4 w-4" />
+                    </button>
+                </div>
+
+                <div class="mt-4 grid gap-3">
+                    <div
+                        class="grid grid-cols-2 gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+                    >
+                        <div>
+                            <p
+                                class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                            >
+                                Current roads
+                            </p>
+                            <p class="mt-1 font-bold">
+                                {{ formatGameNumber(props.roadStats.length) }} km
+                            </p>
+                        </div>
+                        <div>
+                            <p
+                                class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                            >
+                                Required
+                            </p>
+                            <p class="mt-1 font-bold">
+                                {{ prestigeRequirementLabel }} km
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="overflow-hidden rounded-full border border-[#d7cbb8] bg-[#efe8d9] dark:border-white/15 dark:bg-white/10"
+                    >
+                        <div
+                            class="h-2 rounded-full bg-[#243627] transition-[width] dark:bg-[#caa66c]"
+                            :style="{ width: `${prestigeProgressPercent}%` }"
+                        ></div>
+                    </div>
+
+                    <div
+                        class="grid grid-cols-2 gap-3 rounded-md border border-[#e4dac7] bg-[#fff8eb]/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+                    >
+                        <div>
+                            <p
+                                class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                            >
+                                Prestiges
+                            </p>
+                            <p class="mt-1 font-bold">
+                                {{ formatGameNumber(props.prestigeStats.count) }}
+                            </p>
+                        </div>
+                        <div>
+                            <p
+                                class="text-xs text-[#696250] dark:text-[#b8c2b0]"
+                            >
+                                Rank
+                            </p>
+                            <p class="mt-1 font-bold">
+                                #{{ formatExactNumber(props.prestigeStats.rank) }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-md bg-[#243627] px-3 py-2 font-semibold text-white transition hover:bg-[#1a291d] disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="!props.prestigeStats.canPrestige || isPrestiging"
+                        @click="openPrestigeConfirm"
+                    >
+                        <RotateCcw class="h-4 w-4" />
+                        {{
+                            isPrestiging
+                                ? 'Prestiging...'
+                                : props.prestigeStats.canPrestige
+                                  ? 'Prestige'
+                                  : 'Requirement not met'
+                        }}
+                    </button>
+                </div>
+            </section>
             <BuildingsModal
-                v-if="isBuildingsModalOpen"
+                v-else-if="isBuildingsModalOpen"
                 :buildings="visibleUpgradeBuildings"
                 :upgrading-building-id="upgradingBuildingId"
                 :road-build-amounts="roadBuildAmounts"
@@ -2310,6 +2321,17 @@ function timeFromInputValue(value: string): Date {
 .immersive-popover,
 .immersive-testing-panel {
     overscroll-behavior: contain;
+}
+
+.immersive-popover-resources {
+    width: 20rem;
+    max-width: calc(100vw - 2rem);
+}
+
+.immersive-popover-prestige,
+.immersive-popover-action {
+    width: 22rem;
+    max-width: calc(100vw - 2rem);
 }
 
 .immersive-menu-anchor:has(.immersive-popover) {
