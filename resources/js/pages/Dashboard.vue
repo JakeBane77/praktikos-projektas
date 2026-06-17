@@ -18,7 +18,6 @@ import {
     Wheat,
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { toast } from 'vue-sonner';
 import AchievementUnlockModal from '@/components/game-modals/AchievementUnlockModal.vue';
 import AllianceChatModal from '@/components/game-modals/AllianceChatModal.vue';
 import AllianceModal from '@/components/game-modals/AllianceModal.vue';
@@ -31,26 +30,23 @@ import FoodMinigame from '@/components/minigames/FoodMinigame.vue';
 import GoldMinigame from '@/components/minigames/GoldMinigame.vue';
 import StoneMinigame from '@/components/minigames/StoneMinigame.vue';
 import WoodMinigame from '@/components/minigames/WoodMinigame.vue';
-import { useAllianceChatEcho } from '@/composables/useAllianceChatEcho';
-import { useAlliancePresence } from '@/composables/useAlliancePresence';
-import { useEchoAvailability } from '@/composables/useEchoAvailability';
+import { useAchievementUnlockQueue } from '@/composables/useAchievementUnlockQueue';
+import { useExpandableResourceNumbers } from '@/composables/useExpandableResourceNumbers';
+import { useGameAlliance } from '@/composables/useGameAlliance';
+import { useGameBuildings } from '@/composables/useGameBuildings';
+import { useGameLeaderboard } from '@/composables/useGameLeaderboard';
+import { useGameMinigames } from '@/composables/useGameMinigames';
+import { useOfflineProgress } from '@/composables/useOfflineProgress';
 import {
-    affordableRoadAmount,
     formatExactNumber,
     formatGameNumber,
-    formatHoursDuration,
     formatRate,
     minigameStaminaHoverLabel,
-    minigameWithLiveStamina,
     getTotalResources,
-    upgradeAvailabilityFor,
 } from '@/lib/game';
 import type {
-    AchievementUnlock,
     Building,
     DashboardGameData,
-    Leaderboard,
-    Minigame,
     ResourceKey,
 } from '@/lib/game';
 import {
@@ -75,9 +71,6 @@ const props = defineProps<DashboardGameData>();
 const isBuildingsOpen = ref(false);
 const isCollecting = ref(false);
 const isPrestiging = ref(false);
-const isSubmittingAlliance = ref(false);
-let allianceSearchReloadTimeout: ReturnType<typeof setTimeout> | null = null;
-let leaderboardReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 const activeGameModal = ref<
     | 'alliance'
     | 'alliance-chat'
@@ -86,71 +79,14 @@ const activeGameModal = ref<
     | 'prestige-confirm'
     | null
 >(null);
-const upgradingBuildingId = ref<number | null>(null);
-const activeMinigameResource = ref<ResourceKey | null>(null);
-const selectedMinigameResource = ref<ResourceKey | null>(null);
-const hasWonMinigame = ref(false);
-const selectedLeaderboardKey = ref(props.leaderboards.defaultKey);
-const roadBuildAmounts = ref<Record<number, number>>({});
 const hideCompletedAchievements = ref(true);
-const achievementUnlockQueue = ref<AchievementUnlock[]>([]);
-const activeAchievementUnlockIndex = ref(0);
 const serverTimeMilliseconds = ref(Date.now());
-const staminaClockMilliseconds = ref(Date.now());
-const staminaClockStartedAtMilliseconds = ref(Date.now());
 const isUpdatingWeatherLocation = ref(false);
 const weatherLocationStatus = ref<string | null>(null);
-const expandedResourceNumberKeys = ref<Set<string>>(new Set());
-const isOfflineProgressDismissed = ref(false);
 const predictionBaseMilliseconds = ref(Date.now());
 const buildings = computed<Building[]>(() => props.buildings);
-const staminaElapsedSeconds = computed(() =>
-    Math.floor(
-        (staminaClockMilliseconds.value -
-            staminaClockStartedAtMilliseconds.value) /
-            1000,
-    ),
-);
-const minigames = computed<Minigame[]>(() =>
-    props.minigames.map((minigame) =>
-        minigameWithLiveStamina(minigame, staminaElapsedSeconds.value),
-    ),
-);
-const leaderboards = computed<Leaderboard[]>(() => props.leaderboards.boards);
-const currentAllianceId = computed(() => props.alliances.current?.id ?? null);
-const {
-    onlineUsers: allianceOnlineUsers,
-    onlineUserIds: allianceOnlineUserIds,
-} = useAlliancePresence(currentAllianceId);
-const { shouldUseHttpFallback: shouldUseChatHttpFallback } =
-    useEchoAvailability();
-const selectedMinigame = computed<Minigame | null>(() =>
-    selectedMinigameResource.value
-        ? (minigames.value.find(
-              (minigame) =>
-                  minigame.resource === selectedMinigameResource.value,
-          ) ?? null)
-        : null,
-);
 const achievements = computed(() => props.achievements);
 const achievementBonuses = computed(() => props.achievementBonuses);
-const currentAchievementUnlock = computed(
-    () => achievementUnlockQueue.value[activeAchievementUnlockIndex.value],
-);
-const achievementUnlockCount = computed(
-    () => achievementUnlockQueue.value.length,
-);
-const achievementUnlockPosition = computed(() =>
-    Math.min(
-        activeAchievementUnlockIndex.value + 1,
-        achievementUnlockCount.value,
-    ),
-);
-const achievementUnlockButtonLabel = computed(() =>
-    activeAchievementUnlockIndex.value + 1 < achievementUnlockCount.value
-        ? 'Next'
-        : 'Done',
-);
 const visibleAchievements = computed(() =>
     hideCompletedAchievements.value
         ? achievements.value.filter((achievement) => !achievement.isUnlocked)
@@ -192,6 +128,129 @@ const minigameComponents = {
     food: FoodMinigame,
 };
 
+const {
+    isOfflineProgressDismissed,
+    offlineProgressDurationLabel,
+    offlineProgressResourceRows,
+    closeOfflineProgress,
+} = useOfflineProgress({
+    offlineProgress: () => props.offlineProgress,
+    resources: resourceDisplayOrder.map((key) => ({
+        key,
+        label: resourceLabels[key],
+        icon: resourceIcons[key],
+    })),
+});
+const {
+    upgradingBuildingId,
+    roadBuildAmounts,
+    upgradeAvailabilityLabelFor,
+    roadBuildableAmountFor,
+    updateRoadBuildAmount,
+    upgradeBuilding,
+} = useGameBuildings({
+    resources: () => props.resources,
+    resourceRates: () => props.resourceRates,
+    predictionBaseMilliseconds: () => predictionBaseMilliseconds.value,
+    currentMilliseconds: () => serverTimeMilliseconds.value,
+    maxRoadBuildAmount: MAX_ROAD_BUILD_AMOUNT,
+    floorRoadAmount: false,
+});
+const {
+    toggleResourceNumber,
+    resourceNumberLabel,
+    resourceNumberTitle,
+} = useExpandableResourceNumbers();
+const {
+    currentAchievementUnlock,
+    achievementUnlockCount,
+    achievementUnlockPosition,
+    achievementUnlockButtonLabel,
+    advanceAchievementUnlockPopup,
+} = useAchievementUnlockQueue(() => props.achievementUnlocks);
+const {
+    activeMinigameResource,
+    selectedMinigameResource,
+    hasWonMinigame,
+    minigames,
+    selectedMinigame,
+    selectedMinigameResourceAmount,
+    isMinigameOpen,
+    openMinigame,
+    closeMinigame,
+    continueMinigame,
+    completeSelectedMinigame,
+} = useGameMinigames({
+    minigames: () => props.minigames,
+    resources: () => props.resources,
+    activeGameModal,
+    beforeOpen: () => {
+        isBuildingsOpen.value = false;
+        closeOfflineProgress();
+    },
+});
+const {
+    selectedLeaderboardKey,
+    leaderboards,
+    defaultLeaderboard,
+    selectedLeaderboard,
+    isLeaderboardModalOpen,
+    openLeaderboard,
+    closeLeaderboard,
+} = useGameLeaderboard({
+    leaderboards: () => props.leaderboards,
+    activeGameModal,
+    isBlocked: () => activeMinigameResource.value !== null,
+    beforeOpen: () => {
+        isBuildingsOpen.value = false;
+        closeOfflineProgress();
+        selectedMinigameResource.value = null;
+        hasWonMinigame.value = false;
+    },
+});
+const {
+    isSubmittingAlliance,
+    allianceOnlineUsers,
+    allianceOnlineUserIds,
+    isAllianceModalOpen,
+    isAllianceChatModalOpen,
+    openAlliance,
+    closeAlliance,
+    openAllianceChat,
+    closeAllianceChat,
+    searchAlliances,
+    createAlliance,
+    joinAlliance,
+    applyToAlliance,
+    updateAlliance,
+    acceptAllianceApplication,
+    denyAllianceApplication,
+    leaveAlliance,
+    disbandAlliance,
+    promoteAllianceMember,
+    demoteAllianceMember,
+    transferAllianceLeadership,
+    kickAllianceMember,
+    contributeAllianceGoal,
+    sendAllianceChatMessage,
+} = useGameAlliance({
+    alliances: () => props.alliances,
+    activeGameModal,
+    isBlocked: () => activeMinigameResource.value !== null,
+    beforeOpen: () => {
+        isBuildingsOpen.value = false;
+        closeOfflineProgress();
+        selectedMinigameResource.value = null;
+        hasWonMinigame.value = false;
+    },
+    beforeOpenChat: () => {
+        isBuildingsOpen.value = false;
+        closeOfflineProgress();
+        selectedMinigameResource.value = null;
+        hasWonMinigame.value = false;
+    },
+});
+
 const resourceCards = computed(() => [
     ...resourceDisplayOrder.map((key) => ({
         key,
@@ -215,46 +274,10 @@ const lifetimeResourceCards = computed(() => [
 const lifetimeTotalResources = computed(() =>
     getTotalResources(props.lifetimeResources),
 );
-const selectedMinigameResourceAmount = computed(() =>
-    selectedMinigame.value
-        ? props.resources[selectedMinigame.value.resource]
-        : 0,
-);
 const selectedMinigameComponent = computed(() =>
     selectedMinigame.value
         ? minigameComponents[selectedMinigame.value.resource]
         : null,
-);
-const defaultLeaderboard = computed<Leaderboard | null>(
-    () =>
-        leaderboards.value.find(
-            (leaderboard) => leaderboard.key === props.leaderboards.defaultKey,
-        ) ??
-        leaderboards.value[0] ??
-        null,
-);
-const selectedLeaderboard = computed<Leaderboard | null>(
-    () =>
-        leaderboards.value.find(
-            (leaderboard) => leaderboard.key === selectedLeaderboardKey.value,
-        ) ??
-        defaultLeaderboard.value ??
-        null,
-);
-const isMinigameOpen = computed(
-    () =>
-        activeGameModal.value === 'minigame' && selectedMinigame.value !== null,
-);
-const isLeaderboardModalOpen = computed(
-    () =>
-        activeGameModal.value === 'leaderboard' &&
-        selectedLeaderboard.value !== null,
-);
-const isAllianceModalOpen = computed(() => activeGameModal.value === 'alliance');
-const isAllianceChatModalOpen = computed(
-    () =>
-        activeGameModal.value === 'alliance-chat' &&
-        props.alliances.current !== null,
 );
 const isPrestigeConfirmModalOpen = computed(
     () => activeGameModal.value === 'prestige-confirm',
@@ -334,20 +357,6 @@ const weatherLocationUpdatedLabel = computed(() =>
 const weatherConditionLabel = computed(() =>
     getWeatherConditionLabel(props.weather.conditions),
 );
-const offlineProgressDurationLabel = computed(() =>
-    formatOfflineProgressDuration(props.offlineProgress?.elapsedHours ?? 0),
-);
-const offlineProgressResourceRows = computed(() =>
-    resourceDisplayOrder
-        .map((key) => ({
-            key,
-            label: resourceLabels[key],
-            amount: props.offlineProgress?.resources[key] ?? 0,
-            icon: resourceIcons[key],
-        }))
-        .filter((resource) => resource.amount > 0),
-);
-
 type OpenMeteoCurrentWeatherResponse = {
     current?: {
         time?: string;
@@ -358,8 +367,6 @@ type OpenMeteoCurrentWeatherResponse = {
 let serverTimeBaseMilliseconds = Date.now();
 let serverTimeClientStartedAt = Date.now();
 let serverTimeInterval: number | undefined;
-let staminaClockInterval: number | undefined;
-let staminaRefreshReloadTimeout: number | undefined;
 let clientWeatherRefreshTimeout: number | undefined;
 let lastRequestedWeatherRefreshSlotMilliseconds: number | undefined;
 
@@ -375,40 +382,6 @@ function syncServerTime() {
     predictionBaseMilliseconds.value = serverTimeBaseMilliseconds;
     serverTimeClientStartedAt = Date.now();
     serverTimeMilliseconds.value = serverTimeBaseMilliseconds;
-}
-
-function resetStaminaClock(): void {
-    const now = Date.now();
-
-    staminaClockStartedAtMilliseconds.value = now;
-    staminaClockMilliseconds.value = now;
-}
-
-function clearStaminaRefreshReloadTimeout(): void {
-    if (staminaRefreshReloadTimeout !== undefined) {
-        window.clearTimeout(staminaRefreshReloadTimeout);
-        staminaRefreshReloadTimeout = undefined;
-    }
-}
-
-function scheduleStaminaRefreshReload(): void {
-    clearStaminaRefreshReloadTimeout();
-
-    const nextRefreshSeconds = Math.min(
-        ...props.minigames
-            .map((minigame) => minigame.stamina.availableInSeconds)
-            .filter((seconds) => seconds > 0),
-    );
-
-    if (!Number.isFinite(nextRefreshSeconds)) {
-        return;
-    }
-
-    staminaRefreshReloadTimeout = window.setTimeout(() => {
-        router.reload({
-            only: ['minigames'],
-        });
-    }, (nextRefreshSeconds + 1) * 1000);
 }
 
 function formatServerDateTime(milliseconds: number): string {
@@ -428,140 +401,7 @@ function formatServerDateTime(milliseconds: number): string {
     return `${partValue('year')}-${partValue('month')}-${partValue('day')} ${partValue('hour')}:${partValue('minute')}:${partValue('second')}`;
 }
 
-function isResourceNumberExpanded(key: string): boolean {
-    return expandedResourceNumberKeys.value.has(key);
-}
-
-function toggleResourceNumber(key: string): void {
-    const nextExpandedKeys = new Set(expandedResourceNumberKeys.value);
-
-    if (nextExpandedKeys.has(key)) {
-        nextExpandedKeys.delete(key);
-    } else {
-        nextExpandedKeys.add(key);
-    }
-
-    expandedResourceNumberKeys.value = nextExpandedKeys;
-}
-
-function resourceNumberLabel(key: string, value: number): string {
-    return isResourceNumberExpanded(key)
-        ? formatExactNumber(value)
-        : formatGameNumber(value);
-}
-
-function resourceNumberTitle(key: string): string {
-    return isResourceNumberExpanded(key)
-        ? 'Show compact number'
-        : 'Show full number';
-}
-
-function formatOfflineProgressDuration(elapsedHours: number): string {
-    const days = Math.floor(elapsedHours / 24);
-    const hours = elapsedHours % 24;
-    const parts: string[] = [];
-
-    if (days > 0) {
-        parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
-    }
-
-    if (hours > 0 || parts.length === 0) {
-        parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
-    }
-
-    return parts.join(', ');
-}
-
-function upgradeAvailabilityLabelFor(building: Building): string | null {
-    const availability = upgradeAvailabilityFor(
-        building,
-        props.resources,
-        props.resourceRates,
-    );
-
-    if (availability === null) {
-        return null;
-    }
-
-    if (availability.hours === null || availability.hours <= 0) {
-        return availability.label;
-    }
-
-    const targetMilliseconds =
-        predictionBaseMilliseconds.value + availability.hours * 60 * 60_000;
-    const remainingHours = Math.ceil(
-        Math.max(0, targetMilliseconds - serverTimeMilliseconds.value) /
-            (60 * 60_000),
-    );
-
-    if (remainingHours <= 0) {
-        return 'Available now';
-    }
-
-    return `Available in ${formatHoursDuration(remainingHours)} (${formatUpgradeAvailableAt(targetMilliseconds)})`;
-}
-
-function formatUpgradeAvailableAt(milliseconds: number): string {
-    return new Intl.DateTimeFormat('en-GB', {
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    }).format(new Date(milliseconds));
-}
-
-function roadBuildableAmountFor(building: Building): number {
-    return affordableRoadAmount(
-        building,
-        props.resources,
-        MAX_ROAD_BUILD_AMOUNT,
-    );
-}
-
-function updateRoadBuildAmount(payload: {
-    buildingId: number;
-    amount: number;
-}): void {
-    roadBuildAmounts.value[payload.buildingId] = payload.amount;
-}
-
-function closeOfflineProgress() {
-    isOfflineProgressDismissed.value = true;
-}
-
-watch(
-    () => props.achievementUnlocks,
-    (achievementUnlocks) => {
-        if (
-            achievementUnlocks.length === 0 ||
-            achievementUnlockQueue.value.length > 0
-        ) {
-            return;
-        }
-
-        achievementUnlockQueue.value = [...achievementUnlocks];
-        activeAchievementUnlockIndex.value = 0;
-    },
-    { immediate: true },
-);
-
 watch(() => props.serverTime.iso, syncServerTime, { immediate: true });
-
-useAllianceChatEcho(currentAllianceId, () => {
-    router.reload({
-        only: ['alliances'],
-    });
-});
-
-watch(
-    () => props.minigames,
-    () => {
-        resetStaminaClock();
-        scheduleStaminaRefreshReload();
-    },
-    { immediate: true },
-);
 
 watch(
     () => [
@@ -583,10 +423,6 @@ onMounted(() => {
             (Date.now() - serverTimeClientStartedAt);
     }, 1000);
 
-    staminaClockInterval = window.setInterval(() => {
-        staminaClockMilliseconds.value = Date.now();
-    }, 1000);
-
     scheduleNextClientWeatherRefresh();
 });
 
@@ -595,20 +431,7 @@ onBeforeUnmount(() => {
         window.clearInterval(serverTimeInterval);
     }
 
-    if (staminaClockInterval !== undefined) {
-        window.clearInterval(staminaClockInterval);
-    }
-
-    clearStaminaRefreshReloadTimeout();
     clearClientWeatherRefreshTimeout();
-
-    if (allianceSearchReloadTimeout !== null) {
-        clearTimeout(allianceSearchReloadTimeout);
-    }
-
-    if (leaderboardReloadTimeout !== null) {
-        clearTimeout(leaderboardReloadTimeout);
-    }
 });
 
 function collectResources() {
@@ -914,96 +737,6 @@ function useDefaultWeatherLocation() {
     );
 }
 
-function completeMinigame(minigame: Minigame) {
-    router.post(
-        `/dashboard/minigames/${minigame.resource}/complete`,
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                activeMinigameResource.value = minigame.resource;
-            },
-            onSuccess: () => {
-                hasWonMinigame.value = true;
-            },
-            onError: (errors) => {
-                if (errors.minigame) {
-                    toast.error(errors.minigame);
-                }
-            },
-            onFinish: () => {
-                activeMinigameResource.value = null;
-            },
-        },
-    );
-}
-
-function openMinigame(minigame: Minigame) {
-    if (activeMinigameResource.value !== null || !minigame.stamina.isAvailable) {
-        return;
-    }
-
-    isBuildingsOpen.value = false;
-    closeOfflineProgress();
-    selectedMinigameResource.value = minigame.resource;
-    hasWonMinigame.value = false;
-    activeGameModal.value = 'minigame';
-}
-
-function closeMinigame() {
-    if (activeMinigameResource.value !== null) {
-        return;
-    }
-
-    selectedMinigameResource.value = null;
-    hasWonMinigame.value = false;
-
-    if (activeGameModal.value === 'minigame') {
-        activeGameModal.value = null;
-    }
-}
-
-function continueMinigame() {
-    hasWonMinigame.value = false;
-}
-
-function completeSelectedMinigame() {
-    if (!selectedMinigame.value) {
-        return;
-    }
-
-    completeMinigame(selectedMinigame.value);
-}
-
-function advanceAchievementUnlockPopup() {
-    if (activeAchievementUnlockIndex.value + 1 < achievementUnlockCount.value) {
-        activeAchievementUnlockIndex.value += 1;
-
-        return;
-    }
-
-    const seenAchievementUnlockIds = achievementUnlockQueue.value.map(
-        (achievementUnlock) => achievementUnlock.id,
-    );
-
-    achievementUnlockQueue.value = [];
-    activeAchievementUnlockIndex.value = 0;
-
-    if (seenAchievementUnlockIds.length === 0) {
-        return;
-    }
-
-    router.post(
-        '/dashboard/achievements/unlocks/seen',
-        {
-            ids: seenAchievementUnlockIds,
-        },
-        {
-            preserveScroll: true,
-        },
-    );
-}
-
 function openBuildings() {
     activeGameModal.value = null;
     closeOfflineProgress();
@@ -1012,71 +745,6 @@ function openBuildings() {
 
 function closeBuildings() {
     isBuildingsOpen.value = false;
-}
-
-function openAlliance() {
-    if (activeMinigameResource.value !== null) {
-        return;
-    }
-
-    isBuildingsOpen.value = false;
-    closeOfflineProgress();
-    selectedMinigameResource.value = null;
-    hasWonMinigame.value = false;
-    activeGameModal.value = 'alliance';
-    scheduleAllianceReload('');
-}
-
-function closeAlliance() {
-    if (activeGameModal.value === 'alliance') {
-        activeGameModal.value = null;
-    }
-}
-
-function openAllianceChat() {
-    if (
-        activeMinigameResource.value !== null ||
-        props.alliances.current === null
-    ) {
-        return;
-    }
-
-    isBuildingsOpen.value = false;
-    closeOfflineProgress();
-    selectedMinigameResource.value = null;
-    hasWonMinigame.value = false;
-    activeGameModal.value = 'alliance-chat';
-
-    if (shouldUseChatHttpFallback.value) {
-        router.reload({
-            only: ['alliances'],
-        });
-    }
-}
-
-function closeAllianceChat() {
-    if (activeGameModal.value === 'alliance-chat') {
-        activeGameModal.value = null;
-    }
-}
-
-function searchAlliances(query: string) {
-    scheduleAllianceReload(query);
-}
-
-function scheduleAllianceReload(query: string) {
-    if (allianceSearchReloadTimeout !== null) {
-        clearTimeout(allianceSearchReloadTimeout);
-    }
-
-    allianceSearchReloadTimeout = setTimeout(() => {
-        router.reload({
-            data: {
-                alliance_search: query.trim(),
-            },
-            only: ['alliances'],
-        });
-    }, 500);
 }
 
 function openPrestigeConfirm() {
@@ -1095,42 +763,6 @@ function closePrestigeConfirm() {
     if (activeGameModal.value === 'prestige-confirm') {
         activeGameModal.value = null;
     }
-}
-
-function openLeaderboard(leaderboardKey = defaultLeaderboard.value?.key) {
-    if (activeMinigameResource.value !== null) {
-        return;
-    }
-
-    isBuildingsOpen.value = false;
-    closeOfflineProgress();
-
-    if (leaderboardKey) {
-        selectedLeaderboardKey.value = leaderboardKey;
-    }
-
-    selectedMinigameResource.value = null;
-    hasWonMinigame.value = false;
-    activeGameModal.value = 'leaderboard';
-    scheduleLeaderboardReload();
-}
-
-function closeLeaderboard() {
-    if (activeGameModal.value === 'leaderboard') {
-        activeGameModal.value = null;
-    }
-}
-
-function scheduleLeaderboardReload() {
-    if (leaderboardReloadTimeout !== null) {
-        clearTimeout(leaderboardReloadTimeout);
-    }
-
-    leaderboardReloadTimeout = setTimeout(() => {
-        router.reload({
-            only: ['leaderboards'],
-        });
-    }, 500);
 }
 
 function closeActiveGameModal() {
@@ -1203,348 +835,6 @@ function confirmPrestige() {
     );
 }
 
-function createAlliance(payload: {
-    name: string;
-    description: string | null;
-    is_open: boolean;
-}) {
-    router.post('/alliances', payload, {
-        preserveScroll: true,
-        onStart: () => {
-            isSubmittingAlliance.value = true;
-        },
-        onError: (errors) => {
-            if (errors.alliance) {
-                toast.error(errors.alliance);
-            }
-        },
-        onFinish: () => {
-            isSubmittingAlliance.value = false;
-        },
-    });
-}
-
-function joinAlliance(allianceId: number) {
-    router.post(
-        `/alliances/${allianceId}/join`,
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function applyToAlliance(allianceId: number) {
-    router.post(
-        `/alliances/${allianceId}/apply`,
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function updateAlliance(payload: {
-    allianceId: number;
-    description?: string | null;
-    is_open?: boolean;
-}) {
-    router.patch(`/alliances/${payload.allianceId}`, payload, {
-        preserveScroll: true,
-        onStart: () => {
-            isSubmittingAlliance.value = true;
-        },
-        onError: (errors) => {
-            if (errors.alliance) {
-                toast.error(errors.alliance);
-            }
-        },
-        onFinish: () => {
-            isSubmittingAlliance.value = false;
-        },
-    });
-}
-
-function acceptAllianceApplication(payload: {
-    allianceId: number;
-    applicationId: number;
-}) {
-    router.patch(
-        `/alliances/${payload.allianceId}/applications/${payload.applicationId}/accept`,
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function denyAllianceApplication(payload: {
-    allianceId: number;
-    applicationId: number;
-}) {
-    router.delete(
-        `/alliances/${payload.allianceId}/applications/${payload.applicationId}`,
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function leaveAlliance(allianceId: number) {
-    router.delete(`/alliances/${allianceId}/leave`, {
-        preserveScroll: true,
-        onStart: () => {
-            isSubmittingAlliance.value = true;
-        },
-        onError: (errors) => {
-            if (errors.alliance) {
-                toast.error(errors.alliance);
-            }
-        },
-        onFinish: () => {
-            isSubmittingAlliance.value = false;
-        },
-    });
-}
-
-function disbandAlliance(allianceId: number) {
-    router.delete(`/alliances/${allianceId}`, {
-        preserveScroll: true,
-        onStart: () => {
-            isSubmittingAlliance.value = true;
-        },
-        onError: (errors) => {
-            if (errors.alliance) {
-                toast.error(errors.alliance);
-            }
-        },
-        onFinish: () => {
-            isSubmittingAlliance.value = false;
-        },
-    });
-}
-
-function promoteAllianceMember(payload: {
-    allianceId: number;
-    membershipId: number;
-}) {
-    router.patch(
-        `/alliances/${payload.allianceId}/members/${payload.membershipId}/promote`,
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function demoteAllianceMember(payload: {
-    allianceId: number;
-    membershipId: number;
-}) {
-    router.patch(
-        `/alliances/${payload.allianceId}/members/${payload.membershipId}/demote`,
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function transferAllianceLeadership(payload: {
-    allianceId: number;
-    membershipId: number;
-}) {
-    router.patch(
-        `/alliances/${payload.allianceId}/members/${payload.membershipId}/transfer-leadership`,
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function kickAllianceMember(payload: {
-    allianceId: number;
-    membershipId: number;
-}) {
-    router.delete(
-        `/alliances/${payload.allianceId}/members/${payload.membershipId}`,
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance) {
-                    toast.error(errors.alliance);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function contributeAllianceGoal(payload: {
-    goalId: number;
-    resource_type: ResourceKey;
-    amount: number;
-}) {
-    router.post(
-        `/alliance-goals/${payload.goalId}/contribute`,
-        {
-            resource_type: payload.resource_type,
-            amount: payload.amount,
-        },
-        {
-            preserveScroll: true,
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance_goal) {
-                    toast.error(errors.alliance_goal);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function sendAllianceChatMessage(payload: {
-    allianceId: number;
-    message: string;
-}) {
-    router.post(
-        `/alliances/${payload.allianceId}/chat-messages`,
-        {
-            message: payload.message,
-        },
-        {
-            preserveScroll: true,
-            only: ['alliances'],
-            onStart: () => {
-                isSubmittingAlliance.value = true;
-            },
-            onError: (errors) => {
-                if (errors.alliance_chat) {
-                    toast.error(errors.alliance_chat);
-                }
-            },
-            onFinish: () => {
-                isSubmittingAlliance.value = false;
-            },
-        },
-    );
-}
-
-function roadBuildAmount(building: Building): number {
-    const amount = Number(roadBuildAmounts.value[building.id] ?? 1);
-
-    if (!Number.isFinite(amount)) {
-        return 1;
-    }
-
-    return Math.min(MAX_ROAD_BUILD_AMOUNT, Math.max(1, amount));
-}
-
-function upgradeBuilding(building: Building) {
-    router.post(
-        `/dashboard/buildings/${building.id}/upgrade`,
-        {
-            amount: building.isRoad ? roadBuildAmount(building) : 1,
-        },
-        {
-            preserveScroll: true,
-            onStart: () => {
-                upgradingBuildingId.value = building.id;
-            },
-            onFinish: () => {
-                upgradingBuildingId.value = null;
-            },
-        },
-    );
-}
 </script>
 
 <template>
