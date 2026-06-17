@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
-//throttle values live in app\Providers\AppServiceProvider.php
+// throttle values live in app\Providers\AppServiceProvider.php
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');

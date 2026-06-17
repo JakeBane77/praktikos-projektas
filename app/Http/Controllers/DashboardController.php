@@ -434,5 +434,4 @@ class DashboardController extends Controller
             ->limit(80, '')
             ->toString();
     }
-
 }
