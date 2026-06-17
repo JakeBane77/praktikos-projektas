@@ -109,5 +109,92 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perHour(300)->by($key.':hour')->response($response),
             ];
         });
+
+        RateLimiter::for('weather-location', function (Request $request): Limit {
+            return Limit::perMinute(5)
+                ->by($this->rateLimiterKey($request, 'weather-location'))
+                ->response(
+                    $this->throttledRedirectResponse(
+                        'weather_location',
+                        'Weather location updates are being submitted too quickly. Please wait a moment.',
+                    ),
+                );
+        });
+
+        RateLimiter::for('alliance-membership', function (Request $request): Limit {
+            return Limit::perMinute(5)
+                ->by($this->rateLimiterKey($request, 'alliance-membership'))
+                ->response(
+                    $this->throttledRedirectResponse(
+                        'alliance',
+                        'Alliance join and application requests are being submitted too quickly. Please wait a moment.',
+                    ),
+                );
+        });
+
+        RateLimiter::for('alliance-create', function (Request $request): Limit {
+            return Limit::perMinutes(10, 3)
+                ->by($this->rateLimiterKey($request, 'alliance-create'))
+                ->response(
+                    $this->throttledRedirectResponse(
+                        'alliance',
+                        'Alliance creation requests are being submitted too quickly. Please wait a moment.',
+                    ),
+                );
+        });
+
+        RateLimiter::for('alliance-admin', function (Request $request): Limit {
+            return Limit::perMinute(10)
+                ->by($this->rateLimiterKey($request, 'alliance-admin'))
+                ->response(
+                    $this->throttledRedirectResponse(
+                        'alliance',
+                        'Alliance management actions are being submitted too quickly. Please wait a moment.',
+                    ),
+                );
+        });
+
+        RateLimiter::for('alliance-chat', function (Request $request): Limit {
+            return Limit::perMinute(30)
+                ->by($this->rateLimiterKey($request, 'alliance-chat'))
+                ->response(
+                    $this->throttledRedirectResponse(
+                        'alliance_chat',
+                        'Alliance chat messages are being submitted too quickly. Please wait a moment.',
+                    ),
+                );
+        });
+
+        RateLimiter::for('alliance-contribute', function (Request $request): Limit {
+            return Limit::perMinute(5)
+                ->by($this->rateLimiterKey($request, 'alliance-contribute'))
+                ->response(
+                    $this->throttledRedirectResponse(
+                        'alliance_goal',
+                        'Alliance goal contributions are being submitted too quickly. Please wait a moment.',
+                    ),
+                );
+        });
+    }
+
+    private function rateLimiterKey(Request $request, string $prefix): string
+    {
+        $user = $request->user();
+
+        return implode(':', [
+            $prefix,
+            $user instanceof User ? (string) $user->id : $request->ip(),
+            $request->route()?->getName() ?? 'unknown',
+        ]);
+    }
+
+    private function throttledRedirectResponse(string $errorKey, string $message): \Closure
+    {
+        return fn (Request $request, array $headers) => redirect()
+            ->to(url()->previous(route('dashboard')))
+            ->withErrors([
+                $errorKey => $message,
+            ])
+            ->withHeaders($headers);
     }
 }
