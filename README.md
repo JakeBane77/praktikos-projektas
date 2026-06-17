@@ -86,7 +86,7 @@ If you are not on Windows, use:
 cp .env.example .env
 ```
 
-3. Generate the app key and create the storage symlink:
+3. Generate an application key and create the storage symlink:
 
 ```bash
 php artisan key:generate
@@ -139,18 +139,18 @@ This starts:
 - Reverb websocket server
 - Vite dev server
 
-Open the app at:
-
-```text
-http://localhost:8000
-```
-
 6. Run migrations and seed base game data:
 
 Run:
 
 ```bash
 php artisan migrate --seed
+```
+
+7. Open the app at:
+
+```text
+http://localhost:8000
 ```
 
 ## Docker Setup With Sail
@@ -174,10 +174,10 @@ If you are not on Windows, use:
 cp .env.docker.example .env
 ```
 
-3. Generate an application key and place it into `.env`:
+3. Generate an application key:
 
 ```bash
-php artisan key:generate --show
+php artisan key:generate
 ```
 
 4. Start Sail:
