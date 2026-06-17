@@ -122,7 +122,7 @@ DB_CONNECTION=sqlite
 Also make sure `APP_URL` matches the local template:
 
 ```env
-APP_URL=http://localhost:80
+APP_URL=http://localhost:8000
 ```
 
 5. Start the local development stack:
@@ -142,7 +142,7 @@ This starts:
 Open the app at:
 
 ```text
-http://localhost:80
+http://localhost:8000
 ```
 
 6. Run migrations and seed base game data:
@@ -221,7 +221,7 @@ Use `.env.example` as the base for local development.
 
 Important values:
 
-- `APP_URL=http://localhost:80`
+- `APP_URL=http://localhost:8000`
 - local DB credentials
 - `BROADCAST_CONNECTION=reverb`
 - `REVERB_HOST=127.0.0.1`
@@ -234,7 +234,7 @@ Use `.env.docker.example` as the base for Docker.
 
 Important difference:
 
-- `APP_URL=http://localhost:80`
+- `APP_URL=http://localhost:8000`
 - `REVERB_HOST=reverb` is used inside containers
 - `VITE_REVERB_HOST=localhost` is used by the browser
 

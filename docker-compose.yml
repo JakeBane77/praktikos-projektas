@@ -1,5 +1,21 @@
 # For more information: https://laravel.com/docs/sail
 services:
+    frontend-build:
+        build:
+            context: ./vendor/laravel/sail/runtimes/8.4
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP:-1000}'
+        image: sail-8.4/app
+        environment:
+            WWWUSER: '${WWWUSER:-1337}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        command: /bin/bash -lc "if [ ! -d node_modules ]; then npm install; fi && npm run build"
+
     laravel.test:
         build:
             context: ./vendor/laravel/sail/runtimes/8.4
@@ -23,6 +39,8 @@ services:
         networks:
             - sail
         depends_on:
+            frontend-build:
+                condition: service_completed_successfully
             mysql:
                 condition: service_healthy
 
