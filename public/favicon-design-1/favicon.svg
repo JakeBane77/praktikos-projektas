@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Kingdom Idle favicon">
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="#192b44"/>
+  <ellipse cx="256" cy="440" rx="216" ry="100" fill="#122134"/>
+  <rect x="92" y="382" width="328" height="53" fill="#4e9d56"/>
+  <rect x="128" y="260" width="256" height="130" rx="18" fill="#d5dce5" stroke="#7f8b99" stroke-width="8"/>
+  <rect x="112" y="210" width="78" height="180" rx="16" fill="#d5dce5" stroke="#7f8b99" stroke-width="8"/>
+  <rect x="322" y="210" width="78" height="180" rx="16" fill="#d5dce5" stroke="#7f8b99" stroke-width="8"/>
+  <rect x="205" y="170" width="102" height="220" rx="18" fill="#d5dce5" stroke="#7f8b99" stroke-width="8"/>
+  <g fill="#d5dce5" stroke="#7f8b99" stroke-width="5">
+    <rect x="116" y="182" width="15" height="38"/>
+    <rect x="142" y="182" width="15" height="38"/>
+    <rect x="168" y="182" width="15" height="38"/>
+    <rect x="210" y="142" width="17" height="38"/>
+    <rect x="235" y="142" width="17" height="38"/>
+    <rect x="260" y="142" width="17" height="38"/>
+    <rect x="285" y="142" width="17" height="38"/>
+    <rect x="326" y="182" width="15" height="38"/>
+    <rect x="352" y="182" width="15" height="38"/>
+    <rect x="378" y="182" width="15" height="38"/>
+  </g>
+  <polygon points="236,390 276,390 330,462 182,462" fill="#b27b24"/>
+  <polygon points="246,390 266,390 296,450 216,450" fill="#f5be46"/>
+  <path d="M226 390v-58c0-20 13-32 30-32s30 12 30 32v58z" fill="#0f1a2b"/>
+  <line x1="256" y1="302" x2="256" y2="390" stroke="#0a121c" stroke-width="4"/>
+  <rect x="138" y="259" width="26" height="41" rx="9" fill="#f5be46"/>
+  <rect x="348" y="259" width="26" height="41" rx="9" fill="#f5be46"/>
+  <rect x="243" y="219" width="26" height="41" rx="9" fill="#f5be46"/>
+  <polygon points="256,66 269,94 299,96 276,116 284,145 256,130 228,145 236,116 213,96 243,94" fill="#f5be46"/>
+</svg>
